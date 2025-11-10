@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure;
 
+require_once __DIR__ . '/../lib/FirebaseJWT/JWTExceptionWithPayloadInterface.php';
 require_once __DIR__ . '/../lib/FirebaseJWT/JWT.php';
 require_once __DIR__ . '/../lib/FirebaseJWT/Key.php';
 require_once __DIR__ . '/../lib/FirebaseJWT/ExpiredException.php';
