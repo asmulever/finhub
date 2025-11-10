@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../src/Infrastructure/Config.php';
-require_once __DIR__ . '/../src/Infrastructure/DatabaseConnection.php';
-require_once __DIR__ . '/../src/Domain/UserRepository.php';
-require_once __DIR__ . '/../src/Infrastructure/MysqlUserRepository.php';
-require_once __DIR__ . '/../src/Domain/FinancialObjectRepository.php';
-require_once __DIR__ . '/../src/Infrastructure/MysqlFinancialObjectRepository.php';
-require_once __DIR__ . '/../src/Infrastructure/JwtService.php';
-require_once __DIR__ . '/../src/Application/AuthService.php';
-require_once __DIR__ . '/../src/Application/FinancialObjectService.php';
-require_once __DIR__ . '/../src/Interfaces/AuthController.php';
-require_once __DIR__ . '/../src/Interfaces/FinancialObjectController.php';
-require_once __DIR__ . '/../src/Domain/User.php';
-require_once __DIR__ . '/../src/Domain/FinancialObject.php';
+require_once __DIR__ . '/../App/Infrastructure/Config.php';
+require_once __DIR__ . '/../App/Infrastructure/DatabaseConnection.php';
+require_once __DIR__ . '/../App/Domain/UserRepository.php';
+require_once __DIR__ . '/../App/Infrastructure/MysqlUserRepository.php';
+require_once __DIR__ . '/../App/Domain/FinancialObjectRepository.php';
+require_once __DIR__ . '/../App/Infrastructure/MysqlFinancialObjectRepository.php';
+require_once __DIR__ . '/../App/Infrastructure/JwtService.php';
+require_once __DIR__ . '/../App/Application/AuthService.php';
+require_once __DIR__ . '/../App/Application/FinancialObjectService.php';
+require_once __DIR__ . '/../App/Interfaces/AuthController.php';
+require_once __DIR__ . '/../App/Interfaces/FinancialObjectController.php';
+require_once __DIR__ . '/../App/Domain/User.php';
+require_once __DIR__ . '/../App/Domain/FinancialObject.php';
 
 use App\Application\AuthService;
 use App\Application\FinancialObjectService;
