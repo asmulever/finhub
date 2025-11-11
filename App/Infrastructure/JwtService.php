@@ -16,8 +16,11 @@ use Firebase\JWT\Key;
 
 class JwtService
 {
+    private Logger $logger;
+
     public function __construct(private readonly string $secretKey)
     {
+        $this->logger = new Logger();
     }
 
     public function generateToken(array $payload): string
@@ -29,14 +32,19 @@ class JwtService
             'exp' => $expirationTime,
         ]);
 
-        return JWT::encode($payload, $this->secretKey, 'HS256');
+        $token = JWT::encode($payload, $this->secretKey, 'HS256');
+        $this->logger->info('JWT generated for user ID: ' . ($payload['uid'] ?? 'unknown'));
+        return $token;
     }
 
     public function validateToken(string $token): ?object
     {
         try {
-            return JWT::decode($token, new Key($this->secretKey, 'HS256'));
+            $decoded = JWT::decode($token, new Key($this->secretKey, 'HS256'));
+            $this->logger->info('JWT validated successfully for user ID: ' . ($decoded->uid ?? 'unknown'));
+            return $decoded;
         } catch (\Exception $e) {
+            $this->logger->error('JWT validation failed: ' . $e->getMessage());
             return null;
         }
     }

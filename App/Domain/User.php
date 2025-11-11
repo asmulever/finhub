@@ -7,13 +7,19 @@ namespace App\Domain;
 class User
 {
     public function __construct(
-        private readonly int $id,
+        private readonly string $id,
         private readonly string $email,
-        private readonly string $password
+        private readonly string $password,
+        private readonly string $role,
     ) {
     }
 
-    public function getId(): int
+    public function getRole(): string
+    {
+        return $this->role;
+    }
+
+    public function getId(): string
     {
         return $this->id;
     }
@@ -23,8 +29,8 @@ class User
         return $this->email;
     }
 
-    public function verifyPassword(string $password): bool
+    public function getPassword(): string
     {
-        return password_verify($password, $this->password);
+        return $this->password;
     }
 }
