@@ -19,7 +19,7 @@ class User
         return $this->role;
     }
 
-    public function getId(): int
+    public function getId(): string
     {
         return $this->id;
     }
@@ -29,8 +29,8 @@ class User
         return $this->email;
     }
 
-    public function verifyPassword(string $password): bool
+    public function getPassword(): string
     {
-        return password_verify($password, $this->password);
+        return $this->password;
     }
 }

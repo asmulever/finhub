@@ -21,12 +21,14 @@ class DatabaseConnection
             $pass = Config::get('DB_PASSWORD');
 
             $dsn = "mysql:host=$host;port=$port;dbname=$db;charset=utf8mb4";
+            $logger = new Logger();
 
             try {
                 self::$instance = new PDO($dsn, $user, $pass);
                 self::$instance->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+                $logger->info("Database connection to $db at $host established successfully.");
             } catch (PDOException $e) {
-                // In a real application, you would log this error
+                $logger->error("Database connection failed: " . $e->getMessage());
                 throw new \RuntimeException($e->getMessage());
             }
         }
