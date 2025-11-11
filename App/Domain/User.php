@@ -7,7 +7,7 @@ namespace App\Domain;
 class User
 {
     public function __construct(
-        private readonly int $id,
+        private readonly string $id,
         private readonly string $email,
         private readonly string $password,
         private readonly string $role,
