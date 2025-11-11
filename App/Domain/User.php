@@ -19,7 +19,7 @@ class User
         return $this->role;
     }
 
-    public function getId(): string
+    public function getId(): int
     {
         return $this->id;
     }
