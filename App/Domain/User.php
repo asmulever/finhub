@@ -9,8 +9,14 @@ class User
     public function __construct(
         private readonly int $id,
         private readonly string $email,
-        private readonly string $password
+        private readonly string $password,
+        private readonly string $role,
     ) {
+    }
+
+    public function getRole(): string
+    {
+        return $this->role;
     }
 
     public function getId(): int
