@@ -19,7 +19,7 @@ class MysqlUserRepository implements UserRepository
 
     public function findByEmail(string $email): ?User
     {
-        $stmt = $this->db->prepare('SELECT id, email, password FROM users WHERE email = :email');
+        $stmt = $this->db->prepare('SELECT id, email, password_hash AS password, role FROM users WHERE email = :email LIMIT 1');
         $stmt->execute(['email' => $email]);
         $data = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -27,6 +27,6 @@ class MysqlUserRepository implements UserRepository
             return null;
         }
 
-        return new User($data['id'], $data['email'], $data['password']);
+        return new User($data['id'], $data['email'], $data['password'], $data['role']);
     }
 }
