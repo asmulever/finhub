@@ -6,35 +6,29 @@ namespace App\Infrastructure;
 
 class Logger
 {
-    private const LOG_FILE = __DIR__ . '/../../../logs/app.log';
+    private string $logFile;
 
-    public function __construct()
+    public function __construct(?string $logFile = null)
     {
-        $logDir = dirname(self::LOG_FILE);
-        if (!is_dir($logDir)) {
-            mkdir($logDir, 0755, true);
-        }
+        // En InfinityFree: /tmp/ siempre es escribible
+        $this->logFile = $logFile ?? '/tmp/app.log';
     }
 
     public function info(string $message): void
     {
-        $this->log('INFO', $message);
-    }
-
-    public function warning(string $message): void
-    {
-        $this->log('WARNING', $message);
+        $this->write('INFO', $message);
     }
 
     public function error(string $message): void
     {
-        $this->log('ERROR', $message);
+        $this->write('ERROR', $message);
     }
 
-    private function log(string $level, string $message): void
+    private function write(string $level, string $message): void
     {
-        $timestamp = date('c'); // ISO 8601 format
-        $logEntry = sprintf("[%s] [%s] %s\n", $timestamp, $level, $message);
-        file_put_contents(self::LOG_FILE, $logEntry, FILE_APPEND);
+        $date = date('Y-m-d H:i:s');
+        $line = "[$date] [$level] $message" . PHP_EOL;
+
+        file_put_contents($this->logFile, $line, FILE_APPEND);
     }
 }
