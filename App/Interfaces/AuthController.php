@@ -18,7 +18,15 @@ class AuthController
 
     public function validate(): void
     {
-        $input = json_decode(file_get_contents('php://input'), true);
+        $rawInput = file_get_contents('php://input');
+        $input = json_decode($rawInput, true);
+
+        if (!is_array($input)) {
+            $this->logger->warning("Invalid JSON payload for auth validation.");
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid JSON']);
+            return;
+        }
 
         $this->logger->info("Received validation request.");
         $token = $input['token'] ?? null;
@@ -27,16 +35,17 @@ class AuthController
 
         if ($token) {
             $this->logger->info("Validating token.");
-            $isValid = $this->authService->validateToken($token);
-            if ($isValid) {
+            $payload = $this->authService->decodeToken($token);
+            if ($payload !== null) {
                 $this->logger->info("Token validation successful.");
                 http_response_code(200);
-                echo json_encode(['status' => 'valid_token']);
-            } else {
-                $this->logger->warning("Token validation failed.");
-                http_response_code(401);
-                echo json_encode(['status' => 'invalid_token']);
+                echo json_encode(['status' => 'valid_token', 'payload' => $payload]);
+                return;
             }
+
+            $this->logger->warning("Token validation failed.");
+            http_response_code(401);
+            echo json_encode(['status' => 'invalid_token']);
             return;
         }
 

@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace App\Interfaces;
 
-use App\Application\FinancialObjectService;
+use App\Application\UserService;
 use App\Infrastructure\JwtService;
 use App\Infrastructure\Logger;
 
-class FinancialObjectController
+class UserController
 {
     private Logger $logger;
 
     public function __construct(
-        private readonly FinancialObjectService $financialObjectService,
+        private readonly UserService $userService,
         private readonly JwtService $jwtService
     ) {
         $this->logger = new Logger();
@@ -21,22 +21,18 @@ class FinancialObjectController
 
     public function list(): void
     {
-        $payload = $this->authorize();
-        if ($payload === null) {
+        if ($this->authorizeAdmin() === null) {
             return;
         }
 
-        $this->logger->info("Authorization successful. Fetching financial objects for user {$payload->uid}.");
-        $objects = $this->financialObjectService->getAllFinancialObjects();
+        $users = $this->userService->getAllUsers();
         http_response_code(200);
-        echo json_encode($objects);
-        $this->logger->info("Successfully returned " . count($objects) . " financial objects.");
+        echo json_encode($users);
     }
 
     public function create(): void
     {
-        $payload = $this->authorize(requireAdmin: true);
-        if ($payload === null) {
+        if ($this->authorizeAdmin() === null) {
             return;
         }
 
@@ -45,10 +41,10 @@ class FinancialObjectController
             return;
         }
 
-        $created = $this->financialObjectService->createFinancialObject($input);
+        $created = $this->userService->createUser($input);
         if ($created === null) {
             http_response_code(400);
-            echo json_encode(['error' => 'Invalid financial object data']);
+            echo json_encode(['error' => 'Invalid user data']);
             return;
         }
 
@@ -58,8 +54,7 @@ class FinancialObjectController
 
     public function update(int $id): void
     {
-        $payload = $this->authorize(requireAdmin: true);
-        if ($payload === null) {
+        if ($this->authorizeAdmin() === null) {
             return;
         }
 
@@ -68,38 +63,37 @@ class FinancialObjectController
             return;
         }
 
-        if ($this->financialObjectService->updateFinancialObject($id, $input)) {
+        if ($this->userService->updateUser($id, $input)) {
             http_response_code(200);
             echo json_encode(['status' => 'updated']);
             return;
         }
 
         http_response_code(400);
-        echo json_encode(['error' => 'Unable to update financial object']);
+        echo json_encode(['error' => 'Unable to update user']);
     }
 
     public function delete(int $id): void
     {
-        $payload = $this->authorize(requireAdmin: true);
-        if ($payload === null) {
+        if ($this->authorizeAdmin() === null) {
             return;
         }
 
-        if ($this->financialObjectService->deleteFinancialObject($id)) {
+        if ($this->userService->deleteUser($id)) {
             http_response_code(204);
             return;
         }
 
         http_response_code(400);
-        echo json_encode(['error' => 'Unable to delete financial object']);
+        echo json_encode(['error' => 'Unable to delete user']);
     }
 
-    private function authorize(bool $requireAdmin = false): ?object
+    private function authorizeAdmin(): ?object
     {
-        $this->logger->info("Authorizing request for financial objects.");
+        $this->logger->info("Authorizing admin request.");
         $authHeader = $this->getAuthorizationHeader();
 
-        if ($authHeader === null || !preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
+        if ($authHeader === null || !preg_match('/Bearer\\s(\\S+)/', $authHeader, $matches)) {
             $this->logger->warning("Unauthorized access attempt: missing or malformed Authorization header.");
             http_response_code(401);
             echo json_encode(['error' => 'Unauthorized']);
@@ -115,7 +109,7 @@ class FinancialObjectController
             return null;
         }
 
-        if ($requireAdmin && (($payload->role ?? '') !== 'admin')) {
+        if (($payload->role ?? '') !== 'admin') {
             $this->logger->warning("Forbidden operation for user {$payload->uid}, requires admin.");
             http_response_code(403);
             echo json_encode(['error' => 'Forbidden']);

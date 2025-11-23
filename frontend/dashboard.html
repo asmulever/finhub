@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Finhub | Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="dashboard-shell">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-3">
+    <a class="navbar-brand fw-semibold" href="#">Finhub Suite</a>
+    <div class="ms-auto d-flex align-items-center gap-3">
+      <div class="text-light text-end">
+        <div class="fw-semibold" id="userName">Usuario</div>
+        <small id="sessionCountdown" class="text-secondary"></small>
+      </div>
+      <button class="btn btn-outline-light btn-sm" id="extendSession">Extender sesión</button>
+      <button class="btn btn-primary btn-sm" id="logoutBtn">Cerrar sesión</button>
+    </div>
+  </nav>
+  <div class="container-fluid">
+    <div class="row">
+      <aside class="col-md-3 col-lg-2 sidebar p-3">
+        <h6 class="text-uppercase text-white-50 mb-3">Menú principal</h6>
+        <nav class="nav flex-column gap-1" id="mainNav">
+          <a href="#" class="nav-link active" data-section="overview">Resumen</a>
+          <a href="#" class="nav-link" data-section="users" data-role="admin">Usuarios</a>
+          <a href="#" class="nav-link" data-section="tickers">Ticker's</a>
+          <a href="#" class="nav-link" data-section="portfolio">Portafolio</a>
+        </nav>
+      </aside>
+      <main class="col-md-9 col-lg-10 content-area">
+        <section id="section-overview" class="dashboard-section active">
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+              <h3 class="mb-0">Bienvenido al panel</h3>
+              <p class="text-muted mb-0">Extiende esta vista para tus módulos internos.</p>
+            </div>
+            <span class="badge text-bg-light" id="tokenPreview">Token activo</span>
+          </div>
+          <div class="row g-4">
+            <div class="col-md-4">
+              <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                  <h6 class="text-uppercase text-muted">Usuarios</h6>
+                  <p class="display-6 fw-bold mb-0" id="usersMetric">--</p>
+                  <small class="text-muted">Total visibles</small>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                  <h6 class="text-uppercase text-muted">Ticker's</h6>
+                  <p class="display-6 fw-bold mb-0" id="foMetric">--</p>
+                  <small class="text-muted">Registros actuales</small>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                  <h6 class="text-uppercase text-muted">Estado</h6>
+                  <p class="display-6 fw-bold mb-0 text-success" id="healthStatus">--</p>
+                  <small class="text-muted">Última verificación</small>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card mt-4 shadow-sm border-0">
+            <div class="card-body">
+              <h5>Módulos futuros</h5>
+              <p class="text-muted mb-0">
+                Agrega nuevas pantallas invocando APIs internas con Bootstrap por CDN.
+                Esta sección sirve como contenedor para tableros, tablas o gráficos.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section id="section-users" class="dashboard-section">
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+              <h3 class="mb-0">Gestión de usuarios</h3>
+              <p class="text-muted mb-0">CRUD completo disponible solo para administradores.</p>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" id="userFormReset">Nuevo usuario</button>
+          </div>
+          <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+              <form id="userForm" class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label">Email</label>
+                  <input type="email" class="form-control" id="userEmail" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Password</label>
+                  <input type="password" class="form-control" id="userPassword" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Rol</label>
+                  <select id="userRole" class="form-select">
+                    <option value="admin">admin</option>
+                    <option value="user">user</option>
+                  </select>
+                </div>
+                <div class="col-12 d-flex gap-2">
+                  <button class="btn btn-primary" type="submit" id="userSaveBtn">Guardar usuario</button>
+                  <div class="text-muted" id="userFormStatus"></div>
+                </div>
+              </form>
+            </div>
+          </div>
+          <div class="card shadow-sm border-0">
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Email</th>
+                      <th>Rol</th>
+                      <th class="text-end">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="usersTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="section-tickers" class="dashboard-section">
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+              <h3 class="mb-0">Ticker's</h3>
+              <p class="text-muted mb-0">Administra tus instrumentos financieros.</p>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" id="tickerFormReset">Nuevo ticker</button>
+          </div>
+          <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+              <form id="tickerForm" class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label">Nombre</label>
+                  <input type="text" class="form-control" id="tickerName" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Símbolo</label>
+                  <input type="text" class="form-control" id="tickerSymbol" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Tipo</label>
+                  <input type="text" class="form-control" id="tickerType" placeholder="stock / etf / crypto" required>
+                </div>
+                <div class="col-12 d-flex gap-2">
+                  <button class="btn btn-primary" type="submit" id="tickerSaveBtn">Guardar ticker</button>
+                  <div class="text-muted" id="tickerFormStatus"></div>
+                </div>
+              </form>
+            </div>
+          </div>
+          <div class="card shadow-sm border-0">
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Nombre</th>
+                      <th>Símbolo</th>
+                      <th>Tipo</th>
+                      <th class="text-end">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tickersTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="section-portfolio" class="dashboard-section">
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+              <h3 class="mb-0">Portafolio</h3>
+              <p class="text-muted mb-0">Selecciona ticker's por usuario y amplía la cartera.</p>
+            </div>
+          </div>
+          <div class="row g-4">
+            <div class="col-lg-6">
+              <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                  <div class="mb-3">
+                    <label class="form-label">Usuario</label>
+                    <select id="portfolioUserSelect" class="form-select"></select>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Ticker existente</label>
+                    <div class="input-group">
+                      <select id="portfolioTickerSelect" class="form-select"></select>
+                      <button class="btn btn-primary" id="addTickerToPortfolio">Agregar al portafolio</button>
+                    </div>
+                  </div>
+                  <div>
+                    <h6 class="text-uppercase text-muted">Ticker's en portafolio</h6>
+                    <div id="portfolioList" class="portfolio-list d-flex flex-wrap gap-2"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                  <h5 class="mb-3">Agregar nuevo ticker al catálogo</h5>
+                  <form id="portfolioNewTickerForm" class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label">Nombre</label>
+                      <input type="text" class="form-control" id="portfolioTickerName" required>
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label">Símbolo</label>
+                      <input type="text" class="form-control" id="portfolioTickerSymbol" required>
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label">Tipo</label>
+                      <input type="text" class="form-control" id="portfolioTickerType" required>
+                    </div>
+                    <div class="col-12 d-flex gap-2">
+                      <button class="btn btn-outline-primary" type="submit">Crear y agregar</button>
+                      <div class="text-muted" id="portfolioTickerStatus"></div>
+                    </div>
+                  </form>
+                  <small class="text-muted">Al eliminar desde esta vista solo se quita la relación del portafolio. Para borrar o editar un ticker ve a la sección Ticker's.</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js"></script>
+  <script src="js/session.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

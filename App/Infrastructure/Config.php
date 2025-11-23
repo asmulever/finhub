@@ -19,17 +19,23 @@ class Config
 
     private static function load(): void
     {
-        $lines = file(__DIR__ . '/../../.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        foreach ($lines as $line) {
-            if (strpos(trim($line), '#') === 0) {
-                continue;
+        $envFile = dirname(__DIR__, 2) . '/.env';
+
+        if (file_exists($envFile)) {
+            $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach ($lines as $line) {
+                if (strpos(trim($line), '#') === 0) {
+                    continue;
+                }
+
+                [$name, $value] = explode('=', $line, 2);
+                $name = trim($name);
+                $value = trim($value);
+
+                self::$instance[$name] = $value;
+                // Make values available to getenv for downstream consumers
+                putenv("{$name}={$value}");
             }
-
-            list($name, $value) = explode('=', $line, 2);
-            $name = trim($name);
-            $value = trim($value);
-
-            self::$instance[$name] = $value;
         }
     }
 }

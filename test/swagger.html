@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Finhub Docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@3/swagger-ui.css">
+  <style>
+    :root {
+      --bg: #0b1021;
+      --panel: #11172c;
+      --accent: #00c6ff;
+      --accent2: #7c5dff;
+      --text: #e9edf6;
+      --muted: #9aa3b5;
+      --success: #42d392;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 32px 16px 12px;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      letter-spacing: 0.4px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .pill {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #0b1021;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+    p.description {
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.4;
+    }
+    .token-form {
+      margin-top: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .token-input {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .token-input input {
+      flex: 1;
+      min-width: 220px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(15,20,39,0.7);
+      color: var(--text);
+      font-size: 14px;
+    }
+    .token-input button {
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+    .token-input button:hover { opacity: 0.9; }
+    .token-input button[type="submit"] {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #0b1021;
+    }
+    .token-input .ghost {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .token-status.success { color: var(--success); }
+    .swagger-shell {
+      flex: 1;
+      background: #fff;
+      border-radius: 18px 18px 0 0;
+      padding: 24px 16px 32px;
+      box-shadow: 0 -4px 25px rgba(0, 0, 0, 0.35);
+    }
+    #swagger-ui {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Finhub API <span class="pill">Swagger</span></h1>
+    <p class="description">
+      Documentación oficial de los endpoints protegidos con JWT. Ingresa tu token para habilitar las llamadas protegidas.
+    </p>
+    <form id="token-form" class="token-form">
+      <label for="tokenField">Token JWT</label>
+      <div class="token-input">
+        <input id="tokenField" type="text" placeholder="Bearer eyJhbGciOi..." autocomplete="off">
+        <button type="submit">Aplicar token</button>
+        <button type="button" id="clearToken" class="ghost">Limpiar</button>
+      </div>
+      <small id="tokenStatus" class="token-status muted"></small>
+    </form>
+  </header>
+  <div class="swagger-shell">
+    <div id="swagger-ui"></div>
+  </div>
+
+  <script src="https://unpkg.com/swagger-ui-dist@3/swagger-ui-bundle.js"></script>
+  <script src="https://unpkg.com/swagger-ui-dist@3/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.onload = function () {
+      const ui = SwaggerUIBundle({
+        url: "/swagger.json",
+        dom_id: "#swagger-ui",
+        deepLinking: true,
+        persistAuthorization: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [
+          SwaggerUIBundle.plugins.DownloadUrl
+        ],
+        layout: "StandaloneLayout",
+      });
+      window.ui = ui;
+
+      const form = document.getElementById("token-form");
+      const tokenField = document.getElementById("tokenField");
+      const clearBtn = document.getElementById("clearToken");
+      const status = document.getElementById("tokenStatus");
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const raw = tokenField.value.trim();
+        if (!raw) {
+          status.textContent = "Proporciona un token JWT válido.";
+          status.classList.remove("success");
+          return;
+        }
+        const bearer = raw.toLowerCase().startsWith("bearer ") ? raw : `Bearer ${raw}`;
+        try {
+          window.ui?.authActions?.authorize({
+            bearerAuth: { value: bearer }
+          });
+          status.textContent = "Token aplicado. Swagger enviará el encabezado Authorization automáticamente.";
+          status.classList.add("success");
+        } catch (err) {
+          console.error(err);
+          status.textContent = "No fue posible aplicar el token. Verifica el formato.";
+          status.classList.remove("success");
+        }
+      });
+
+      clearBtn.addEventListener("click", () => {
+        tokenField.value = "";
+        status.textContent = "Token limpiado. Las llamadas protegidas volverán a requerir autenticación.";
+        status.classList.remove("success");
+        window.ui?.authActions?.logoutAll();
+      });
+    };
+  </script>
+</body>
+</html>
