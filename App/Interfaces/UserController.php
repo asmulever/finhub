@@ -91,17 +91,16 @@ class UserController
     private function authorizeAdmin(): ?object
     {
         $this->logger->info("Authorizing admin request.");
-        $authHeader = $this->getAuthorizationHeader();
+        $token = $this->getAccessToken();
 
-        if ($authHeader === null || !preg_match('/Bearer\\s(\\S+)/', $authHeader, $matches)) {
-            $this->logger->warning("Unauthorized access attempt: missing or malformed Authorization header.");
+        if ($token === null) {
+            $this->logger->warning("Unauthorized access attempt: missing token.");
             http_response_code(401);
             echo json_encode(['error' => 'Unauthorized']);
             return null;
         }
 
-        $token = $matches[1];
-        $payload = $this->jwtService->validateToken($token);
+        $payload = $this->jwtService->validateToken($token, 'access');
         if ($payload === null) {
             $this->logger->warning("Unauthorized access attempt: invalid token.");
             http_response_code(401);
@@ -134,7 +133,7 @@ class UserController
         return $input;
     }
 
-    private function getAuthorizationHeader(): ?string
+    private function getAccessToken(): ?string
     {
         $candidates = [
             $_SERVER['HTTP_AUTHORIZATION'] ?? null,
@@ -142,8 +141,8 @@ class UserController
         ];
 
         foreach ($candidates as $value) {
-            if (is_string($value) && $value !== '') {
-                return trim($value);
+            if (is_string($value) && $value !== '' && preg_match('/Bearer\\s(\\S+)/', $value, $matches)) {
+                return $matches[1];
             }
         }
 
@@ -152,11 +151,16 @@ class UserController
             $headers = $headerFetcher();
             if (is_array($headers)) {
                 foreach ($headers as $name => $value) {
-                    if (strcasecmp($name, 'Authorization') === 0) {
-                        return trim((string)$value);
+                    if (strcasecmp($name, 'Authorization') === 0 && preg_match('/Bearer\\s(\\S+)/', (string)$value, $matches)) {
+                        return $matches[1];
                     }
                 }
             }
+        }
+
+        $cookieToken = $_COOKIE['access_token'] ?? null;
+        if (is_string($cookieToken) && $cookieToken !== '') {
+            return $cookieToken;
         }
 
         return null;
