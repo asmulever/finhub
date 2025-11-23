@@ -33,9 +33,10 @@ document.addEventListener("DOMContentLoaded", () => {
     loginBtn.textContent = "Validando...";
 
     try {
-      const response = await fetch(`${API_BASE}/auth/validate`, {
+      const response = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({
           email: emailInput.value.trim(),
           password: passwordInput.value,
@@ -47,20 +48,30 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       const data = await response.json();
-      const token = data.token;
-      if (!token) {
+      let payload = data.payload ?? null;
+      let accessExp = data.access_expires_at ?? null;
+
+      // Fallback: si el backend colocó solo la cookie, obtener sesión explícita
+      if (!payload || !accessExp) {
+        const sessionCheck = await fetch(`${API_BASE}/auth/session`, {
+          credentials: "same-origin",
+        });
+        if (sessionCheck.ok) {
+          const sessionData = await sessionCheck.json();
+          payload = payload ?? sessionData.payload ?? null;
+          accessExp =
+            accessExp ??
+            sessionData.access_expires_at ??
+            sessionData.payload?.exp ??
+            null;
+        }
+      }
+
+      if (!payload || !accessExp) {
         throw new Error("No se recibió un token válido.");
       }
 
-      const payload = await fetch(`${API_BASE}/auth/validate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-      })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((json) => json?.payload ?? null);
-
-      Session.save(token, payload ?? {});
+      Session.save(payload, accessExp);
       if (rememberCheck.checked) {
         Session.rememberEmail(emailInput.value.trim());
       } else {
@@ -81,13 +92,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function updateSessionInfo() {
     const payload = Session.getPayload();
-    if (!payload) {
+    const exp = Session.getExpiresAt();
+    if (!payload || !exp) {
       sessionInfo.textContent = "Sin sesión activa";
       return;
     }
-    const exp = payload.exp ? new Date(payload.exp * 1000) : null;
-    sessionInfo.textContent = exp
-      ? `Expira: ${exp.toLocaleString()}`
-      : "Sesión activa";
+    const expDate = new Date(exp * 1000);
+    sessionInfo.textContent = `Expira: ${expDate.toLocaleString()}`;
   }
 });

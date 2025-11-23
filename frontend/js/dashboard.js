@@ -2,8 +2,8 @@ const API_BASE = "/index.php";
 const PORTFOLIO_KEY = "finhub_portfolios";
 
 let state = {
-  token: null,
   payload: null,
+  sessionExpiresAt: null,
   isAdmin: false,
   users: [],
   tickers: [],
@@ -12,24 +12,29 @@ let state = {
   editingTickerId: null,
 };
 
-document.addEventListener("DOMContentLoaded", () => {
-  const token = Session.getToken();
-  const payload = Session.getPayload();
+let sessionCountdownInterval = null;
+let sessionPromptTimeout = null;
+let sessionPromptCountdownInterval = null;
 
-  if (!token || Session.isExpired(payload)) {
-    redirectToLogin();
-    return;
-  }
+document.addEventListener("DOMContentLoaded", async () => {
+  const sessionInfo = await fetchSession();
+  if (!sessionInfo) return;
 
   state = {
     ...state,
-    token,
-    payload,
-    isAdmin: (payload?.role ?? "").toLowerCase() === "admin",
+    payload: sessionInfo.payload,
+    sessionExpiresAt: sessionInfo.access_expires_at,
+    isAdmin:
+      (sessionInfo.payload?.role ?? "").toLowerCase() === "admin",
   };
 
   setupLayout();
   loadInitialData();
+  startCountdown(
+    state.sessionExpiresAt,
+    document.getElementById("sessionCountdown")
+  );
+  scheduleSessionPrompt(state.sessionExpiresAt);
 });
 
 function setupLayout() {
@@ -40,15 +45,13 @@ function setupLayout() {
   const extendBtn = document.getElementById("extendSession");
 
   userName.textContent = state.payload?.email ?? "Usuario autenticado";
-  tokenPreview.textContent = `${state.token.substring(0, 15)}...`;
+  tokenPreview.textContent = "Cookie HttpOnly activa";
 
   logoutBtn.addEventListener("click", () => {
-    Session.clear();
-    redirectToLogin();
+    logoutAndRedirect();
   });
 
-  extendBtn.addEventListener("click", () => extendSession(state.token));
-  startCountdown(state.payload?.exp, sessionCountdown);
+  extendBtn.addEventListener("click", () => refreshSession());
 
   document
     .querySelectorAll("#mainNav .nav-link")
@@ -119,9 +122,9 @@ function showSection(section) {
 async function loadInitialData() {
   // Health is public, tickers require token, users only if admin
   const healthPromise = fetchPublic("/health");
-  const tickersPromise = fetchProtected("/financial-objects", state.token);
+  const tickersPromise = fetchProtected("/financial-objects");
   const usersPromise = state.isAdmin
-    ? fetchProtected("/users", state.token)
+    ? fetchProtected("/users")
     : Promise.resolve([
         {
           id: state.payload?.uid ?? 0,
@@ -170,11 +173,20 @@ async function handleUserFormSubmit(event) {
 
   try {
     if (state.editingUserId) {
-      await requestWithAuth(
-        `/users/${state.editingUserId}`,
-        "PUT",
-        payload
-      );
+      try {
+        await requestWithAuth(
+          `/users/${state.editingUserId}`,
+          "PUT",
+          payload
+        );
+      } catch (err) {
+        console.warn("PUT /users failed, retrying via POST", err);
+        await requestWithAuth(
+          `/users/${state.editingUserId}/update`,
+          "POST",
+          payload
+        );
+      }
       status.textContent = "Usuario actualizado.";
     } else {
       await requestWithAuth("/users", "POST", payload);
@@ -189,7 +201,7 @@ async function handleUserFormSubmit(event) {
 
 async function loadUsers() {
   if (!state.isAdmin) return;
-  const data = await fetchProtected("/users", state.token);
+  const data = await fetchProtected("/users");
   if (Array.isArray(data)) {
     state.users = data;
     renderUsersTable();
@@ -258,7 +270,13 @@ async function deleteUser(userId) {
     await requestWithAuth(`/users/${userId}`, "DELETE");
     await loadUsers();
   } catch (err) {
-    alert(err.message || "No se pudo eliminar el usuario.");
+    console.warn("DELETE fallback to POST", err);
+    try {
+      await requestWithAuth(`/users/${userId}/delete`, "POST");
+      await loadUsers();
+    } catch (err2) {
+      alert(err2.message || "No se pudo eliminar el usuario.");
+    }
   }
 }
 
@@ -301,7 +319,7 @@ async function handleTickerFormSubmit(event) {
 }
 
 async function loadTickers() {
-  const data = await fetchProtected("/financial-objects", state.token);
+  const data = await fetchProtected("/financial-objects");
   if (Array.isArray(data)) {
     state.tickers = data;
     renderTickersTable();
@@ -506,9 +524,9 @@ async function requestWithAuth(route, method, body) {
   const res = await fetch(`${API_BASE}${route}`, {
     method,
     headers: {
-      Authorization: `Bearer ${state.token}`,
       "Content-Type": "application/json",
     },
+    credentials: "same-origin",
     body: body ? JSON.stringify(body) : undefined,
   });
 
@@ -527,13 +545,10 @@ async function requestWithAuth(route, method, body) {
   return null;
 }
 
-async function fetchProtected(route, token) {
+async function fetchProtected(route) {
   try {
     const res = await fetch(`${API_BASE}${route}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
+      credentials: "same-origin",
     });
     if (res.status === 401) {
       redirectToLogin();
@@ -559,24 +574,156 @@ async function fetchPublic(route) {
   }
 }
 
+async function fetchSession() {
+  try {
+    const res = await fetch(`${API_BASE}/auth/session`, {
+      credentials: "same-origin",
+    });
+    if (!res.ok) {
+      redirectToLogin();
+      return null;
+    }
+    const data = await res.json();
+    const payload = data.payload ?? null;
+    const accessExp = data.access_expires_at ?? payload?.exp ?? null;
+    if (!payload || !accessExp) {
+      redirectToLogin();
+      return null;
+    }
+    Session.save(payload, accessExp);
+    return { payload, access_expires_at: accessExp };
+  } catch (err) {
+    console.error("No se pudo validar la sesión", err);
+    redirectToLogin();
+    return null;
+  }
+}
+
+async function logoutAndRedirect() {
+  clearSessionTimers();
+  try {
+    await fetch(`${API_BASE}/auth/logout`, {
+      method: "POST",
+      credentials: "same-origin",
+    });
+  } catch (err) {
+    console.warn("No se pudo cerrar la sesión en el servidor", err);
+  }
+  redirectToLogin();
+}
+
 function redirectToLogin() {
+  clearSessionTimers();
   Session.clear();
   window.location.href = "../index.html";
 }
 
+function clearSessionTimers() {
+  if (sessionCountdownInterval) {
+    clearInterval(sessionCountdownInterval);
+    sessionCountdownInterval = null;
+  }
+  if (sessionPromptTimeout) {
+    clearTimeout(sessionPromptTimeout);
+    sessionPromptTimeout = null;
+  }
+  if (sessionPromptCountdownInterval) {
+    clearInterval(sessionPromptCountdownInterval);
+    sessionPromptCountdownInterval = null;
+  }
+}
+
 function startCountdown(exp, element) {
   if (!exp || !element) return;
-  const interval = setInterval(() => {
+  if (sessionCountdownInterval) clearInterval(sessionCountdownInterval);
+
+  const update = () => {
     const now = Math.floor(Date.now() / 1000);
     const secondsLeft = exp - now;
     if (secondsLeft <= 0) {
       element.textContent = "Sesión expirada";
-      clearInterval(interval);
-      redirectToLogin();
+      if (sessionCountdownInterval) clearInterval(sessionCountdownInterval);
+      if (!document.getElementById("sessionExtendPrompt")) {
+        showExtendPrompt();
+      }
       return;
     }
     element.textContent = `Expira en ${formatDuration(secondsLeft)}`;
+  };
+
+  update();
+  sessionCountdownInterval = setInterval(update, 1000);
+}
+
+function scheduleSessionPrompt(exp) {
+  if (!exp) return;
+  if (sessionPromptTimeout) clearTimeout(sessionPromptTimeout);
+  const now = Math.floor(Date.now() / 1000);
+  const msUntilPrompt = Math.max(exp - now, 0) * 1000;
+  sessionPromptTimeout = setTimeout(() => showExtendPrompt(), msUntilPrompt);
+}
+
+function showExtendPrompt() {
+  const existing = document.getElementById("sessionExtendPrompt");
+  if (existing) return;
+  sessionPromptTimeout = null;
+
+  const overlay = document.createElement("div");
+  overlay.id = "sessionExtendPrompt";
+  overlay.style.position = "fixed";
+  overlay.style.inset = "0";
+  overlay.style.background = "rgba(0,0,0,0.5)";
+  overlay.style.display = "flex";
+  overlay.style.alignItems = "center";
+  overlay.style.justifyContent = "center";
+  overlay.style.zIndex = "1050";
+
+  overlay.innerHTML = `
+    <div style="background:#fff; padding:24px; border-radius:12px; max-width:420px; width:90%; box-shadow:0 10px 30px rgba(0,0,0,0.25); text-align:center;">
+      <h5 style="margin-bottom:12px;">Extender sesión</h5>
+      <p style="margin-bottom:12px;">Tu sesión de 5 minutos llegó al límite. ¿Quieres extenderla?</p>
+      <p style="font-size:14px; color:#6c757d; margin-bottom:16px;">Se cerrará automáticamente en <span data-countdown>20</span>s.</p>
+      <div style="display:flex; gap:10px; justify-content:center;">
+        <button type="button" class="btn btn-primary" data-action="extend">Extender</button>
+        <button type="button" class="btn btn-outline-secondary" data-action="logout">Salir</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  const countdownEl = overlay.querySelector("[data-countdown]");
+  let remaining = 20;
+  if (sessionPromptCountdownInterval) {
+    clearInterval(sessionPromptCountdownInterval);
+  }
+  sessionPromptCountdownInterval = setInterval(() => {
+    remaining -= 1;
+    if (countdownEl) countdownEl.textContent = remaining;
+    if (remaining <= 0) {
+      clearInterval(sessionPromptCountdownInterval);
+      overlay.remove();
+      logoutAndRedirect();
+    }
   }, 1000);
+
+  overlay
+    .querySelector('[data-action="extend"]')
+    ?.addEventListener("click", async () => {
+      clearInterval(sessionPromptCountdownInterval);
+      sessionPromptCountdownInterval = null;
+      overlay.remove();
+      await refreshSession({ silent: true });
+    });
+
+  overlay
+    .querySelector('[data-action="logout"]')
+    ?.addEventListener("click", () => {
+      clearInterval(sessionPromptCountdownInterval);
+      sessionPromptCountdownInterval = null;
+      overlay.remove();
+      logoutAndRedirect();
+    });
 }
 
 function formatDuration(seconds) {
@@ -585,25 +732,38 @@ function formatDuration(seconds) {
   return `${mins}m ${secs}s`;
 }
 
-async function extendSession(token) {
+async function refreshSession({ silent = false } = {}) {
   try {
-    const res = await fetch(`${API_BASE}/auth/validate`, {
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
+      credentials: "same-origin",
     });
-    if (!res.ok) throw new Error("El token no es válido, vuelve a iniciar sesión.");
+    if (!res.ok) throw new Error("No se pudo extender la sesión.");
     const data = await res.json();
     const payload = data.payload ?? null;
-    if (payload) {
-      Session.save(token, payload);
-      state.payload = payload;
-      document.getElementById("userName").textContent =
-        payload.email ?? "Usuario autenticado";
+    const accessExp = data.access_expires_at ?? payload?.exp ?? null;
+    if (!payload || !accessExp) throw new Error("Respuesta de sesión incompleta.");
+
+    Session.save(payload, accessExp);
+    state.payload = payload;
+    state.sessionExpiresAt = accessExp;
+    state.isAdmin = (payload?.role ?? "").toLowerCase() === "admin";
+    const userName = document.getElementById("userName");
+    if (userName) {
+      userName.textContent = payload.email ?? "Usuario autenticado";
     }
-    alert("Sesión validada. Integra aquí la renovación del token si está disponible.");
+    startCountdown(
+      accessExp,
+      document.getElementById("sessionCountdown")
+    );
+    scheduleSessionPrompt(accessExp);
+    return true;
   } catch (err) {
-    alert(err.message);
+    console.error(err);
+    if (!silent) {
+      alert(err.message || "No se pudo extender la sesión.");
+    }
     redirectToLogin();
+    return false;
   }
 }

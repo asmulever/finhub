@@ -1,20 +1,18 @@
 const Session = (() => {
-  const TOKEN_KEY = "finhub_token";
   const PAYLOAD_KEY = "finhub_payload";
+  const EXPIRATION_KEY = "finhub_exp";
   const EMAIL_COOKIE = "finhubRememberEmail";
 
-  function save(token, payload) {
-    localStorage.setItem(TOKEN_KEY, token);
+  function save(payload, expiresAt) {
     localStorage.setItem(PAYLOAD_KEY, JSON.stringify(payload));
+    if (expiresAt) {
+      localStorage.setItem(EXPIRATION_KEY, String(expiresAt));
+    }
   }
 
   function clear() {
-    localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(PAYLOAD_KEY);
-  }
-
-  function getToken() {
-    return localStorage.getItem(TOKEN_KEY);
+    localStorage.removeItem(EXPIRATION_KEY);
   }
 
   function getPayload() {
@@ -27,10 +25,17 @@ const Session = (() => {
     }
   }
 
-  function isExpired(payload) {
-    if (!payload || !payload.exp) return true;
+  function getExpiresAt() {
+    const raw = localStorage.getItem(EXPIRATION_KEY);
+    if (!raw) return null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function isExpired(expiration) {
+    if (!expiration) return true;
     const now = Math.floor(Date.now() / 1000);
-    return now >= Number(payload.exp);
+    return now >= Number(expiration);
   }
 
   function rememberEmail(email) {
@@ -48,8 +53,8 @@ const Session = (() => {
   return {
     save,
     clear,
-    getToken,
     getPayload,
+    getExpiresAt,
     isExpired,
     rememberEmail,
     getRememberedEmail,

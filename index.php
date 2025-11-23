@@ -41,6 +41,16 @@ header("Content-Type: application/json; charset=UTF-8");
 try {
     $requestUri = $_SERVER['REQUEST_URI'] ?? '/';
     $requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+    // Responde preflight para evitar errores 403/404 en hosts que bloquean OPTIONS
+    if ($requestMethod === 'OPTIONS') {
+        header("Access-Control-Allow-Origin: *");
+        header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+        header("Access-Control-Allow-Headers: Content-Type, Authorization");
+        http_response_code(204);
+        exit;
+    }
+
     $uri = strtok($requestUri, '?');
     // Normaliza cuando se invoca como /index.php/endpoint
     if (str_starts_with($uri, '/index.php')) {
@@ -65,8 +75,14 @@ try {
     $userController = new UserController($userService, $jwtService);
 
     // Router simple
-    if ($uri === '/auth/validate' && $requestMethod === 'POST') {
-        $authController->validate();
+    if (($uri === '/auth/login' || $uri === '/auth/validate') && $requestMethod === 'POST') {
+        $authController->login();
+    } elseif ($uri === '/auth/refresh' && $requestMethod === 'POST') {
+        $authController->refresh();
+    } elseif ($uri === '/auth/session' && $requestMethod === 'GET') {
+        $authController->session();
+    } elseif ($uri === '/auth/logout' && $requestMethod === 'POST') {
+        $authController->logout();
     } elseif ($uri === '/health' && $requestMethod === 'GET') {
         http_response_code(200);
         echo json_encode([
@@ -92,6 +108,12 @@ try {
         $userController->list();
     } elseif ($uri === '/users' && $requestMethod === 'POST') {
         $userController->create();
+    } elseif (preg_match('#^/users/(\d+)/(delete|remove)$#', $uri, $matches) && $requestMethod === 'POST') {
+        $id = (int)$matches[1];
+        $userController->delete($id);
+    } elseif (preg_match('#^/users/(\d+)/(update|edit)$#', $uri, $matches) && $requestMethod === 'POST') {
+        $id = (int)$matches[1];
+        $userController->update($id);
     } elseif (preg_match('#^/users/(\d+)$#', $uri, $matches)) {
         $id = (int)$matches[1];
         if ($requestMethod === 'PUT') {
