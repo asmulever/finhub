@@ -8,3 +8,6 @@ logs/
 # Ignore Docs
 *.md
 docs/
+
+# Ignore VSCode editor files
+.vscode/
