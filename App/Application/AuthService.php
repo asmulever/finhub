@@ -24,9 +24,13 @@ class AuthService
         $this->logger->info("Login attempt for email: $email");
         $user = $this->userRepository->findByEmail($email);
 
-        if ($user && password_verify($password, $user->getPassword())) {
+        if ($user && password_verify($password, $user->getPasswordHash())) {
             $this->logger->info("Login successful for email: $email");
-            return $this->jwtService->generateToken(['uid' => $user->getId()]);
+            return $this->jwtService->generateToken([
+                'uid' => $user->getId(),
+                'email' => $user->getEmail(),
+                'role' => $user->getRole(),
+            ]);
         }
 
         $this->logger->warning("Failed login attempt for email: $email");
@@ -37,5 +41,10 @@ class AuthService
     {
         $payload = $this->jwtService->validateToken($token);
         return $payload !== null;
+    }
+
+    public function decodeToken(string $token): ?object
+    {
+        return $this->jwtService->validateToken($token);
     }
 }

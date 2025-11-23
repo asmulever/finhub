@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Finhub Dashboard</title>
+  <style>
+    :root {
+      --bg: #0b1021;
+      --panel: #121830;
+      --accent: #00c6ff;
+      --accent-2: #7c5dff;
+      --text: #e8ecf5;
+      --muted: #9aa3b5;
+      --error: #ff7b7b;
+      --success: #42d392;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at 20% 20%, rgba(124,93,255,0.15), transparent 30%), radial-gradient(circle at 80% 10%, rgba(0,198,255,0.18), transparent 30%), var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 32px 16px 64px;
+    }
+    .app {
+      width: min(1200px, 100%);
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .title {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .badge {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      padding: 6px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #0b1021;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 16px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+      letter-spacing: 0.3px;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: #0f1427;
+      color: var(--text);
+      font-size: 14px;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #0b1021;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: transform 0.1s ease, box-shadow 0.2s ease;
+    }
+    button:hover { transform: translateY(-1px); box-shadow: 0 10px 25px rgba(124,93,255,0.35); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .status {
+      margin-top: 8px;
+      font-size: 13px;
+    }
+    .status.error { color: var(--error); }
+    .status.success { color: var(--success); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      font-size: 14px;
+    }
+    th {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      font-size: 12px;
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: rgba(124,93,255,0.12);
+      color: var(--accent);
+      border: 1px solid rgba(124,93,255,0.3);
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+      header { flex-direction: column; gap: 8px; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="title">Finhub Dashboard <span class="badge">API</span></div>
+      <div id="envStatus" class="pill">Modo: --</div>
+    </header>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Login admin</h2>
+        <form id="loginForm">
+          <label for="email">Email</label>
+          <input type="email" id="email" value="admin@example.com" required>
+          <label for="password">Password</label>
+          <input type="password" id="password" value="admin123" required>
+          <button type="submit">Obtener token</button>
+        </form>
+        <div id="loginResult" class="status"></div>
+        <div id="tokenPreview" class="pill" style="margin-top:10px; display:none;"></div>
+        <div class="actions">
+          <button id="refreshBtn" type="button" disabled>Cargar datos</button>
+          <button id="logoutBtn" type="button" disabled>Salir</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Salud del servicio</h2>
+        <pre id="health" style="margin:0; background:#0f1427; padding:12px; border-radius:10px; font-size:13px; color:#c8d2e3; overflow:auto;">Verificando...</pre>
+      </div>
+    </div>
+
+    <div class="grid" style="margin-top:16px;">
+      <div class="card">
+        <h2>Usuarios</h2>
+        <div id="usersTable">Inicie sesión para ver usuarios.</div>
+      </div>
+      <div class="card">
+        <h2>Objetos financieros</h2>
+        <div id="foTable">Inicie sesión para ver objetos financieros.</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h2>Alta de usuario (admin)</h2>
+      <div id="userCreateNotice" class="status">Requiere token admin.</div>
+      <form id="userCreateForm" style="margin-top:12px;">
+        <label for="newEmail">Email</label>
+        <input type="email" id="newEmail" placeholder="usuario@ejemplo.com" required>
+        <label for="newPassword">Password</label>
+        <input type="text" id="newPassword" placeholder="password seguro" required>
+        <label for="newRole">Rol (admin/user)</label>
+        <input type="text" id="newRole" value="user" required>
+        <button type="submit" disabled id="createUserBtn">Crear usuario</button>
+      </form>
+      <div id="userCreateResult" class="status"></div>
+    </div>
+  </div>
+
+  <script>
+    let token = null;
+    const API_BASE = '/index.php';
+    const TOKEN_COOKIE = 'finhub_token';
+
+    function setCookie(name, value, expiresMs) {
+      const d = new Date();
+      d.setTime(d.getTime() + expiresMs);
+      document.cookie = `${name}=${value};expires=${d.toUTCString()};path=/;SameSite=Lax`;
+    }
+
+    function getCookie(name) {
+      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      return match ? match[2] : null;
+    }
+
+    function clearCookie(name) {
+      document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+    }
+
+    function decodeJwtPayload(jwt) {
+      try {
+        const base64Url = jwt.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+        return JSON.parse(jsonPayload);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function isTokenValid() {
+      if (!token) return false;
+      const payload = decodeJwtPayload(token);
+      if (!payload || !payload.exp) return false;
+      return payload.exp * 1000 > Date.now();
+    }
+
+    function persistToken(jwt) {
+      token = jwt;
+      const payload = decodeJwtPayload(jwt);
+      const ms = payload && payload.exp ? (payload.exp * 1000 - Date.now()) : 3600_000;
+      setCookie(TOKEN_COOKIE, jwt, ms);
+      document.getElementById('tokenPreview').style.display = 'inline-flex';
+      document.getElementById('tokenPreview').textContent = jwt.slice(0, 32) + '...';
+      document.getElementById('refreshBtn').disabled = false;
+      document.getElementById('logoutBtn').disabled = false;
+      document.getElementById('createUserBtn').disabled = false;
+    }
+
+    function restoreToken() {
+      const stored = getCookie(TOKEN_COOKIE);
+      if (!stored) return;
+      token = stored;
+      if (isTokenValid()) {
+        persistToken(stored);
+      } else {
+        clearSession();
+      }
+    }
+
+    function clearSession(message = 'Sesión cerrada') {
+      token = null;
+      clearCookie(TOKEN_COOKIE);
+      document.getElementById('loginResult').textContent = message;
+      document.getElementById('loginResult').className = 'status';
+      document.getElementById('tokenPreview').style.display = 'none';
+      document.getElementById('refreshBtn').disabled = true;
+      document.getElementById('logoutBtn').disabled = true;
+      document.getElementById('createUserBtn').disabled = true;
+      document.getElementById('usersTable').innerHTML = 'Inicie sesión para ver usuarios.';
+      document.getElementById('foTable').innerHTML = 'Inicie sesión para ver objetos financieros.';
+    }
+
+    async function fetchJSON(url, options = {}) {
+      if (!isTokenValid() && token) {
+        clearSession('Token expirado, inicie sesión nuevamente.');
+        throw new Error('Token expirado');
+      }
+
+      const endpoint = url.startsWith('http') ? url : `${API_BASE}${url}`;
+      const res = await fetch(endpoint, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+        },
+        ...options
+      });
+      const data = await res.json().catch(() => ({}));
+      return { ok: res.ok, data, status: res.status };
+    }
+
+    function renderTable(el, rows, columns) {
+      if (!rows || rows.length === 0) {
+        el.innerHTML = '<div class="status">Sin datos disponibles.</div>';
+        return;
+      }
+      const head = columns.map(c => `<th>${c.label}</th>`).join('');
+      const body = rows.map(r => `<tr>${columns.map(c => `<td>${c.format ? c.format(r[c.key], r) : (r[c.key] ?? '')}</td>`).join('')}</tr>`).join('');
+      el.innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+    }
+
+    async function loadHealth() {
+      const el = document.getElementById('health');
+      el.textContent = 'Verificando...';
+      try {
+        const { ok, data } = await fetchJSON('/health', { headers: { 'Content-Type': 'application/json' } });
+        if (!ok) throw new Error('No disponible');
+        el.textContent = JSON.stringify(data, null, 2);
+        document.getElementById('envStatus').textContent = 'Modo: ' + (data.environment || 'desconocido');
+      } catch (err) {
+        el.textContent = 'Error obteniendo salud: ' + err.message;
+      }
+    }
+
+    async function loadUsers() {
+      const el = document.getElementById('usersTable');
+      el.innerHTML = 'Cargando usuarios...';
+      const { ok, data } = await fetchJSON('/users');
+      if (!ok) {
+        el.innerHTML = `<div class="status error">No se pudo cargar: ${data.error || 'Requiere token admin'}</div>`;
+        return;
+      }
+      renderTable(el, data, [
+        { key: 'id', label: 'ID' },
+        { key: 'email', label: 'Email' },
+        { key: 'role', label: 'Rol', format: (v) => `<span class="pill">${v}</span>` },
+      ]);
+    }
+
+    async function loadFinancialObjects() {
+      const el = document.getElementById('foTable');
+      el.innerHTML = 'Cargando objetos...';
+      const { ok, data } = await fetchJSON('/financial-objects');
+      if (!ok) {
+        el.innerHTML = `<div class="status error">No se pudo cargar: ${data.error || 'Requiere token'}</div>`;
+        return;
+      }
+      renderTable(el, data, [
+        { key: 'id', label: 'ID' },
+        { key: 'name', label: 'Nombre' },
+        { key: 'symbol', label: 'Ticker' },
+        { key: 'type', label: 'Tipo', format: (v) => `<span class="pill">${v}</span>` },
+      ]);
+    }
+
+    async function handleLogin(event) {
+      event.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const status = document.getElementById('loginResult');
+      status.textContent = 'Autenticando...';
+      status.className = 'status';
+
+      try {
+        const { ok, data } = await fetchJSON('/auth/validate', {
+          method: 'POST',
+          body: JSON.stringify({ email, password })
+        });
+        if (ok && data.status === 'authenticated') {
+          token = data.token;
+          status.textContent = 'Token obtenido';
+          status.classList.add('success');
+          persistToken(data.token);
+          await loadUsers();
+          await loadFinancialObjects();
+        } else {
+          status.textContent = 'Credenciales invalidas';
+          status.classList.add('error');
+        }
+      } catch (err) {
+        status.textContent = 'Error: ' + err.message;
+        status.classList.add('error');
+      }
+    }
+
+    function handleLogout() {
+      clearSession();
+    }
+
+    async function handleUserCreate(event) {
+      event.preventDefault();
+      const resEl = document.getElementById('userCreateResult');
+      if (!token) {
+        resEl.textContent = 'Necesita token admin.';
+        resEl.className = 'status error';
+        return;
+      }
+      resEl.textContent = 'Creando...';
+      resEl.className = 'status';
+      const payload = {
+        email: document.getElementById('newEmail').value,
+        password: document.getElementById('newPassword').value,
+        role: document.getElementById('newRole').value || 'user'
+      };
+      const { ok, data } = await fetchJSON('/users', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      if (ok) {
+        resEl.textContent = `Usuario creado (id ${data.id ?? '?'})`;
+        resEl.classList.add('success');
+        await loadUsers();
+      } else {
+        resEl.textContent = 'Error: ' + (data.error || 'No autorizado / datos invalidos');
+        resEl.classList.add('error');
+      }
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', handleLogin);
+    document.getElementById('refreshBtn').addEventListener('click', async () => {
+      await loadUsers();
+      await loadFinancialObjects();
+    });
+    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+    document.getElementById('userCreateForm').addEventListener('submit', handleUserCreate);
+
+    loadHealth();
+    restoreToken();
+  </script>
+</body>
+</html>

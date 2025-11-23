@@ -1,0 +1,306 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Finhub API",
+    "version": "1.1.0",
+    "description": "Endpoints protegidos con JWT para autenticacion, usuarios y objetos financieros."
+  },
+  "servers": [
+    { "url": "http://localhost:8080", "description": "Entorno local" },
+    { "url": "https://finhub.42web.io", "description": "Producción" }
+  ],
+  "tags": [
+    { "name": "Auth", "description": "Login y validacion de token" },
+    { "name": "Health", "description": "Estado del servicio y base de datos" },
+    { "name": "Users", "description": "CRUD de usuarios (solo rol admin)" },
+    { "name": "Financial Objects", "description": "CRUD de objetos financieros" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "email": { "type": "string", "format": "email" },
+          "role": { "type": "string", "example": "admin" }
+        }
+      },
+      "FinancialObject": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "symbol": { "type": "string" },
+          "type": { "type": "string", "example": "stock" }
+        }
+      },
+      "UserCreate": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string" },
+          "role": { "type": "string", "default": "user" }
+        },
+        "required": ["email", "password"]
+      },
+      "FinancialObjectCreate": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "symbol": { "type": "string" },
+          "type": { "type": "string" }
+        },
+        "required": ["name", "symbol", "type"]
+      },
+      "AuthRequest": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "email": { "type": "string", "format": "email" },
+              "password": { "type": "string" }
+            },
+            "required": ["email", "password"]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "token": { "type": "string" }
+            },
+            "required": ["token"]
+          }
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/auth/validate": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Autentica por credenciales o valida un token existente",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AuthRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Autenticado o token valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "token": { "type": "string" },
+                    "payload": { "type": "object" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credenciales invalidas o token invalido",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+          },
+          "400": {
+            "description": "JSON invalido",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Revisa estado y conexion a la base",
+        "responses": {
+          "200": {
+            "description": "Estado OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "environment": { "type": "string" },
+                    "database": { "type": "object" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Lista usuarios (requiere admin)",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Token JWT en formato `Bearer <token>` necesario para autorizar el listado.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            }
+          }
+        ],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Listado de usuarios",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/User" } }
+              }
+            }
+          },
+          "401": { "description": "No autenticado" },
+          "403": { "description": "No autorizado (solo admin)" }
+        }
+      },
+      "post": {
+        "tags": ["Users"],
+        "summary": "Crea un usuario (admin)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/UserCreate" } }
+          }
+        },
+        "responses": {
+          "201": { "description": "Usuario creado" },
+          "400": { "description": "Datos invalidos" },
+          "401": { "description": "No autenticado" },
+          "403": { "description": "No autorizado (solo admin)" }
+        }
+      }
+    },
+    "/users/{id}": {
+      "put": {
+        "tags": ["Users"],
+        "summary": "Actualiza un usuario (admin)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/UserCreate" } }
+          }
+        },
+        "responses": {
+          "200": { "description": "Usuario actualizado" },
+          "400": { "description": "Datos invalidos" },
+          "401": { "description": "No autenticado" },
+          "403": { "description": "No autorizado (solo admin)" }
+        }
+      },
+      "delete": {
+        "tags": ["Users"],
+        "summary": "Elimina un usuario (admin)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "204": { "description": "Usuario eliminado" },
+          "401": { "description": "No autenticado" },
+          "403": { "description": "No autorizado (solo admin)" }
+        }
+      }
+    },
+    "/financial-objects": {
+      "get": {
+        "tags": ["Financial Objects"],
+        "summary": "Lista objetos financieros (requiere token)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Listado de objetos",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/FinancialObject" } }
+              }
+            }
+          },
+          "401": { "description": "No autenticado" }
+        }
+      },
+      "post": {
+        "tags": ["Financial Objects"],
+        "summary": "Crea objeto financiero (admin)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/FinancialObjectCreate" } }
+          }
+        },
+        "responses": {
+          "201": { "description": "Objeto creado" },
+          "400": { "description": "Datos invalidos" },
+          "401": { "description": "No autenticado" },
+          "403": { "description": "No autorizado (solo admin)" }
+        }
+      }
+    },
+    "/financial-objects/{id}": {
+      "put": {
+        "tags": ["Financial Objects"],
+        "summary": "Actualiza objeto financiero (admin)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/FinancialObjectCreate" } }
+          }
+        },
+        "responses": {
+          "200": { "description": "Objeto actualizado" },
+          "400": { "description": "Datos invalidos" },
+          "401": { "description": "No autenticado" },
+          "403": { "description": "No autorizado (solo admin)" }
+        }
+      },
+      "delete": {
+        "tags": ["Financial Objects"],
+        "summary": "Elimina objeto financiero (admin)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "204": { "description": "Objeto eliminado" },
+          "401": { "description": "No autenticado" },
+          "403": { "description": "No autorizado (solo admin)" }
+        }
+      }
+    }
+  }
+}

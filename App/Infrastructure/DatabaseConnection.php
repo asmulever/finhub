@@ -22,7 +22,7 @@ class DatabaseConnection
 
             $dsn = "mysql:host=$host;port=$port;dbname=$db;charset=utf8mb4";
 
-            $logger = new Logger('/tmp/app.log');
+            $logger = new Logger();
 
             try {
                 self::$instance = new PDO($dsn, $user, $pass);
