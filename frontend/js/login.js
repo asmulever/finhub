@@ -38,6 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
           email: emailInput.value.trim(),
           password: passwordInput.value,
         }),
+        skipSessionExtend: true,
       });
 
       if (!response.ok) {

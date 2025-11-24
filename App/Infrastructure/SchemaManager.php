@@ -129,13 +129,21 @@ class SchemaManager
     private static function applyRootUserPolicy(PDO $pdo, Logger $logger): void
     {
         $enabled = Config::get('ENABLE_ROOT_USER', '0');
-        if ($enabled !== '1') {
-            return;
-        }
-
         $rootEmail = Config::getRequired('ROOT_EMAIL');
         $rootPassword = Config::getRequired('ROOT_PASSWORD');
         $fullAdminRole = 'admin'; // Admin completo = rol admin + usuario activo.
+
+        if ($enabled !== '1') {
+            $stmt = $pdo->prepare("SELECT id FROM users WHERE email = :email LIMIT 1");
+            $stmt->execute(['email' => $rootEmail]);
+            $existingId = $stmt->fetchColumn();
+            if ($existingId !== false) {
+                $update = $pdo->prepare("UPDATE users SET is_active = 0 WHERE id = :id");
+                $update->execute(['id' => $existingId]);
+                $logger->info("Root user {$rootEmail} marked inactive due to ENABLE_ROOT_USER=0.");
+            }
+            return;
+        }
 
         $stmt = $pdo->prepare("SELECT id FROM users WHERE email = :email LIMIT 1");
         $stmt->execute(['email' => $rootEmail]);

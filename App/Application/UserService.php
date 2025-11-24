@@ -76,7 +76,7 @@ class UserService
 
         try {
             $hashed = password_hash($password, PASSWORD_DEFAULT);
-            $user = new User($id, strtolower($email), $hashed, $role, $this->shouldUsersBeActive());
+            $user = new User($id, strtolower($email), $hashed, $role, $existing->isActive());
             $this->userRepository->update($user);
             return true;
         } catch (\Exception $e) {
