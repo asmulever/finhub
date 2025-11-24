@@ -8,7 +8,7 @@ use App\Application\AuthService;
 use App\Infrastructure\Config;
 use App\Infrastructure\Logger;
 
-class AuthController
+class AuthController extends BaseController
 {
     private Logger $logger;
     private bool $secureCookies;
@@ -125,7 +125,8 @@ class AuthController
     public function logout(): void
     {
         $this->clearAuthCookies();
-        http_response_code(204);
+        http_response_code(200);
+        echo json_encode(['status' => 'logged_out']);
     }
 
     private function setAuthCookies(string $accessToken, int $accessExpiresAt, string $refreshToken, int $refreshExpiresAt): void
@@ -160,26 +161,6 @@ class AuthController
         ];
         setcookie('access_token', '', $cookieConfig);
         setcookie('refresh_token', '', $cookieConfig);
-    }
-
-    private function getAccessTokenFromRequest(): ?string
-    {
-        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? null;
-        if ($authHeader && preg_match('/Bearer\\s(\\S+)/', $authHeader, $matches)) {
-            return $matches[1];
-        }
-
-        $redirectHeader = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
-        if ($redirectHeader && preg_match('/Bearer\\s(\\S+)/', $redirectHeader, $matches)) {
-            return $matches[1];
-        }
-
-        $cookieToken = $_COOKIE['access_token'] ?? null;
-        if ($cookieToken && $cookieToken !== '') {
-            return $cookieToken;
-        }
-
-        return null;
     }
 
     private function shouldUseSecureCookies(): bool

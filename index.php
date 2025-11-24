@@ -10,28 +10,41 @@ require_once __DIR__ . '/App/Infrastructure/Config.php';
 require_once __DIR__ . '/App/Infrastructure/DatabaseConnection.php';
 require_once __DIR__ . '/App/Infrastructure/Logger.php';
 require_once __DIR__ . '/App/Infrastructure/SchemaManager.php';
+require_once __DIR__ . '/App/Domain/Account.php';
 require_once __DIR__ . '/App/Domain/UserRepository.php';
 require_once __DIR__ . '/App/Infrastructure/MysqlUserRepository.php';
 require_once __DIR__ . '/App/Domain/FinancialObjectRepository.php';
 require_once __DIR__ . '/App/Infrastructure/MysqlFinancialObjectRepository.php';
 require_once __DIR__ . '/App/Infrastructure/JwtService.php';
+require_once __DIR__ . '/App/Domain/AccountRepository.php';
+require_once __DIR__ . '/App/Infrastructure/MysqlAccountRepository.php';
+require_once __DIR__ . '/App/Domain/Portfolio.php';
+require_once __DIR__ . '/App/Domain/PortfolioRepository.php';
+require_once __DIR__ . '/App/Infrastructure/MysqlPortfolioRepository.php';
 require_once __DIR__ . '/App/Application/AuthService.php';
 require_once __DIR__ . '/App/Application/FinancialObjectService.php';
 require_once __DIR__ . '/App/Application/UserService.php';
+require_once __DIR__ . '/App/Application/AccountService.php';
+require_once __DIR__ . '/App/Interfaces/BaseController.php';
 require_once __DIR__ . '/App/Interfaces/AuthController.php';
 require_once __DIR__ . '/App/Interfaces/FinancialObjectController.php';
 require_once __DIR__ . '/App/Interfaces/UserController.php';
+require_once __DIR__ . '/App/Interfaces/AccountController.php';
 require_once __DIR__ . '/App/Domain/User.php';
 require_once __DIR__ . '/App/Domain/FinancialObject.php';
 
 use App\Application\AuthService;
 use App\Application\FinancialObjectService;
+use App\Application\AccountService;
 use App\Application\UserService;
 use App\Infrastructure\JwtService;
+use App\Infrastructure\MysqlAccountRepository;
 use App\Infrastructure\MysqlFinancialObjectRepository;
+use App\Infrastructure\MysqlPortfolioRepository;
 use App\Infrastructure\MysqlUserRepository;
 use App\Infrastructure\SchemaManager;
 use App\Interfaces\AuthController;
+use App\Interfaces\AccountController;
 use App\Interfaces\FinancialObjectController;
 use App\Interfaces\UserController;
 
@@ -41,15 +54,6 @@ header("Content-Type: application/json; charset=UTF-8");
 try {
     $requestUri = $_SERVER['REQUEST_URI'] ?? '/';
     $requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-
-    // Responde preflight para evitar errores 403/404 en hosts que bloquean OPTIONS
-    if ($requestMethod === 'OPTIONS') {
-        header("Access-Control-Allow-Origin: *");
-        header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-        header("Access-Control-Allow-Headers: Content-Type, Authorization");
-        http_response_code(204);
-        exit;
-    }
 
     $uri = strtok($requestUri, '?');
     // Normaliza cuando se invoca como /index.php/endpoint
@@ -66,13 +70,17 @@ try {
     // Dependencias
     $userRepository = new MysqlUserRepository();
     $financialObjectRepository = new MysqlFinancialObjectRepository();
-    $jwtService = new JwtService(\App\Infrastructure\Config::get('JWT_SECRET'));
+    $jwtService = new JwtService(\App\Infrastructure\Config::getRequired('JWT_SECRET'));
     $authService = new AuthService($userRepository, $jwtService);
+    $accountRepository = new MysqlAccountRepository();
+    $portfolioRepository = new MysqlPortfolioRepository();
     $financialObjectService = new FinancialObjectService($financialObjectRepository);
     $userService = new UserService($userRepository);
+    $accountService = new AccountService($accountRepository, $userRepository, $portfolioRepository);
     $authController = new AuthController($authService);
     $financialObjectController = new FinancialObjectController($financialObjectService, $jwtService);
     $userController = new UserController($userService, $jwtService);
+    $accountController = new AccountController($accountService, $jwtService);
 
     // Router simple
     if (($uri === '/auth/login' || $uri === '/auth/validate') && $requestMethod === 'POST') {
@@ -100,6 +108,26 @@ try {
             $financialObjectController->update($id);
         } elseif ($requestMethod === 'DELETE') {
             $financialObjectController->delete($id);
+        } else {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method Not Allowed']);
+        }
+    } elseif ($uri === '/accounts' && $requestMethod === 'GET') {
+        $accountController->list();
+    } elseif ($uri === '/accounts' && $requestMethod === 'POST') {
+        $accountController->create();
+    } elseif (preg_match('#^/accounts/(\d+)/(update|edit)$#', $uri, $matches) && $requestMethod === 'POST') {
+        $id = (int)$matches[1];
+        $accountController->update($id);
+    } elseif (preg_match('#^/accounts/(\d+)/(delete|remove)$#', $uri, $matches) && $requestMethod === 'POST') {
+        $id = (int)$matches[1];
+        $accountController->delete($id);
+    } elseif (preg_match('#^/accounts/(\d+)$#', $uri, $matches)) {
+        $id = (int)$matches[1];
+        if ($requestMethod === 'PUT') {
+            $accountController->update($id);
+        } elseif ($requestMethod === 'DELETE') {
+            $accountController->delete($id);
         } else {
             http_response_code(405);
             echo json_encode(['error' => 'Method Not Allowed']);

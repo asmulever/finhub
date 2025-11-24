@@ -6,6 +6,7 @@ namespace App\Application;
 
 use App\Domain\User;
 use App\Domain\UserRepository;
+use App\Infrastructure\Config;
 use App\Infrastructure\Logger;
 
 class UserService
@@ -42,7 +43,7 @@ class UserService
 
         try {
             $hashed = password_hash($password, PASSWORD_DEFAULT);
-            $user = new User(null, strtolower($email), $hashed, $role);
+            $user = new User(null, strtolower($email), $hashed, $role, $this->shouldUsersBeActive());
             $id = $this->userRepository->save($user);
 
             return [
@@ -75,7 +76,7 @@ class UserService
 
         try {
             $hashed = password_hash($password, PASSWORD_DEFAULT);
-            $user = new User($id, strtolower($email), $hashed, $role);
+            $user = new User($id, strtolower($email), $hashed, $role, $this->shouldUsersBeActive());
             $this->userRepository->update($user);
             return true;
         } catch (\Exception $e) {
@@ -99,5 +100,10 @@ class UserService
             $this->logger->error("Error deleting user $id: " . $e->getMessage());
             return false;
         }
+    }
+
+    private function shouldUsersBeActive(): bool
+    {
+        return Config::get('ENABLE_ROOT_USER', '0') === '1';
     }
 }

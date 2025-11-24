@@ -24,7 +24,7 @@ class AuthService
         $this->logger->info("Login attempt for email: $email");
         $user = $this->userRepository->findByEmail($email);
 
-        if ($user && password_verify($password, $user->getPasswordHash())) {
+        if ($user && $user->isActive() && password_verify($password, $user->getPasswordHash())) {
             $this->logger->info("Login successful for email: $email");
             return $this->issueTokensForUser($user);
         }
