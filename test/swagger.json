@@ -2,17 +2,18 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Finhub API",
-    "version": "1.1.0",
-    "description": "Endpoints protegidos con JWT para autenticacion, usuarios y objetos financieros."
+    "version": "1.2.0",
+    "description": "Endpoints protegidos con JWT para autenticacion, usuarios, cuentas y objetos financieros. Tokens de acceso duran 5 minutos y se renuevan con refresh tokens de 7 dias (cookies HttpOnly)."
   },
   "servers": [
     { "url": "http://localhost:8080", "description": "Entorno local" },
-    { "url": "https://finhub.42web.io", "description": "Producción" }
+    { "url": "https://finhub.42web.io", "description": "Produccion" }
   ],
   "tags": [
-    { "name": "Auth", "description": "Login y validacion de token" },
+    { "name": "Auth", "description": "Login, refresh y validacion de sesiones JWT" },
     { "name": "Health", "description": "Estado del servicio y base de datos" },
     { "name": "Users", "description": "CRUD de usuarios (solo rol admin)" },
+    { "name": "Accounts", "description": "Cuentas de inversion ligadas a usuarios" },
     { "name": "Financial Objects", "description": "CRUD de objetos financieros" }
   ],
   "components": {
@@ -32,6 +33,15 @@
           "role": { "type": "string", "example": "admin" }
         }
       },
+      "UserCreate": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "format": "password" },
+          "role": { "type": "string", "default": "user" }
+        },
+        "required": ["email", "password"]
+      },
       "FinancialObject": {
         "type": "object",
         "properties": {
@@ -40,15 +50,6 @@
           "symbol": { "type": "string" },
           "type": { "type": "string", "example": "stock" }
         }
-      },
-      "UserCreate": {
-        "type": "object",
-        "properties": {
-          "email": { "type": "string", "format": "email" },
-          "password": { "type": "string" },
-          "role": { "type": "string", "default": "user" }
-        },
-        "required": ["email", "password"]
       },
       "FinancialObjectCreate": {
         "type": "object",
@@ -59,24 +60,83 @@
         },
         "required": ["name", "symbol", "type"]
       },
-      "AuthRequest": {
-        "oneOf": [
-          {
-            "type": "object",
-            "properties": {
-              "email": { "type": "string", "format": "email" },
-              "password": { "type": "string" }
-            },
-            "required": ["email", "password"]
-          },
-          {
-            "type": "object",
-            "properties": {
-              "token": { "type": "string" }
-            },
-            "required": ["token"]
-          }
-        ]
+      "Account": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "user_id": { "type": "integer" },
+          "user_email": { "type": "string", "format": "email" },
+          "broker_name": { "type": "string" },
+          "currency": { "type": "string", "example": "USD" },
+          "is_primary": { "type": "boolean" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AccountCreate": {
+        "type": "object",
+        "properties": {
+          "user_id": { "type": "integer" },
+          "broker_name": { "type": "string" },
+          "currency": { "type": "string", "default": "USD" },
+          "is_primary": { "type": "boolean", "default": false }
+        },
+        "required": ["user_id", "broker_name", "currency"]
+      },
+      "AccountUpdate": {
+        "type": "object",
+        "properties": {
+          "user_id": { "type": "integer" },
+          "broker_name": { "type": "string" },
+          "currency": { "type": "string" },
+          "is_primary": { "type": "boolean" }
+        },
+        "description": "Si se omiten campos se usan los valores actuales de la cuenta."
+      },
+      "AuthLoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "format": "password" }
+        },
+        "required": ["email", "password"]
+      },
+      "AuthPayload": {
+        "type": "object",
+        "properties": {
+          "uid": { "type": "integer" },
+          "email": { "type": "string", "format": "email" },
+          "role": { "type": "string", "example": "admin" },
+          "exp": { "type": "integer", "description": "UNIX epoch de expiracion del access token" }
+        }
+      },
+      "AuthSuccess": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "example": "authenticated" },
+          "payload": { "$ref": "#/components/schemas/AuthPayload" },
+          "access_expires_at": { "type": "integer", "format": "int64", "description": "UNIX epoch del access token (5 minutos)" },
+          "refresh_expires_at": { "type": "integer", "format": "int64", "description": "UNIX epoch del refresh token (7 dias)" }
+        }
+      },
+      "SessionResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "example": "valid_token" },
+          "payload": { "$ref": "#/components/schemas/AuthPayload" },
+          "access_expires_at": { "type": "integer", "format": "int64" }
+        }
+      },
+      "AuthStatus": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "example": "unauthenticated" }
+        }
+      },
+      "UpdatedResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "example": "updated" }
+        }
       },
       "Error": {
         "type": "object",
@@ -87,42 +147,99 @@
     }
   },
   "paths": {
-    "/auth/validate": {
+    "/auth/login": {
       "post": {
         "tags": ["Auth"],
-        "summary": "Autentica por credenciales o valida un token existente",
+        "summary": "Inicia sesion con email y password",
+        "description": "Genera access_token (5m) y refresh_token (7d) en cookies HttpOnly. Usa tambien /auth/validate para clientes legados.",
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/AuthRequest" }
-            }
+            "application/json": { "schema": { "$ref": "#/components/schemas/AuthLoginRequest" } }
           }
         },
         "responses": {
           "200": {
-            "description": "Autenticado o token valido",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": { "type": "string" },
-                    "token": { "type": "string" },
-                    "payload": { "type": "object" }
-                  }
-                }
-              }
-            }
+            "description": "Credenciales validas, cookies emitidas",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthSuccess" } } }
           },
           "401": {
-            "description": "Credenciales invalidas o token invalido",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "description": "Credenciales invalidas",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthStatus" } } }
           },
           "400": {
             "description": "JSON invalido",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
           }
+        }
+      }
+    },
+    "/auth/validate": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Alias de login para clientes existentes",
+        "description": "Mismo comportamiento que /auth/login: recibe email/password y emite cookies con los tokens.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/AuthLoginRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Credenciales validas, cookies emitidas",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthSuccess" } } }
+          },
+          "401": {
+            "description": "Credenciales invalidas",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthStatus" } } }
+          },
+          "400": {
+            "description": "JSON invalido",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Renueva la sesion usando refresh_token de cookie",
+        "responses": {
+          "200": {
+            "description": "Tokens renovados",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthSuccess" } } }
+          },
+          "401": {
+            "description": "Refresh token ausente o invalido",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthStatus" } } }
+          }
+        }
+      }
+    },
+    "/auth/session": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Valida un access_token (header Authorization o cookie)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Token valido",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SessionResponse" } } }
+          },
+          "401": {
+            "description": "Token ausente o invalido",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthStatus" } } }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Limpia las cookies de sesion",
+        "responses": {
+          "204": { "description": "Sesion cerrada" }
         }
       }
     },
@@ -138,9 +255,9 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string" },
-                    "environment": { "type": "string" },
-                    "database": { "type": "object" }
+                    "status": { "type": "string", "example": "ok" },
+                    "environment": { "type": "string", "example": "production" },
+                    "database": { "type": "object", "description": "Conteos de tablas y estado de conexion" }
                   }
                 }
               }
@@ -153,18 +270,6 @@
       "get": {
         "tags": ["Users"],
         "summary": "Lista usuarios (requiere admin)",
-        "parameters": [
-          {
-            "name": "Authorization",
-            "in": "header",
-            "description": "Token JWT en formato `Bearer <token>` necesario para autorizar el listado.",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "example": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-            }
-          }
-        ],
         "security": [{ "bearerAuth": [] }],
         "responses": {
           "200": {
@@ -175,8 +280,8 @@
               }
             }
           },
-          "401": { "description": "No autenticado" },
-          "403": { "description": "No autorizado (solo admin)" }
+          "401": { "description": "No autenticado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "No autorizado (solo admin)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       },
       "post": {
@@ -190,10 +295,10 @@
           }
         },
         "responses": {
-          "201": { "description": "Usuario creado" },
-          "400": { "description": "Datos invalidos" },
-          "401": { "description": "No autenticado" },
-          "403": { "description": "No autorizado (solo admin)" }
+          "201": { "description": "Usuario creado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } },
+          "400": { "description": "Datos invalidos", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "No autenticado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "No autorizado (solo admin)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       }
     },
@@ -212,10 +317,10 @@
           }
         },
         "responses": {
-          "200": { "description": "Usuario actualizado" },
-          "400": { "description": "Datos invalidos" },
-          "401": { "description": "No autenticado" },
-          "403": { "description": "No autorizado (solo admin)" }
+          "200": { "description": "Usuario actualizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdatedResponse" } } } },
+          "400": { "description": "Datos invalidos", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "No autenticado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "No autorizado (solo admin)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       },
       "delete": {
@@ -227,8 +332,9 @@
         ],
         "responses": {
           "204": { "description": "Usuario eliminado" },
-          "401": { "description": "No autenticado" },
-          "403": { "description": "No autorizado (solo admin)" }
+          "400": { "description": "No se pudo eliminar", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "No autenticado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "No autorizado (solo admin)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       }
     },
@@ -246,7 +352,7 @@
               }
             }
           },
-          "401": { "description": "No autenticado" }
+          "401": { "description": "No autenticado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       },
       "post": {
@@ -260,10 +366,10 @@
           }
         },
         "responses": {
-          "201": { "description": "Objeto creado" },
-          "400": { "description": "Datos invalidos" },
-          "401": { "description": "No autenticado" },
-          "403": { "description": "No autorizado (solo admin)" }
+          "201": { "description": "Objeto creado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FinancialObject" } } } },
+          "400": { "description": "Datos invalidos", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "No autenticado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "No autorizado (solo admin)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       }
     },
@@ -282,10 +388,10 @@
           }
         },
         "responses": {
-          "200": { "description": "Objeto actualizado" },
-          "400": { "description": "Datos invalidos" },
-          "401": { "description": "No autenticado" },
-          "403": { "description": "No autorizado (solo admin)" }
+          "200": { "description": "Objeto actualizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdatedResponse" } } } },
+          "400": { "description": "Datos invalidos", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "No autenticado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "No autorizado (solo admin)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       },
       "delete": {
@@ -297,8 +403,82 @@
         ],
         "responses": {
           "204": { "description": "Objeto eliminado" },
-          "401": { "description": "No autenticado" },
-          "403": { "description": "No autorizado (solo admin)" }
+          "400": { "description": "No se pudo eliminar", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "No autenticado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "No autorizado (solo admin)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/accounts": {
+      "get": {
+        "tags": ["Accounts"],
+        "summary": "Lista cuentas (admin ve todas, usuario ve solo las suyas)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Listado de cuentas",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Account" } }
+              }
+            }
+          },
+          "401": { "description": "No autenticado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "post": {
+        "tags": ["Accounts"],
+        "summary": "Crea una cuenta (admin)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/AccountCreate" } }
+          }
+        },
+        "responses": {
+          "201": { "description": "Cuenta creada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Account" } } } },
+          "422": { "description": "Datos invalidos", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "No autenticado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "No autorizado (solo admin)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/accounts/{id}": {
+      "put": {
+        "tags": ["Accounts"],
+        "summary": "Actualiza una cuenta (admin)",
+        "description": "Tambien acepta POST a /accounts/{id}/update para clientes legados.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/AccountUpdate" } }
+          }
+        },
+        "responses": {
+          "200": { "description": "Cuenta actualizada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Account" } } } },
+          "422": { "description": "Datos invalidos o cuenta inexistente", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "No autenticado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "No autorizado (solo admin)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "delete": {
+        "tags": ["Accounts"],
+        "summary": "Elimina una cuenta (admin)",
+        "description": "Tambien acepta POST a /accounts/{id}/delete o /remove para clientes legados.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "204": { "description": "Cuenta eliminada" },
+          "404": { "description": "Cuenta no encontrada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "No autenticado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "No autorizado (solo admin)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       }
     }

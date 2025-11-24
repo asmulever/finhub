@@ -23,7 +23,7 @@ class MysqlUserRepository implements UserRepository
     {
         $this->logger->info("Attempting to find user by email: $email");
         try {
-            $stmt = $this->db->prepare('SELECT id, email, password_hash AS password, role FROM users WHERE email = :email LIMIT 1');
+            $stmt = $this->db->prepare('SELECT id, email, password_hash AS password, role, is_active FROM users WHERE email = :email LIMIT 1');
             $stmt->execute(['email' => $email]);
             $data = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -33,7 +33,7 @@ class MysqlUserRepository implements UserRepository
             }
 
             $this->logger->info("User with email $email found.");
-            return new User((int)$data['id'], $data['email'], $data['password'], $data['role']);
+            return new User((int)$data['id'], $data['email'], $data['password'], $data['role'], (bool)$data['is_active']);
         } catch (\PDOException $e) {
             $this->logger->error("Database error while finding user by email: " . $e->getMessage());
             return null;
@@ -44,7 +44,7 @@ class MysqlUserRepository implements UserRepository
     {
         $this->logger->info("Attempting to find user by id: $id");
         try {
-            $stmt = $this->db->prepare('SELECT id, email, password_hash AS password, role FROM users WHERE id = :id LIMIT 1');
+            $stmt = $this->db->prepare('SELECT id, email, password_hash AS password, role, is_active FROM users WHERE id = :id LIMIT 1');
             $stmt->execute(['id' => $id]);
             $data = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -54,7 +54,7 @@ class MysqlUserRepository implements UserRepository
             }
 
             $this->logger->info("User with id $id found.");
-            return new User((int)$data['id'], $data['email'], $data['password'], $data['role']);
+            return new User((int)$data['id'], $data['email'], $data['password'], $data['role'], (bool)$data['is_active']);
         } catch (\PDOException $e) {
             $this->logger->error("Database error while finding user by id: " . $e->getMessage());
             return null;
@@ -65,10 +65,10 @@ class MysqlUserRepository implements UserRepository
     {
         $this->logger->info("Attempting to find all users");
         try {
-            $stmt = $this->db->query('SELECT id, email, password_hash AS password, role FROM users');
+            $stmt = $this->db->query('SELECT id, email, password_hash AS password, role, is_active FROM users');
             $results = [];
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                $results[] = new User((int)$row['id'], $row['email'], $row['password'], $row['role']);
+                $results[] = new User((int)$row['id'], $row['email'], $row['password'], $row['role'], (bool)$row['is_active']);
             }
             $this->logger->info("Found " . count($results) . " users.");
             return $results;
@@ -82,11 +82,12 @@ class MysqlUserRepository implements UserRepository
     {
         $this->logger->info("Attempting to save user: " . $user->getEmail());
         try {
-            $stmt = $this->db->prepare('INSERT INTO users (email, password_hash, role) VALUES (:email, :password, :role)');
+            $stmt = $this->db->prepare('INSERT INTO users (email, password_hash, role, is_active) VALUES (:email, :password, :role, :is_active)');
             $stmt->execute([
                 'email' => $user->getEmail(),
                 'password' => $user->getPasswordHash(),
-                'role' => $user->getRole()
+                'role' => $user->getRole(),
+                'is_active' => $user->isActive() ? 1 : 0,
             ]);
             $this->logger->info("User saved successfully.");
             return (int)$this->db->lastInsertId();
@@ -100,12 +101,13 @@ class MysqlUserRepository implements UserRepository
     {
         $this->logger->info("Attempting to update user: " . $user->getId());
         try {
-            $stmt = $this->db->prepare('UPDATE users SET email = :email, password_hash = :password, role = :role WHERE id = :id');
+            $stmt = $this->db->prepare('UPDATE users SET email = :email, password_hash = :password, role = :role, is_active = :is_active WHERE id = :id');
             $stmt->execute([
                 'id' => $user->getId(),
                 'email' => $user->getEmail(),
                 'password' => $user->getPasswordHash(),
-                'role' => $user->getRole()
+                'role' => $user->getRole(),
+                'is_active' => $user->isActive() ? 1 : 0,
             ]);
             $this->logger->info("User updated successfully.");
         } catch (\PDOException $e) {

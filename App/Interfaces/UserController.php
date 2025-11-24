@@ -8,7 +8,7 @@ use App\Application\UserService;
 use App\Infrastructure\JwtService;
 use App\Infrastructure\Logger;
 
-class UserController
+class UserController extends BaseController
 {
     private Logger $logger;
 
@@ -80,7 +80,8 @@ class UserController
         }
 
         if ($this->userService->deleteUser($id)) {
-            http_response_code(204);
+            http_response_code(200);
+            echo json_encode(['status' => 'deleted']);
             return;
         }
 
@@ -91,7 +92,7 @@ class UserController
     private function authorizeAdmin(): ?object
     {
         $this->logger->info("Authorizing admin request.");
-        $token = $this->getAccessToken();
+        $token = $this->getAccessTokenFromRequest();
 
         if ($token === null) {
             $this->logger->warning("Unauthorized access attempt: missing token.");
@@ -133,36 +134,4 @@ class UserController
         return $input;
     }
 
-    private function getAccessToken(): ?string
-    {
-        $candidates = [
-            $_SERVER['HTTP_AUTHORIZATION'] ?? null,
-            $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null,
-        ];
-
-        foreach ($candidates as $value) {
-            if (is_string($value) && $value !== '' && preg_match('/Bearer\\s(\\S+)/', $value, $matches)) {
-                return $matches[1];
-            }
-        }
-
-        $headerFetcher = function_exists('getallheaders') ? 'getallheaders' : (function_exists('apache_request_headers') ? 'apache_request_headers' : null);
-        if ($headerFetcher !== null) {
-            $headers = $headerFetcher();
-            if (is_array($headers)) {
-                foreach ($headers as $name => $value) {
-                    if (strcasecmp($name, 'Authorization') === 0 && preg_match('/Bearer\\s(\\S+)/', (string)$value, $matches)) {
-                        return $matches[1];
-                    }
-                }
-            }
-        }
-
-        $cookieToken = $_COOKIE['access_token'] ?? null;
-        if (is_string($cookieToken) && $cookieToken !== '') {
-            return $cookieToken;
-        }
-
-        return null;
-    }
 }

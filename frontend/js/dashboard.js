@@ -1,4 +1,3 @@
-const API_BASE = "/index.php";
 const PORTFOLIO_KEY = "finhub_portfolios";
 
 let state = {
@@ -7,9 +6,11 @@ let state = {
   isAdmin: false,
   users: [],
   tickers: [],
+  accounts: [],
   health: null,
   editingUserId: null,
   editingTickerId: null,
+  editingAccountId: null,
 };
 
 let sessionCountdownInterval = null;
@@ -85,6 +86,15 @@ function setupLayout() {
       ?.addEventListener("click", resetTickerForm);
   }
 
+  const brokerForm = document.getElementById("brokerForm");
+  if (brokerForm) {
+    brokerForm.addEventListener("submit", handleBrokerFormSubmit);
+    document
+      .getElementById("brokerFormReset")
+      ?.addEventListener("click", resetBrokerForm);
+  }
+  applyBrokerFormMode();
+
   const portfolioUserSelect = document.getElementById("portfolioUserSelect");
   const portfolioTickerSelect = document.getElementById("portfolioTickerSelect");
   const addTickerBtn = document.getElementById("addTickerToPortfolio");
@@ -123,6 +133,7 @@ async function loadInitialData() {
   // Health is public, tickers require token, users only if admin
   const healthPromise = fetchPublic("/health");
   const tickersPromise = fetchProtected("/financial-objects");
+  const accountsPromise = fetchProtected("/accounts");
   const usersPromise = state.isAdmin
     ? fetchProtected("/users")
     : Promise.resolve([
@@ -133,19 +144,23 @@ async function loadInitialData() {
         },
       ]);
 
-  const [health, tickers, users] = await Promise.all([
+  const [health, tickers, users, accounts] = await Promise.all([
     healthPromise,
     tickersPromise,
     usersPromise,
+    accountsPromise,
   ]);
 
   state.health = health ?? { status: "N/D" };
   state.tickers = Array.isArray(tickers) ? tickers : [];
   state.users = Array.isArray(users) ? users : [];
+  state.accounts = Array.isArray(accounts) ? accounts : [];
 
   updateMetrics();
   renderUsersTable();
   renderTickersTable();
+  populateBrokerUsers();
+  renderBrokersTable();
   populatePortfolioSelectors();
   renderPortfolioList();
 }
@@ -206,6 +221,7 @@ async function loadUsers() {
     state.users = data;
     renderUsersTable();
     populatePortfolioSelectors();
+    populateBrokerUsers();
     updateMetrics();
   }
 }
@@ -394,6 +410,177 @@ function resetTickerForm() {
   document.getElementById("tickerFormStatus").textContent = "";
 }
 
+// Brokers CRUD ----------------------------------------------------
+function applyBrokerFormMode() {
+  const form = document.getElementById("brokerForm");
+  const notice = document.getElementById("brokerReadOnlyNotice");
+  if (!form) return;
+
+  const disabled = !state.isAdmin;
+  form
+    .querySelectorAll("input, select, button")
+    .forEach((el) => {
+      if (el.id === "brokerFormReset") return;
+      el.disabled = disabled;
+    });
+
+  if (notice) {
+    notice.classList.toggle("d-none", !disabled);
+  }
+}
+
+async function handleBrokerFormSubmit(event) {
+  event.preventDefault();
+  if (!state.isAdmin) return;
+
+  const status = document.getElementById("brokerFormStatus");
+  status.textContent = "Guardando...";
+
+  const payload = {
+    user_id: Number(document.getElementById("brokerUserSelect").value),
+    broker_name: document.getElementById("brokerName").value.trim(),
+    currency: document.getElementById("brokerCurrency").value.trim(),
+    is_primary: document.getElementById("brokerPrimary").checked,
+  };
+
+  try {
+    if (state.editingAccountId) {
+      try {
+        await requestWithAuth(
+          `/accounts/${state.editingAccountId}`,
+          "PUT",
+          payload
+        );
+      } catch (err) {
+        console.warn("PUT /accounts failed, retrying via POST", err);
+        await requestWithAuth(
+          `/accounts/${state.editingAccountId}/update`,
+          "POST",
+          payload
+        );
+      }
+      status.textContent = "Cuenta actualizada.";
+    } else {
+      await requestWithAuth("/accounts", "POST", payload);
+      status.textContent = "Cuenta creada.";
+    }
+    resetBrokerForm();
+    await loadAccounts();
+  } catch (err) {
+    status.textContent = err.message || "No fue posible guardar.";
+  }
+}
+
+async function loadAccounts() {
+  const data = await fetchProtected("/accounts");
+  if (Array.isArray(data)) {
+    state.accounts = data;
+    renderBrokersTable();
+  }
+}
+
+function renderBrokersTable() {
+  const tbody = document.getElementById("brokersTableBody");
+  if (!tbody) return;
+
+  if (state.accounts.length === 0) {
+    tbody.innerHTML =
+      '<tr><td colspan="7" class="text-center text-muted">Sin cuentas registradas.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = state.accounts
+    .map(
+      (account) => `
+      <tr>
+        <td>${account.id}</td>
+        <td>${account.user_email}</td>
+        <td>${account.broker_name}</td>
+        <td>${account.currency}</td>
+        <td>${account.is_primary ? "Sí" : "No"}</td>
+        <td>${account.created_at ?? "-"}</td>
+        <td class="text-end table-actions">
+          ${
+            state.isAdmin
+              ? `<button class="btn btn-sm btn-outline-primary" data-action="edit-account" data-id="${account.id}">Editar</button>
+                 <button class="btn btn-sm btn-outline-danger" data-action="delete-account" data-id="${account.id}">Eliminar</button>`
+              : '<span class="text-muted small">Solo lectura</span>'
+          }
+        </td>
+      </tr>
+    `
+    )
+    .join("");
+
+  if (!state.isAdmin) {
+    return;
+  }
+
+  tbody.querySelectorAll("button").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const id = Number(btn.dataset.id);
+      if (btn.dataset.action === "edit-account") {
+        startEditBroker(id);
+      } else if (btn.dataset.action === "delete-account") {
+        deleteAccountBroker(id);
+      }
+    })
+  );
+}
+
+function populateBrokerUsers() {
+  const select = document.getElementById("brokerUserSelect");
+  if (!select) return;
+
+  const users = state.isAdmin
+    ? state.users
+    : [
+        {
+          id: state.payload?.uid ?? 0,
+          email: state.payload?.email ?? "usuario",
+        },
+      ];
+
+  select.innerHTML = users
+    .map((user) => `<option value="${user.id}">${user.email}</option>`)
+    .join("");
+}
+
+function startEditBroker(accountId) {
+  const account = state.accounts.find((a) => a.id === accountId);
+  if (!account) return;
+
+  state.editingAccountId = accountId;
+  document.getElementById("brokerUserSelect").value = String(account.user_id);
+  document.getElementById("brokerName").value = account.broker_name;
+  document.getElementById("brokerCurrency").value = account.currency;
+  document.getElementById("brokerPrimary").checked = account.is_primary;
+  document.getElementById("brokerFormStatus").textContent =
+    "Editando broker #" + accountId;
+}
+
+async function deleteAccountBroker(accountId) {
+  if (!confirm("¿Eliminar esta cuenta definitivamente?")) return;
+  try {
+    await requestWithAuth(`/accounts/${accountId}`, "DELETE");
+    await loadAccounts();
+  } catch (err) {
+    console.warn("DELETE /accounts fallo, reintentando via POST", err);
+    try {
+      await requestWithAuth(`/accounts/${accountId}/delete`, "POST");
+      await loadAccounts();
+    } catch (err2) {
+      alert(err2.message || "No se pudo eliminar la cuenta.");
+    }
+  }
+}
+
+function resetBrokerForm() {
+  state.editingAccountId = null;
+  document.getElementById("brokerForm")?.reset();
+  document.getElementById("brokerFormStatus").textContent = "";
+}
+
 // Portafolio -------------------------------------------------------
 function populatePortfolioSelectors() {
   const userSelect = document.getElementById("portfolioUserSelect");
@@ -521,12 +708,11 @@ async function handlePortfolioTickerCreate(event) {
 
 // Helpers ----------------------------------------------------------
 async function requestWithAuth(route, method, body) {
-  const res = await fetch(`${API_BASE}${route}`, {
+  const res = await apiFetch(route, {
     method,
     headers: {
       "Content-Type": "application/json",
     },
-    credentials: "same-origin",
     body: body ? JSON.stringify(body) : undefined,
   });
 
@@ -547,9 +733,7 @@ async function requestWithAuth(route, method, body) {
 
 async function fetchProtected(route) {
   try {
-    const res = await fetch(`${API_BASE}${route}`, {
-      credentials: "same-origin",
-    });
+    const res = await apiFetch(route);
     if (res.status === 401) {
       redirectToLogin();
       return null;
@@ -566,7 +750,7 @@ async function fetchProtected(route) {
 
 async function fetchPublic(route) {
   try {
-    const res = await fetch(`${API_BASE}${route}`);
+    const res = await apiFetch(route);
     return await res.json();
   } catch (err) {
     console.warn(`Error fetching ${route}`, err);
@@ -576,9 +760,7 @@ async function fetchPublic(route) {
 
 async function fetchSession() {
   try {
-    const res = await fetch(`${API_BASE}/auth/session`, {
-      credentials: "same-origin",
-    });
+    const res = await apiFetch("/auth/session");
     if (!res.ok) {
       redirectToLogin();
       return null;
@@ -602,10 +784,7 @@ async function fetchSession() {
 async function logoutAndRedirect() {
   clearSessionTimers();
   try {
-    await fetch(`${API_BASE}/auth/logout`, {
-      method: "POST",
-      credentials: "same-origin",
-    });
+    await apiFetch("/auth/logout", { method: "POST" });
   } catch (err) {
     console.warn("No se pudo cerrar la sesión en el servidor", err);
   }
@@ -734,10 +913,7 @@ function formatDuration(seconds) {
 
 async function refreshSession({ silent = false } = {}) {
   try {
-    const res = await fetch(`${API_BASE}/auth/refresh`, {
-      method: "POST",
-      credentials: "same-origin",
-    });
+    const res = await apiFetch("/auth/refresh", { method: "POST" });
     if (!res.ok) throw new Error("No se pudo extender la sesión.");
     const data = await res.json();
     const payload = data.payload ?? null;
@@ -748,6 +924,7 @@ async function refreshSession({ silent = false } = {}) {
     state.payload = payload;
     state.sessionExpiresAt = accessExp;
     state.isAdmin = (payload?.role ?? "").toLowerCase() === "admin";
+    applyBrokerFormMode();
     const userName = document.getElementById("userName");
     if (userName) {
       userName.textContent = payload.email ?? "Usuario autenticado";

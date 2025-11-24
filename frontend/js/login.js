@@ -1,5 +1,3 @@
-const API_BASE = "/index.php";
-
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("loginForm");
   const emailInput = document.getElementById("email");
@@ -33,10 +31,9 @@ document.addEventListener("DOMContentLoaded", () => {
     loginBtn.textContent = "Validando...";
 
     try {
-      const response = await fetch(`${API_BASE}/auth/login`, {
+      const response = await apiFetch("/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
         body: JSON.stringify({
           email: emailInput.value.trim(),
           password: passwordInput.value,
@@ -53,9 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Fallback: si el backend colocó solo la cookie, obtener sesión explícita
       if (!payload || !accessExp) {
-        const sessionCheck = await fetch(`${API_BASE}/auth/session`, {
-          credentials: "same-origin",
-        });
+        const sessionCheck = await apiFetch("/auth/session");
         if (sessionCheck.ok) {
           const sessionData = await sessionCheck.json();
           payload = payload ?? sessionData.payload ?? null;

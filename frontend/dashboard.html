@@ -26,6 +26,7 @@
         <nav class="nav flex-column gap-1" id="mainNav">
           <a href="#" class="nav-link active" data-section="overview">Resumen</a>
           <a href="#" class="nav-link" data-section="users" data-role="admin">Usuarios</a>
+          <a href="#" class="nav-link" data-section="brokers">Brokers</a>
           <a href="#" class="nav-link" data-section="tickers">Ticker's</a>
           <a href="#" class="nav-link" data-section="portfolio">Portafolio</a>
         </nav>
@@ -75,6 +76,67 @@
                 Agrega nuevas pantallas invocando APIs internas con Bootstrap por CDN.
                 Esta sección sirve como contenedor para tableros, tablas o gráficos.
               </p>
+            </div>
+          </div>
+        </section>
+
+        <section id="section-brokers" class="dashboard-section">
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+              <h3 class="mb-0">Brokers / Cuentas</h3>
+              <p class="text-muted mb-0">Relaciona usuarios con sus cuentas operativas.</p>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" id="brokerFormReset" data-role="admin">Nueva cuenta</button>
+          </div>
+          <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+              <form id="brokerForm" class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label">Usuario</label>
+                  <select id="brokerUserSelect" class="form-select"></select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Broker / Cuenta</label>
+                  <input type="text" id="brokerName" class="form-control" required>
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label">Moneda</label>
+                  <input type="text" id="brokerCurrency" class="form-control" value="USD" maxlength="12">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="brokerPrimary">
+                    <label class="form-check-label" for="brokerPrimary">Principal</label>
+                  </div>
+                </div>
+                <div class="col-12 d-flex gap-2">
+                  <button class="btn btn-primary" type="submit" id="brokerSaveBtn">Guardar</button>
+                  <div class="text-muted" id="brokerFormStatus"></div>
+                </div>
+              </form>
+              <div class="alert alert-info mt-3 d-none" id="brokerReadOnlyNotice">
+                Solo los administradores pueden crear o editar brokers. Consulta a tu equipo para cambios.
+              </div>
+            </div>
+          </div>
+          <div class="card shadow-sm border-0">
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Usuario</th>
+                      <th>Broker</th>
+                      <th>Moneda</th>
+                      <th>Principal</th>
+                      <th>Creado</th>
+                      <th class="text-end">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="brokersTableBody"></tbody>
+                </table>
+              </div>
             </div>
           </div>
         </section>
@@ -244,7 +306,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js"></script>
+  <script src="js/api-client.js?v=1"></script>
   <script src="js/session.js?v=4"></script>
-  <script src="js/dashboard.js?v=4"></script>
+  <script src="js/dashboard.js?v=5"></script>
 </body>
 </html>

@@ -11,6 +11,7 @@ class User
         private readonly string $email,
         private readonly string $passwordHash,
         private readonly string $role = 'user',
+        private readonly bool $isActive = true,
     ) {
     }
 
@@ -34,6 +35,11 @@ class User
         return $this->passwordHash;
     }
 
+    public function isActive(): bool
+    {
+        return $this->isActive;
+    }
+
     /**
      * BC helper: keeps compatibility with older calls expecting getPassword.
      */
@@ -48,6 +54,7 @@ class User
             'id' => $this->id,
             'email' => $this->email,
             'role' => $this->role,
+            'is_active' => $this->isActive,
         ];
     }
 }
