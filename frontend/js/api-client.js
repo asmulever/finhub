@@ -35,9 +35,51 @@ function buildApiUrl(route) {
   return `${trimTrailingSlash(base)}${normalized}`;
 }
 
+const SESSION_REFRESH_PATH = "/auth/refresh";
+const SESSION_EXEMPT_ROUTES = new Set([
+  "/auth/login",
+  "/auth/logout",
+  SESSION_REFRESH_PATH,
+]);
+let sessionRefreshPromise = null;
+
 function apiFetch(route, options = {}) {
+  const { skipSessionExtend = false, ...fetchOptions } = options;
   const url = buildApiUrl(route);
   const defaultCredentials = API_IS_CROSS_ORIGIN ? "include" : "same-origin";
-  const requestOptions = { credentials: defaultCredentials, ...options };
-  return fetch(url, requestOptions);
+  const requestOptions = { credentials: defaultCredentials, ...fetchOptions };
+
+  return fetch(url, requestOptions).then(async (response) => {
+    if (
+      response.ok &&
+      !skipSessionExtend &&
+      !SESSION_EXEMPT_ROUTES.has(route)
+    ) {
+      try {
+        await refreshSessionTokens(defaultCredentials);
+      } catch (err) {
+        console.warn("No se pudo refrescar la sesión tras la acción.", err);
+      }
+    }
+    return response;
+  });
+}
+
+async function refreshSessionTokens(credentialsMode) {
+  if (sessionRefreshPromise) {
+    return sessionRefreshPromise;
+  }
+
+  sessionRefreshPromise = fetch(buildApiUrl(SESSION_REFRESH_PATH), {
+    method: "POST",
+    credentials:
+      credentialsMode ?? (API_IS_CROSS_ORIGIN ? "include" : "same-origin"),
+  }).finally(() => {
+    sessionRefreshPromise = null;
+  });
+
+  const response = await sessionRefreshPromise;
+  if (!response.ok) {
+    throw new Error(`Refresh failed: ${response.status}`);
+  }
 }

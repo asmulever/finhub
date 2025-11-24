@@ -784,7 +784,7 @@ async function fetchSession() {
 async function logoutAndRedirect() {
   clearSessionTimers();
   try {
-    await apiFetch("/auth/logout", { method: "POST" });
+    await apiFetch("/auth/logout", { method: "POST", skipSessionExtend: true });
   } catch (err) {
     console.warn("No se pudo cerrar la sesión en el servidor", err);
   }
