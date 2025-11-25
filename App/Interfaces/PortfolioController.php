@@ -26,9 +26,26 @@ class PortfolioController extends BaseController
             return;
         }
 
-        $data = $this->portfolioService->getPortfolioWithTickers((int)$payload->uid);
+        $brokerId = isset($_GET['broker_id']) ? (int)$_GET['broker_id'] : 0;
+        if ($brokerId <= 0) {
+            http_response_code(400);
+            echo json_encode(['error' => 'broker_id is required']);
+            return;
+        }
+
+        try {
+            $tickers = $this->portfolioService->getTickersForBroker((int)$payload->uid, $brokerId);
+        } catch (\Throwable $e) {
+            http_response_code(400);
+            echo json_encode(['error' => $e->getMessage()]);
+            return;
+        }
+
         http_response_code(200);
-        echo json_encode($data);
+        echo json_encode([
+            'broker_id' => $brokerId,
+            'tickers' => $tickers,
+        ]);
     }
 
     public function addTicker(): void

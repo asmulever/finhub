@@ -36,7 +36,7 @@ function buildApiUrl(route) {
 }
 
 const SESSION_REFRESH_PATH = "/auth/refresh";
-const SESSION_EXEMPT_ROUTES = new Set([
+const SESSION_EXEMPT_PATHS = new Set([
   "/auth/login",
   "/auth/logout",
   SESSION_REFRESH_PATH,
@@ -48,7 +48,15 @@ function apiFetch(route, options = {}) {
   const url = buildApiUrl(route);
   const defaultCredentials = API_IS_CROSS_ORIGIN ? "include" : "same-origin";
   const requestOptions = { credentials: defaultCredentials, ...fetchOptions };
-  const mustExtend = !skipSessionExtend && !SESSION_EXEMPT_ROUTES.has(route);
+  const routePath = getRoutePath(route);
+  const hasSession =
+    typeof Session !== "undefined" &&
+    Session.getPayload() !== null &&
+    !Session.isExpired(Session.getExpiresAt());
+  const mustExtend =
+    !skipSessionExtend &&
+    hasSession &&
+    !SESSION_EXEMPT_PATHS.has(routePath);
 
   const refreshPromise = mustExtend
     ? refreshSessionTokens(defaultCredentials).catch((err) => {
@@ -90,13 +98,26 @@ async function refreshSessionTokens(credentialsMode) {
         }
       }
 
-      return response;
+      return true;
     })
     .finally(() => {
       sessionRefreshPromise = null;
     });
 
   await sessionRefreshPromise;
+}
+
+function getRoutePath(route) {
+  try {
+    const absolute = new URL(route, window.location.origin);
+    const trimmed = trimTrailingSlash(absolute.pathname);
+    return trimmed === "" ? "/" : trimmed;
+  } catch {
+    const normalized = normalizeRoute(route);
+    const absolute = new URL(normalized, window.location.origin);
+    const trimmed = trimTrailingSlash(absolute.pathname);
+    return trimmed === "" ? "/" : trimmed;
+  }
 }
 
 window.apiFetch = apiFetch;

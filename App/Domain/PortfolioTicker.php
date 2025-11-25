@@ -8,7 +8,7 @@ class PortfolioTicker
 {
     public function __construct(
         private readonly ?int $id,
-        private readonly int $portfolioId,
+        private readonly int $brokerId,
         private readonly int $financialObjectId,
         private readonly float $quantity,
         private readonly float $avgPrice
@@ -20,9 +20,9 @@ class PortfolioTicker
         return $this->id;
     }
 
-    public function getPortfolioId(): int
+    public function getBrokerId(): int
     {
-        return $this->portfolioId;
+        return $this->brokerId;
     }
 
     public function getFinancialObjectId(): int
@@ -44,7 +44,7 @@ class PortfolioTicker
     {
         return [
             'id' => $this->id,
-            'portfolio_id' => $this->portfolioId,
+            'broker_id' => $this->brokerId,
             'financial_object_id' => $this->financialObjectId,
             'quantity' => $this->quantity,
             'avg_price' => $this->avgPrice,

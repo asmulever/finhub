@@ -24,7 +24,6 @@ class SchemaManager
         self::ensureUsersTable($pdo, $logger);
         self::ensureFinancialObjectsTable($pdo, $logger);
         self::ensureAccountsTable($pdo, $logger);
-        self::ensurePortfoliosTable($pdo, $logger);
         self::ensurePortfolioTickersTable($pdo, $logger);
         self::seedData($pdo, $logger);
         self::applyRootUserPolicy($pdo, $logger);
@@ -84,67 +83,39 @@ class SchemaManager
         ) " . self::TABLE_OPTIONS);
     }
 
-    private static function ensurePortfoliosTable(PDO $pdo, Logger $logger): void
-    {
-        self::renameLegacyTable($pdo, $logger, 'portfolios', 'id');
-
-        $pdo->exec("CREATE TABLE IF NOT EXISTS portfolios (
-            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            user_id INT UNSIGNED NOT NULL UNIQUE,
-            name VARCHAR(120) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            CONSTRAINT fk_portfolios_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        ) " . self::TABLE_OPTIONS);
-
-        if (!self::columnExists($pdo, 'portfolios', 'user_id')) {
-            $pdo->exec("ALTER TABLE portfolios ADD COLUMN user_id INT UNSIGNED NULL AFTER id");
-        }
-
-        if (self::columnExists($pdo, 'portfolios', 'account_id')) {
-            $pdo->exec(
-                "UPDATE portfolios p
-                 INNER JOIN accounts a ON p.account_id = a.id
-                 SET p.user_id = a.user_id
-                 WHERE p.user_id IS NULL"
-            );
-        }
-
-        self::deduplicatePortfolios($pdo, $logger);
-
-        $pdo->exec("ALTER TABLE portfolios MODIFY COLUMN user_id INT UNSIGNED NOT NULL");
-        self::ensureUniqueIndex($pdo, $logger, 'portfolios', 'unique_portfolio_user', 'user_id');
-
-        if (self::columnExists($pdo, 'portfolios', 'account_id')) {
-            self::dropForeignKeyIfExists($pdo, $logger, 'portfolios', 'fk_portfolios_account');
-            $pdo->exec("ALTER TABLE portfolios DROP COLUMN account_id");
-        }
-    }
-
     private static function ensurePortfolioTickersTable(PDO $pdo, Logger $logger): void
     {
         $pdo->exec("CREATE TABLE IF NOT EXISTS portfolio_tickers (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            portfolio_id INT UNSIGNED NOT NULL,
+            account_id INT UNSIGNED NOT NULL,
             financial_object_id INT UNSIGNED NOT NULL,
             quantity DECIMAL(18,4) NOT NULL DEFAULT 0,
             avg_price DECIMAL(18,4) NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            CONSTRAINT fk_pt_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE,
+            CONSTRAINT fk_pt_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
             CONSTRAINT fk_pt_financial_object FOREIGN KEY (financial_object_id) REFERENCES financial_objects(id) ON DELETE CASCADE,
-            UNIQUE KEY unique_portfolio_ticker (portfolio_id, financial_object_id)
+            UNIQUE KEY unique_account_ticker (account_id, financial_object_id)
         ) " . self::TABLE_OPTIONS);
 
-        if (self::columnExists($pdo, 'portfolio_tickers', 'weight')) {
-            if (!self::columnExists($pdo, 'portfolio_tickers', 'quantity')) {
-                $pdo->exec("ALTER TABLE portfolio_tickers ADD COLUMN quantity DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER financial_object_id");
-            }
-            $pdo->exec("UPDATE portfolio_tickers SET quantity = weight WHERE quantity = 0");
-            $pdo->exec("ALTER TABLE portfolio_tickers DROP COLUMN weight");
+        if (!self::columnExists($pdo, 'portfolio_tickers', 'account_id')) {
+            $logger->info('Adding account_id to portfolio_tickers.');
+            $pdo->exec("ALTER TABLE portfolio_tickers ADD COLUMN account_id INT UNSIGNED NULL AFTER id");
         }
 
-        if (!self::columnExists($pdo, 'portfolio_tickers', 'avg_price')) {
-            $pdo->exec("ALTER TABLE portfolio_tickers ADD COLUMN avg_price DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER quantity");
+        if (self::columnExists($pdo, 'portfolio_tickers', 'portfolio_id')) {
+            $logger->info('Migrating portfolio_tickers.portfolio_id to account_id.');
+            $pdo->exec("UPDATE portfolio_tickers SET account_id = portfolio_id WHERE account_id IS NULL");
+            $pdo->exec("ALTER TABLE portfolio_tickers DROP COLUMN portfolio_id");
         }
+
+        $pdo->exec("ALTER TABLE portfolio_tickers MODIFY COLUMN account_id INT UNSIGNED NOT NULL");
+    }
+
+    private static function columnExists(PDO $pdo, string $table, string $column): bool
+    {
+        $stmt = $pdo->prepare("SHOW COLUMNS FROM {$table} LIKE :column");
+        $stmt->execute(['column' => $column]);
+        return $stmt->fetchColumn() !== false;
     }
 
     private static function seedData(PDO $pdo, Logger $logger): void
@@ -281,44 +252,4 @@ class SchemaManager
         }
     }
 
-    private static function deduplicatePortfolios(PDO $pdo, Logger $logger): void
-    {
-        $stmt = $pdo->query("SELECT id, user_id FROM portfolios WHERE user_id IS NOT NULL ORDER BY user_id, id");
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $seen = [];
-        $deleteStmt = $pdo->prepare("DELETE FROM portfolios WHERE id = :id");
-
-        foreach ($rows as $row) {
-            $userId = (int)$row['user_id'];
-            if ($userId === 0) {
-                continue;
-            }
-
-            if (isset($seen[$userId])) {
-                $deleteStmt->execute(['id' => (int)$row['id']]);
-                $logger->warning("Deleted duplicate portfolio {$row['id']} for user {$userId}");
-            } else {
-                $seen[$userId] = true;
-            }
-        }
-    }
-
-    private static function columnExists(PDO $pdo, string $table, string $column): bool
-    {
-        $stmt = $pdo->prepare("SHOW COLUMNS FROM {$table} LIKE :column");
-        $stmt->execute(['column' => $column]);
-        return $stmt->fetchColumn() !== false;
-    }
-
-    private static function dropForeignKeyIfExists(PDO $pdo, Logger $logger, string $table, string $keyName): void
-    {
-        try {
-            $pdo->exec("ALTER TABLE {$table} DROP FOREIGN KEY {$keyName}");
-        } catch (\PDOException $e) {
-            if (str_contains($e->getMessage(), 'Cannot drop constraint')) {
-                return;
-            }
-            $logger->warning("Unable to drop foreign key {$keyName} on {$table}: " . $e->getMessage());
-        }
-    }
 }
