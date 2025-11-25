@@ -5,18 +5,25 @@ declare(strict_types=1);
 namespace App\Application;
 
 use App\Domain\UserRepository;
+use App\Infrastructure\Config;
 use App\Infrastructure\JwtService;
 use App\Infrastructure\Logger;
 
 class AuthService
 {
     private Logger $logger;
+    private int $sessionTimeoutSeconds;
 
     public function __construct(
         private readonly UserRepository $userRepository,
         private readonly JwtService $jwtService
     ) {
         $this->logger = new Logger();
+        $timeoutMs = (int)Config::getRequired('SESSION_TIMEOUT_MS');
+        if ($timeoutMs <= 0) {
+            throw new \RuntimeException('SESSION_TIMEOUT_MS must be a positive integer (milliseconds).');
+        }
+        $this->sessionTimeoutSeconds = (int)max(1, ceil($timeoutMs / 1000));
     }
 
     public function validateCredentials(string $email, string $password): ?array
@@ -72,11 +79,11 @@ class AuthService
             'role' => $user->getRole(),
         ];
 
-        $accessToken = $this->jwtService->generateAccessToken($payload, 300); // 5 minutes
+        $accessToken = $this->jwtService->generateAccessToken($payload, $this->sessionTimeoutSeconds);
         $refreshToken = $this->jwtService->generateRefreshToken(['uid' => $user->getId()], 604800); // 7 days
 
         $decodedAccess = $this->jwtService->validateToken($accessToken, 'access');
-        $accessExp = $decodedAccess->exp ?? (time() + 300);
+        $accessExp = $decodedAccess->exp ?? (time() + $this->sessionTimeoutSeconds);
 
         $decodedRefresh = $this->jwtService->validateToken($refreshToken, 'refresh');
         $refreshExp = $decodedRefresh->exp ?? (time() + 604800);

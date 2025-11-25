@@ -6,7 +6,6 @@ namespace App\Application;
 
 use App\Domain\Account;
 use App\Domain\AccountRepository;
-use App\Domain\PortfolioRepository;
 use App\Domain\UserRepository;
 use App\Infrastructure\Logger;
 
@@ -17,7 +16,6 @@ class AccountService
     public function __construct(
         private readonly AccountRepository $accountRepository,
         private readonly UserRepository $userRepository,
-        private readonly PortfolioRepository $portfolioRepository,
     ) {
         $this->logger = new Logger();
     }

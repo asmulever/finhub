@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace App\Application;
 
+use App\Domain\AccountRepository;
 use App\Domain\FinancialObjectRepository;
-use App\Domain\Portfolio;
-use App\Domain\PortfolioRepository;
 use App\Domain\PortfolioTickerRepository;
 use App\Infrastructure\Logger;
 
@@ -15,45 +14,35 @@ class PortfolioService
     private Logger $logger;
 
     public function __construct(
-        private readonly PortfolioRepository $portfolioRepository,
+        private readonly AccountRepository $accountRepository,
         private readonly PortfolioTickerRepository $tickerRepository,
         private readonly FinancialObjectRepository $financialObjectRepository
     ) {
         $this->logger = new Logger();
     }
 
-    public function getPortfolioWithTickers(int $userId): array
+    public function getTickersForBroker(int $userId, int $brokerId): array
     {
-        $portfolio = $this->getOrCreatePortfolio($userId);
-        $tickers = $this->tickerRepository->findDetailedByPortfolio($portfolio->getId(), $userId);
-
-        return [
-            'portfolio' => $portfolio->toArray(),
-            'tickers' => $tickers,
-        ];
+        $this->assertBrokerOwnership($userId, $brokerId);
+        return $this->tickerRepository->findDetailedByBroker($brokerId, $userId);
     }
 
     public function addTicker(int $userId, array $payload): array
     {
-        $portfolio = $this->getOrCreatePortfolio($userId);
+        $brokerId = (int)($payload['broker_id'] ?? 0);
         $financialObjectId = (int)($payload['financial_object_id'] ?? 0);
         $quantity = (float)($payload['quantity'] ?? 0);
         $avgPrice = (float)($payload['avg_price'] ?? 0);
 
-        $this->assertTickerPayload($financialObjectId, $quantity, $avgPrice);
+        $this->assertTickerPayload($brokerId, $financialObjectId, $quantity, $avgPrice);
+        $this->assertBrokerOwnership($userId, $brokerId);
 
         $financialObject = $this->financialObjectRepository->findById($financialObjectId);
         if ($financialObject === null) {
             throw new \RuntimeException('Financial object not found.');
         }
 
-        $tickerId = $this->tickerRepository->create(
-            $portfolio->getId(),
-            $financialObjectId,
-            $quantity,
-            $avgPrice,
-            $userId
-        );
+        $tickerId = $this->tickerRepository->create($brokerId, $financialObjectId, $quantity, $avgPrice, $userId);
 
         $created = $this->tickerRepository->findDetailedById($tickerId, $userId);
         if ($created === null) {
@@ -86,22 +75,20 @@ class PortfolioService
         }
     }
 
-    private function getOrCreatePortfolio(int $userId): Portfolio
+    private function assertBrokerOwnership(int $userId, int $brokerId): void
     {
-        $existing = $this->portfolioRepository->findByUserId($userId);
-        if ($existing !== null) {
-            return $existing;
+        $broker = $this->accountRepository->findById($brokerId);
+        if ($broker === null || $broker->getUserId() !== $userId) {
+            throw new \RuntimeException('Unauthorized broker reference.');
         }
-
-        $name = sprintf('Portfolio #%d', $userId);
-        $portfolioId = $this->portfolioRepository->createForUser($userId, $name);
-        $this->logger->info("Portfolio {$portfolioId} created for user {$userId}");
-
-        return $this->portfolioRepository->findByUserId($userId) ?? new Portfolio($portfolioId, $userId, $name);
     }
 
-    private function assertTickerPayload(int $financialObjectId, float $quantity, float $avgPrice): void
+    private function assertTickerPayload(int $brokerId, int $financialObjectId, float $quantity, float $avgPrice): void
     {
+        if ($brokerId <= 0) {
+            throw new \RuntimeException('broker_id is required.');
+        }
+
         if ($financialObjectId <= 0) {
             throw new \RuntimeException('financial_object_id is required.');
         }

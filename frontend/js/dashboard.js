@@ -5,7 +5,6 @@ let state = {
   users: [],
   tickers: [],
   accounts: [],
-  portfolio: null,
   portfolioTickers: [],
   selectedBrokerId: null,
   health: null,
@@ -110,8 +109,9 @@ function setupLayout() {
 
   document
     .getElementById("portfolioBrokerSelect")
-    ?.addEventListener("change", (event) => {
-      state.selectedBrokerId = event.target.value;
+    ?.addEventListener("change", async (event) => {
+      state.selectedBrokerId = event.target.value || null;
+      await loadPortfolio();
     });
 }
 
@@ -458,28 +458,33 @@ async function loadAccounts() {
   const data = await fetchProtected("/accounts");
   if (Array.isArray(data)) {
     state.accounts = data;
-    if (
-      !state.selectedBrokerId ||
-      !state.accounts.some((account) => String(account.id) === state.selectedBrokerId)
-    ) {
-      state.selectedBrokerId =
-        state.accounts.length > 0 ? String(state.accounts[0].id) : null;
-    }
+    const stillExists =
+      state.selectedBrokerId &&
+      state.accounts.some(
+        (account) => String(account.id) === state.selectedBrokerId
+      );
+    state.selectedBrokerId = stillExists ? state.selectedBrokerId : null;
     renderBrokersTable();
     renderPortfolioSection();
   }
 }
 
-async function loadPortfolio() {
-  const data = await fetchProtected("/portfolio");
+async function loadPortfolio(brokerId = state.selectedBrokerId) {
+  if (!brokerId) {
+    state.portfolioTickers = [];
+    state.selectedBrokerId = null;
+    renderPortfolioSection();
+    return;
+  }
+
+  const data = await fetchProtected(`/portfolio?broker_id=${brokerId}`);
   if (!data) {
-    state.portfolio = null;
     state.portfolioTickers = [];
     renderPortfolioSection();
     return;
   }
 
-  state.portfolio = data.portfolio ?? null;
+  state.selectedBrokerId = brokerId;
   state.portfolioTickers = Array.isArray(data.tickers) ? data.tickers : [];
   renderPortfolioSection();
 }
@@ -490,8 +495,13 @@ function renderPortfolioSection() {
   const tickerSelect = document.getElementById("portfolioTickerSelect");
   const tableBody = document.getElementById("portfolioTickersBody");
   const form = document.getElementById("portfolioTickerForm");
+  const status = document.getElementById("portfolioTickerStatus");
   if (!brokerSelect || !noBrokersAlert || !tickerSelect || !tableBody || !form) {
     return;
+  }
+
+  if (status) {
+    status.textContent = "";
   }
 
   const toggleFormDisabled = (disabled) => {
@@ -508,17 +518,18 @@ function renderPortfolioSection() {
   } else {
     brokerSelect.disabled = false;
     noBrokersAlert.classList.add("d-none");
-    brokerSelect.innerHTML = state.accounts
+    const options = state.accounts
       .map(
         (account) =>
           `<option value="${account.id}" ${
-            String(account.id) === state.selectedBrokerId ? "selected" : ""
+            String(account.id) === (state.selectedBrokerId ?? '')
+              ? "selected"
+              : ""
           }>${account.broker_name}</option>`
       )
       .join("");
-    if (!state.selectedBrokerId && state.accounts.length > 0) {
-      state.selectedBrokerId = String(state.accounts[0].id);
-    }
+    brokerSelect.innerHTML =
+      '<option value="">Seleccione un broker</option>' + options;
     toggleFormDisabled(false);
   }
 
@@ -530,9 +541,9 @@ function renderPortfolioSection() {
       )
       .join("") || '<option value="">Sin ticker\'s disponibles</option>';
 
-  if (!state.portfolio) {
+  if (!state.selectedBrokerId) {
     tableBody.innerHTML =
-      '<tr><td colspan="6" class="text-center text-muted">Cargando portafolio...</td></tr>';
+      '<tr><td colspan="6" class="text-center text-muted">Seleccione el broker con el que desea operar.</td></tr>';
     toggleFormDisabled(true);
     return;
   }
@@ -587,8 +598,8 @@ async function handlePortfolioTickerFormSubmit(event) {
   const status = document.getElementById("portfolioTickerStatus");
   status.textContent = "Guardando...";
 
-  if (!state.portfolio) {
-    status.textContent = "No se encontró portafolio disponible.";
+  if (!state.selectedBrokerId) {
+    status.textContent = "Debes seleccionar un broker.";
     return;
   }
 
@@ -600,6 +611,7 @@ async function handlePortfolioTickerFormSubmit(event) {
 
   try {
     await requestWithAuth("/portfolio/tickers", "POST", {
+      broker_id: Number(state.selectedBrokerId),
       financial_object_id: financialObjectId,
       quantity,
       avg_price: avgPrice,

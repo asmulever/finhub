@@ -16,19 +16,19 @@ class MysqlPortfolioTickerRepository implements PortfolioTickerRepository
         $this->db = DatabaseConnection::getInstance();
     }
 
-    public function findDetailedByPortfolio(int $portfolioId, int $userId): array
+    public function findDetailedByBroker(int $brokerId, int $userId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT t.id, t.portfolio_id, t.financial_object_id, t.quantity, t.avg_price,
+            'SELECT t.id, t.account_id, t.financial_object_id, t.quantity, t.avg_price,
                     f.name AS financial_object_name, f.symbol AS financial_object_symbol, f.type AS financial_object_type
              FROM portfolio_tickers t
-             INNER JOIN portfolios p ON p.id = t.portfolio_id
+             INNER JOIN accounts a ON a.id = t.account_id
              INNER JOIN financial_objects f ON f.id = t.financial_object_id
-             WHERE t.portfolio_id = :portfolio_id AND p.user_id = :user_id
+             WHERE t.account_id = :account_id AND a.user_id = :user_id
              ORDER BY t.id DESC'
         );
         $stmt->execute([
-            'portfolio_id' => $portfolioId,
+            'account_id' => $brokerId,
             'user_id' => $userId,
         ]);
 
@@ -38,12 +38,12 @@ class MysqlPortfolioTickerRepository implements PortfolioTickerRepository
     public function findDetailedById(int $tickerId, int $userId): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT t.id, t.portfolio_id, t.financial_object_id, t.quantity, t.avg_price,
+            'SELECT t.id, t.account_id, t.financial_object_id, t.quantity, t.avg_price,
                     f.name AS financial_object_name, f.symbol AS financial_object_symbol, f.type AS financial_object_type
              FROM portfolio_tickers t
-             INNER JOIN portfolios p ON p.id = t.portfolio_id
+             INNER JOIN accounts a ON a.id = t.account_id
              INNER JOIN financial_objects f ON f.id = t.financial_object_id
-             WHERE t.id = :ticker_id AND p.user_id = :user_id
+             WHERE t.id = :ticker_id AND a.user_id = :user_id
              LIMIT 1'
         );
         $stmt->execute([
@@ -55,20 +55,20 @@ class MysqlPortfolioTickerRepository implements PortfolioTickerRepository
         return $row === false ? null : $row;
     }
 
-    public function create(int $portfolioId, int $financialObjectId, float $quantity, float $avgPrice, int $userId): int
+    public function create(int $brokerId, int $financialObjectId, float $quantity, float $avgPrice, int $userId): int
     {
         $stmt = $this->db->prepare(
-            'INSERT INTO portfolio_tickers (portfolio_id, financial_object_id, quantity, avg_price)
-             SELECT :portfolio_id, :financial_object_id, :quantity, :avg_price
-             FROM portfolios p
-             WHERE p.id = :portfolio_id_check AND p.user_id = :user_id'
+            'INSERT INTO portfolio_tickers (account_id, financial_object_id, quantity, avg_price)
+             SELECT :account_id, :financial_object_id, :quantity, :avg_price
+             FROM accounts a
+             WHERE a.id = :account_check AND a.user_id = :user_id'
         );
         $stmt->execute([
-            'portfolio_id' => $portfolioId,
+            'account_id' => $brokerId,
             'financial_object_id' => $financialObjectId,
             'quantity' => $quantity,
             'avg_price' => $avgPrice,
-            'portfolio_id_check' => $portfolioId,
+            'account_check' => $brokerId,
             'user_id' => $userId,
         ]);
 
@@ -83,9 +83,9 @@ class MysqlPortfolioTickerRepository implements PortfolioTickerRepository
     {
         $stmt = $this->db->prepare(
             'UPDATE portfolio_tickers t
-             INNER JOIN portfolios p ON p.id = t.portfolio_id
+             INNER JOIN accounts a ON a.id = t.account_id
              SET t.quantity = :quantity, t.avg_price = :avg_price
-             WHERE t.id = :ticker_id AND p.user_id = :user_id'
+             WHERE t.id = :ticker_id AND a.user_id = :user_id'
         );
         $stmt->execute([
             'quantity' => $quantity,
@@ -101,8 +101,8 @@ class MysqlPortfolioTickerRepository implements PortfolioTickerRepository
     {
         $stmt = $this->db->prepare(
             'DELETE t FROM portfolio_tickers t
-             INNER JOIN portfolios p ON p.id = t.portfolio_id
-             WHERE t.id = :ticker_id AND p.user_id = :user_id'
+             INNER JOIN accounts a ON a.id = t.account_id
+             WHERE t.id = :ticker_id AND a.user_id = :user_id'
         );
         $stmt->execute([
             'ticker_id' => $tickerId,
