@@ -56,9 +56,9 @@ class AccountService
         $account = new Account(null, $userId, $brokerName, $currency, $isPrimary);
         $accountId = $this->accountRepository->save($account);
 
-        $existingPortfolio = $this->portfolioRepository->findByAccountId($accountId);
+        $existingPortfolio = $this->portfolioRepository->findByUserId($userId);
         if ($existingPortfolio === null) {
-            $this->portfolioRepository->createForAccount($accountId, "{$brokerName} portfolio");
+            $this->portfolioRepository->createForUser($userId, "{$brokerName} portfolio");
         }
 
         return $this->accountRepository->findDetailedById($accountId);
@@ -103,7 +103,7 @@ class AccountService
             return false;
         }
 
-        $this->portfolioRepository->deleteByAccount($id);
+        $this->portfolioRepository->deleteByUserId($existing->getUserId());
         $this->accountRepository->delete($id);
         return true;
     }

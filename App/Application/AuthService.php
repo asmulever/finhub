@@ -57,7 +57,7 @@ class AuthService
         }
 
         $user = $this->userRepository->findById($userId);
-        if ($user === null) {
+        if ($user === null || !$user->isActive()) {
             return null;
         }
 

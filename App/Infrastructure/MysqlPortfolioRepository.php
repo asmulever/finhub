@@ -17,33 +17,33 @@ class MysqlPortfolioRepository implements PortfolioRepository
         $this->db = DatabaseConnection::getInstance();
     }
 
-    public function createForAccount(int $accountId, string $name): int
+    public function createForUser(int $userId, string $name): int
     {
-        $stmt = $this->db->prepare('INSERT INTO portfolios (account_id, name) VALUES (:account_id, :name)');
+        $stmt = $this->db->prepare('INSERT INTO portfolios (user_id, name) VALUES (:user_id, :name)');
         $stmt->execute([
-            'account_id' => $accountId,
+            'user_id' => $userId,
             'name' => $name,
         ]);
 
         return (int)$this->db->lastInsertId();
     }
 
-    public function deleteByAccount(int $accountId): void
+    public function findByUserId(int $userId): ?Portfolio
     {
-        $stmt = $this->db->prepare('DELETE FROM portfolios WHERE account_id = :account_id');
-        $stmt->execute(['account_id' => $accountId]);
-    }
-
-    public function findByAccountId(int $accountId): ?Portfolio
-    {
-        $stmt = $this->db->prepare('SELECT id, account_id, name FROM portfolios WHERE account_id = :account_id LIMIT 1');
-        $stmt->execute(['account_id' => $accountId]);
+        $stmt = $this->db->prepare('SELECT id, user_id, name FROM portfolios WHERE user_id = :user_id LIMIT 1');
+        $stmt->execute(['user_id' => $userId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($row === false) {
             return null;
         }
 
-        return new Portfolio((int)$row['id'], (int)$row['account_id'], $row['name']);
+        return new Portfolio((int)$row['id'], (int)$row['user_id'], $row['name']);
+    }
+
+    public function deleteByUserId(int $userId): void
+    {
+        $stmt = $this->db->prepare('DELETE FROM portfolios WHERE user_id = :user_id');
+        $stmt->execute(['user_id' => $userId]);
     }
 }

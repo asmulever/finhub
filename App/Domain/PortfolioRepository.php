@@ -6,9 +6,9 @@ namespace App\Domain;
 
 interface PortfolioRepository
 {
-    public function createForAccount(int $accountId, string $name): int;
+    public function createForUser(int $userId, string $name): int;
 
-    public function deleteByAccount(int $accountId): void;
+    public function findByUserId(int $userId): ?Portfolio;
 
-    public function findByAccountId(int $accountId): ?Portfolio;
+    public function deleteByUserId(int $userId): void;
 }

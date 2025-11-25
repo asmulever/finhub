@@ -8,7 +8,7 @@ class Portfolio
 {
     public function __construct(
         private readonly ?int $id,
-        private readonly int $accountId,
+        private readonly int $userId,
         private readonly string $name
     ) {
     }
@@ -18,13 +18,22 @@ class Portfolio
         return $this->id;
     }
 
-    public function getAccountId(): int
+    public function getUserId(): int
     {
-        return $this->accountId;
+        return $this->userId;
     }
 
     public function getName(): string
     {
         return $this->name;
+    }
+
+    public function toArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'user_id' => $this->userId,
+            'name' => $this->name,
+        ];
     }
 }
