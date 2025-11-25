@@ -48,21 +48,15 @@ function apiFetch(route, options = {}) {
   const url = buildApiUrl(route);
   const defaultCredentials = API_IS_CROSS_ORIGIN ? "include" : "same-origin";
   const requestOptions = { credentials: defaultCredentials, ...fetchOptions };
+  const mustExtend = !skipSessionExtend && !SESSION_EXEMPT_ROUTES.has(route);
 
-  return fetch(url, requestOptions).then(async (response) => {
-    if (
-      response.ok &&
-      !skipSessionExtend &&
-      !SESSION_EXEMPT_ROUTES.has(route)
-    ) {
-      try {
-        await refreshSessionTokens(defaultCredentials);
-      } catch (err) {
-        console.warn("No se pudo refrescar la sesión tras la acción.", err);
-      }
-    }
-    return response;
-  });
+  const refreshPromise = mustExtend
+    ? refreshSessionTokens(defaultCredentials).catch((err) => {
+        console.warn("No se pudo extender la sesión antes de la acción.", err);
+      })
+    : Promise.resolve();
+
+  return refreshPromise.then(() => fetch(url, requestOptions));
 }
 
 async function refreshSessionTokens(credentialsMode) {
@@ -74,12 +68,36 @@ async function refreshSessionTokens(credentialsMode) {
     method: "POST",
     credentials:
       credentialsMode ?? (API_IS_CROSS_ORIGIN ? "include" : "same-origin"),
-  }).finally(() => {
-    sessionRefreshPromise = null;
-  });
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        throw new Error(`Refresh failed: ${response.status}`);
+      }
 
-  const response = await sessionRefreshPromise;
-  if (!response.ok) {
-    throw new Error(`Refresh failed: ${response.status}`);
-  }
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const data = await response.json();
+        const payload = data.payload ?? null;
+        const accessExp = data.access_expires_at ?? payload?.exp ?? null;
+
+        if (payload && accessExp && typeof Session !== "undefined") {
+          Session.save(payload, accessExp);
+          window.dispatchEvent(
+            new CustomEvent("session:refreshed", {
+              detail: { payload, accessExp },
+            })
+          );
+        }
+      }
+
+      return response;
+    })
+    .finally(() => {
+      sessionRefreshPromise = null;
+    });
+
+  await sessionRefreshPromise;
 }
+
+window.apiFetch = apiFetch;
+window.buildApiUrl = buildApiUrl;
