@@ -1,5 +1,3 @@
-const PORTFOLIO_KEY = "finhub_portfolios";
-
 let state = {
   payload: null,
   sessionExpiresAt: null,
@@ -7,6 +5,8 @@ let state = {
   users: [],
   tickers: [],
   accounts: [],
+  portfolioTickers: [],
+  selectedBrokerId: null,
   health: null,
   editingUserId: null,
   editingTickerId: null,
@@ -38,21 +38,35 @@ document.addEventListener("DOMContentLoaded", async () => {
   scheduleSessionPrompt(state.sessionExpiresAt);
 });
 
+window.addEventListener("session:refreshed", (event) => {
+  const detail = event.detail || {};
+  if (!detail.payload || !detail.accessExp) {
+    return;
+  }
+  applySessionPayload(detail.payload, detail.accessExp);
+});
+
 function setupLayout() {
-  const userName = document.getElementById("userName");
   const tokenPreview = document.getElementById("tokenPreview");
-  const sessionCountdown = document.getElementById("sessionCountdown");
-  const logoutBtn = document.getElementById("logoutBtn");
-  const extendBtn = document.getElementById("extendSession");
+  const userMenuEmail = document.getElementById("userMenuEmail");
+  const adminUsersLink = document.getElementById("userMenuUsersLink");
 
-  userName.textContent = state.payload?.email ?? "Usuario autenticado";
   tokenPreview.textContent = "Cookie HttpOnly activa";
+  if (userMenuEmail) {
+    userMenuEmail.textContent = state.payload?.email ?? "Usuario autenticado";
+  }
+  if (adminUsersLink) {
+    adminUsersLink.classList.toggle("d-none", !state.isAdmin);
+  }
 
-  logoutBtn.addEventListener("click", () => {
-    logoutAndRedirect();
-  });
-
-  extendBtn.addEventListener("click", () => refreshSession());
+  document
+    .querySelectorAll('[data-user-action]')
+    .forEach((item) =>
+      item.addEventListener("click", (event) => {
+        event.preventDefault();
+        handleUserMenuAction(item.dataset.userAction);
+      })
+    );
 
   document
     .querySelectorAll("#mainNav .nav-link")
@@ -61,6 +75,7 @@ function setupLayout() {
         event.preventDefault();
         const section = link.dataset.section;
         showSection(section);
+        refreshSession({ silent: true }).catch(() => {});
       })
     );
 
@@ -93,21 +108,19 @@ function setupLayout() {
       .getElementById("brokerFormReset")
       ?.addEventListener("click", resetBrokerForm);
   }
-  applyBrokerFormMode();
 
-  const portfolioUserSelect = document.getElementById("portfolioUserSelect");
-  const portfolioTickerSelect = document.getElementById("portfolioTickerSelect");
-  const addTickerBtn = document.getElementById("addTickerToPortfolio");
-  const newTickerForm = document.getElementById("portfolioNewTickerForm");
+  document
+    .getElementById("portfolioTickerForm")
+    ?.addEventListener("submit", handlePortfolioTickerFormSubmit);
 
-  portfolioUserSelect?.addEventListener("change", renderPortfolioList);
-  addTickerBtn?.addEventListener("click", () => {
-    const userId = portfolioUserSelect.value;
-    const tickerId = Number(portfolioTickerSelect.value);
-    if (!userId || !tickerId) return;
-    addTickerToPortfolio(userId, tickerId);
-  });
-  newTickerForm?.addEventListener("submit", handlePortfolioTickerCreate);
+  document
+    .getElementById("portfolioBrokerSelect")
+    ?.addEventListener("change", async (event) => {
+      state.selectedBrokerId = event.target.value || null;
+      await loadPortfolio();
+    });
+
+  updateIdentitySections();
 }
 
 function showSection(section) {
@@ -127,6 +140,30 @@ function showSection(section) {
     `#mainNav .nav-link[data-section="${section}"]`
   );
   activeLink?.classList.add("active");
+}
+
+function handleUserMenuAction(action) {
+  switch (action) {
+    case "profile":
+      showSection("profile");
+      refreshSession({ silent: true }).catch(() => {});
+      break;
+    case "preferences":
+      showSection("preferences");
+      refreshSession({ silent: true }).catch(() => {});
+      break;
+    case "users":
+      if (state.isAdmin) {
+        showSection("users");
+        refreshSession({ silent: true }).catch(() => {});
+      }
+      break;
+    case "logout":
+      logoutAndRedirect();
+      break;
+    default:
+      break;
+  }
 }
 
 async function loadInitialData() {
@@ -159,10 +196,8 @@ async function loadInitialData() {
   updateMetrics();
   renderUsersTable();
   renderTickersTable();
-  populateBrokerUsers();
   renderBrokersTable();
-  populatePortfolioSelectors();
-  renderPortfolioList();
+  await loadPortfolio();
 }
 
 function updateMetrics() {
@@ -410,34 +445,12 @@ function resetTickerForm() {
   document.getElementById("tickerFormStatus").textContent = "";
 }
 
-// Brokers CRUD ----------------------------------------------------
-function applyBrokerFormMode() {
-  const form = document.getElementById("brokerForm");
-  const notice = document.getElementById("brokerReadOnlyNotice");
-  if (!form) return;
-
-  const disabled = !state.isAdmin;
-  form
-    .querySelectorAll("input, select, button")
-    .forEach((el) => {
-      if (el.id === "brokerFormReset") return;
-      el.disabled = disabled;
-    });
-
-  if (notice) {
-    notice.classList.toggle("d-none", !disabled);
-  }
-}
-
 async function handleBrokerFormSubmit(event) {
   event.preventDefault();
-  if (!state.isAdmin) return;
-
   const status = document.getElementById("brokerFormStatus");
   status.textContent = "Guardando...";
 
   const payload = {
-    user_id: Number(document.getElementById("brokerUserSelect").value),
     broker_name: document.getElementById("brokerName").value.trim(),
     currency: document.getElementById("brokerCurrency").value.trim(),
     is_primary: document.getElementById("brokerPrimary").checked,
@@ -466,6 +479,8 @@ async function handleBrokerFormSubmit(event) {
     }
     resetBrokerForm();
     await loadAccounts();
+    await loadPortfolio();
+    renderPortfolioSection();
   } catch (err) {
     status.textContent = err.message || "No fue posible guardar.";
   }
@@ -475,7 +490,201 @@ async function loadAccounts() {
   const data = await fetchProtected("/accounts");
   if (Array.isArray(data)) {
     state.accounts = data;
+    const stillExists =
+      state.selectedBrokerId &&
+      state.accounts.some(
+        (account) => String(account.id) === state.selectedBrokerId
+      );
+    state.selectedBrokerId = stillExists ? state.selectedBrokerId : null;
     renderBrokersTable();
+    renderPortfolioSection();
+  }
+}
+
+async function loadPortfolio(brokerId = state.selectedBrokerId) {
+  if (!brokerId) {
+    state.portfolioTickers = [];
+    state.selectedBrokerId = null;
+    renderPortfolioSection();
+    return;
+  }
+
+  const data = await fetchProtected(`/portfolio?broker_id=${brokerId}`);
+  if (!data) {
+    state.portfolioTickers = [];
+    renderPortfolioSection();
+    return;
+  }
+
+  state.selectedBrokerId = brokerId;
+  state.portfolioTickers = Array.isArray(data.tickers) ? data.tickers : [];
+  renderPortfolioSection();
+}
+
+function renderPortfolioSection() {
+  const brokerSelect = document.getElementById("portfolioBrokerSelect");
+  const noBrokersAlert = document.getElementById("portfolioNoBrokers");
+  const tickerSelect = document.getElementById("portfolioTickerSelect");
+  const tableBody = document.getElementById("portfolioTickersBody");
+  const form = document.getElementById("portfolioTickerForm");
+  const status = document.getElementById("portfolioTickerStatus");
+  if (!brokerSelect || !noBrokersAlert || !tickerSelect || !tableBody || !form) {
+    return;
+  }
+
+  if (status) {
+    status.textContent = "";
+  }
+
+  const toggleFormDisabled = (disabled) => {
+    Array.from(form.elements).forEach((el) => {
+      el.disabled = disabled;
+    });
+  };
+
+  if (state.accounts.length === 0) {
+    brokerSelect.innerHTML = '<option value="">Sin brokers</option>';
+    brokerSelect.disabled = true;
+    noBrokersAlert.classList.remove("d-none");
+    toggleFormDisabled(true);
+  } else {
+    brokerSelect.disabled = false;
+    noBrokersAlert.classList.add("d-none");
+    const options = state.accounts
+      .map(
+        (account) =>
+          `<option value="${account.id}" ${
+            String(account.id) === (state.selectedBrokerId ?? '')
+              ? "selected"
+              : ""
+          }>${account.broker_name}</option>`
+      )
+      .join("");
+    brokerSelect.innerHTML =
+      '<option value="">Seleccione un broker</option>' + options;
+    toggleFormDisabled(false);
+  }
+
+  tickerSelect.innerHTML =
+    state.tickers
+      .map(
+        (ticker) =>
+          `<option value="${ticker.id}">${ticker.symbol} - ${ticker.name}</option>`
+      )
+      .join("") || '<option value="">Sin ticker\'s disponibles</option>';
+
+  if (!state.selectedBrokerId) {
+    tableBody.innerHTML =
+      '<tr><td colspan="6" class="text-center text-muted">Seleccione el broker con el que desea operar.</td></tr>';
+    toggleFormDisabled(true);
+    return;
+  }
+
+  if (state.portfolioTickers.length === 0) {
+    tableBody.innerHTML =
+      '<tr><td colspan="6" class="text-center text-muted">Sin movimientos.</td></tr>';
+    return;
+  }
+
+  tableBody.innerHTML = state.portfolioTickers
+    .map(
+      (ticker) => `
+        <tr data-ticker="${ticker.id}">
+          <td>${ticker.financial_object_symbol}</td>
+          <td>${ticker.financial_object_name}</td>
+          <td>
+            <input type="number" step="0.0001" class="form-control form-control-sm" data-field="quantity" value="${ticker.quantity}">
+          </td>
+          <td>
+            <input type="number" step="0.0001" class="form-control form-control-sm" data-field="avg_price" value="${ticker.avg_price}">
+          </td>
+          <td>${ticker.financial_object_type}</td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-primary" data-action="save-ticker" data-id="${ticker.id}">Guardar</button>
+            <button class="btn btn-sm btn-outline-danger" data-action="delete-ticker" data-id="${ticker.id}">Eliminar</button>
+          </td>
+        </tr>
+      `
+    )
+    .join("");
+
+  tableBody.querySelectorAll("[data-action=\"save-ticker\"]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = Number(btn.dataset.id);
+      handlePortfolioTickerUpdate(id);
+    });
+  });
+
+  tableBody
+    .querySelectorAll("[data-action=\"delete-ticker\"]")
+    .forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = Number(btn.dataset.id);
+        handlePortfolioTickerDelete(id);
+      });
+    });
+}
+
+async function handlePortfolioTickerFormSubmit(event) {
+  event.preventDefault();
+  const status = document.getElementById("portfolioTickerStatus");
+  status.textContent = "Guardando...";
+
+  if (!state.selectedBrokerId) {
+    status.textContent = "Debes seleccionar un broker.";
+    return;
+  }
+
+  const financialObjectId = Number(
+    document.getElementById("portfolioTickerSelect").value
+  );
+  const quantity = parseFloat(document.getElementById("portfolioQty").value);
+  const avgPrice = parseFloat(document.getElementById("portfolioAvgPrice").value);
+
+  try {
+    await requestWithAuth("/portfolio/tickers", "POST", {
+      broker_id: Number(state.selectedBrokerId),
+      financial_object_id: financialObjectId,
+      quantity,
+      avg_price: avgPrice,
+    });
+    event.target.reset();
+    status.textContent = "Ticker agregado.";
+    await loadPortfolio();
+  } catch (err) {
+    status.textContent = err.message || "No fue posible agregar el ticker.";
+  }
+}
+
+async function handlePortfolioTickerUpdate(tickerId) {
+  const row = document.querySelector(`tr[data-ticker="${tickerId}"]`);
+  if (!row) return;
+
+  const quantity = parseFloat(
+    row.querySelector('[data-field="quantity"]').value
+  );
+  const avgPrice = parseFloat(
+    row.querySelector('[data-field="avg_price"]').value
+  );
+
+  try {
+    await requestWithAuth(`/portfolio/tickers/${tickerId}`, "PUT", {
+      quantity,
+      avg_price: avgPrice,
+    });
+    await loadPortfolio();
+  } catch (err) {
+    alert(err.message || "No fue posible actualizar el ticker.");
+  }
+}
+
+async function handlePortfolioTickerDelete(tickerId) {
+  if (!confirm("¿Eliminar este ticker del portafolio?")) return;
+  try {
+    await requestWithAuth(`/portfolio/tickers/${tickerId}`, "DELETE");
+    await loadPortfolio();
+  } catch (err) {
+    alert(err.message || "No fue posible eliminar el ticker.");
   }
 }
 
@@ -494,27 +703,18 @@ function renderBrokersTable() {
       (account) => `
       <tr>
         <td>${account.id}</td>
-        <td>${account.user_email}</td>
         <td>${account.broker_name}</td>
         <td>${account.currency}</td>
         <td>${account.is_primary ? "Sí" : "No"}</td>
         <td>${account.created_at ?? "-"}</td>
         <td class="text-end table-actions">
-          ${
-            state.isAdmin
-              ? `<button class="btn btn-sm btn-outline-primary" data-action="edit-account" data-id="${account.id}">Editar</button>
-                 <button class="btn btn-sm btn-outline-danger" data-action="delete-account" data-id="${account.id}">Eliminar</button>`
-              : '<span class="text-muted small">Solo lectura</span>'
-          }
+          <button class="btn btn-sm btn-outline-primary" data-action="edit-account" data-id="${account.id}">Editar</button>
+          <button class="btn btn-sm btn-outline-danger" data-action="delete-account" data-id="${account.id}">Eliminar</button>
         </td>
       </tr>
     `
     )
     .join("");
-
-  if (!state.isAdmin) {
-    return;
-  }
 
   tbody.querySelectorAll("button").forEach((btn) =>
     btn.addEventListener("click", () => {
@@ -551,7 +751,6 @@ function startEditBroker(accountId) {
   if (!account) return;
 
   state.editingAccountId = accountId;
-  document.getElementById("brokerUserSelect").value = String(account.user_id);
   document.getElementById("brokerName").value = account.broker_name;
   document.getElementById("brokerCurrency").value = account.currency;
   document.getElementById("brokerPrimary").checked = account.is_primary;
@@ -564,11 +763,13 @@ async function deleteAccountBroker(accountId) {
   try {
     await requestWithAuth(`/accounts/${accountId}`, "DELETE");
     await loadAccounts();
+    await loadPortfolio();
   } catch (err) {
     console.warn("DELETE /accounts fallo, reintentando via POST", err);
     try {
       await requestWithAuth(`/accounts/${accountId}/delete`, "POST");
       await loadAccounts();
+      await loadPortfolio();
     } catch (err2) {
       alert(err2.message || "No se pudo eliminar la cuenta.");
     }
@@ -579,131 +780,6 @@ function resetBrokerForm() {
   state.editingAccountId = null;
   document.getElementById("brokerForm")?.reset();
   document.getElementById("brokerFormStatus").textContent = "";
-}
-
-// Portafolio -------------------------------------------------------
-function populatePortfolioSelectors() {
-  const userSelect = document.getElementById("portfolioUserSelect");
-  const tickerSelect = document.getElementById("portfolioTickerSelect");
-  if (!userSelect || !tickerSelect) return;
-
-  const users = state.isAdmin
-    ? state.users
-    : [
-        {
-          id: state.payload?.uid ?? 0,
-          email: state.payload?.email ?? "usuario",
-        },
-      ];
-
-  userSelect.innerHTML = users
-    .map((user) => `<option value="${user.id}">${user.email}</option>`)
-    .join("");
-
-  tickerSelect.innerHTML =
-    state.tickers
-      .map(
-        (ticker) =>
-          `<option value="${ticker.id}">${ticker.symbol} - ${ticker.name}</option>`
-      )
-      .join("") || '<option value="">Sin ticker\'s disponibles</option>';
-
-  if (userSelect.value) {
-    renderPortfolioList();
-  }
-}
-
-function renderPortfolioList() {
-  const container = document.getElementById("portfolioList");
-  const userSelect = document.getElementById("portfolioUserSelect");
-  if (!container || !userSelect) return;
-
-  const userId = userSelect.value;
-  const portfolio = getPortfolioForUser(userId);
-  if (!portfolio || portfolio.length === 0) {
-    container.innerHTML =
-      '<span class="text-muted">Aún no se agregan ticker\'s.</span>';
-    return;
-  }
-
-  container.innerHTML = "";
-  portfolio.forEach((tickerId) => {
-    const ticker = state.tickers.find((t) => t.id === tickerId);
-    if (!ticker) return;
-    const badge = document.createElement("span");
-    badge.className = "badge text-bg-light d-inline-flex align-items-center gap-2";
-    badge.innerHTML = `${ticker.symbol} - ${ticker.name}
-      <button class="btn-close btn-close-dark btn-sm" aria-label="Eliminar"></button>`;
-    badge
-      .querySelector("button")
-      .addEventListener("click", () => removeTickerFromPortfolio(userId, tickerId));
-    container.appendChild(badge);
-  });
-}
-
-function addTickerToPortfolio(userId, tickerId) {
-  const portfolio = getPortfolioStore();
-  const list = new Set(portfolio[userId] ?? []);
-  if (list.has(tickerId)) {
-    alert("Este ticker ya está en el portafolio.");
-    return;
-  }
-  list.add(tickerId);
-  portfolio[userId] = Array.from(list);
-  savePortfolioStore(portfolio);
-  renderPortfolioList();
-}
-
-function removeTickerFromPortfolio(userId, tickerId) {
-  const portfolio = getPortfolioStore();
-  portfolio[userId] = (portfolio[userId] ?? []).filter((id) => id !== tickerId);
-  savePortfolioStore(portfolio);
-  renderPortfolioList();
-}
-
-function getPortfolioForUser(userId) {
-  if (!userId) return [];
-  const portfolio = getPortfolioStore();
-  return portfolio[userId] ?? [];
-}
-
-function getPortfolioStore() {
-  try {
-    const raw = localStorage.getItem(PORTFOLIO_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function savePortfolioStore(data) {
-  localStorage.setItem(PORTFOLIO_KEY, JSON.stringify(data));
-}
-
-async function handlePortfolioTickerCreate(event) {
-  event.preventDefault();
-  const status = document.getElementById("portfolioTickerStatus");
-  status.textContent = "Creando...";
-
-  const payload = {
-    name: document.getElementById("portfolioTickerName").value.trim(),
-    symbol: document.getElementById("portfolioTickerSymbol").value.trim(),
-    type: document.getElementById("portfolioTickerType").value.trim(),
-  };
-
-  try {
-    const result = await requestWithAuth("/financial-objects", "POST", payload);
-    status.textContent = "Ticker creado y disponible.";
-    document.getElementById("portfolioNewTickerForm").reset();
-    await loadTickers();
-    // Agrega de inmediato al portafolio del usuario seleccionado
-    const userId = document.getElementById("portfolioUserSelect").value;
-    if (userId && result?.id) {
-      addTickerToPortfolio(userId, result.id);
-    }
-  } catch (err) {
-    status.textContent = err.message || "No se pudo crear.";
-  }
 }
 
 // Helpers ----------------------------------------------------------
@@ -794,7 +870,7 @@ async function logoutAndRedirect() {
 function redirectToLogin() {
   clearSessionTimers();
   Session.clear();
-  window.location.href = "../index.html";
+  window.location.href = "../index.php";
 }
 
 function clearSessionTimers() {
@@ -920,20 +996,7 @@ async function refreshSession({ silent = false } = {}) {
     const accessExp = data.access_expires_at ?? payload?.exp ?? null;
     if (!payload || !accessExp) throw new Error("Respuesta de sesión incompleta.");
 
-    Session.save(payload, accessExp);
-    state.payload = payload;
-    state.sessionExpiresAt = accessExp;
-    state.isAdmin = (payload?.role ?? "").toLowerCase() === "admin";
-    applyBrokerFormMode();
-    const userName = document.getElementById("userName");
-    if (userName) {
-      userName.textContent = payload.email ?? "Usuario autenticado";
-    }
-    startCountdown(
-      accessExp,
-      document.getElementById("sessionCountdown")
-    );
-    scheduleSessionPrompt(accessExp);
+    applySessionPayload(payload, accessExp);
     return true;
   } catch (err) {
     console.error(err);
@@ -942,5 +1005,41 @@ async function refreshSession({ silent = false } = {}) {
     }
     redirectToLogin();
     return false;
+  }
+}
+
+function applySessionPayload(payload, accessExp) {
+  if (typeof Session !== "undefined") {
+    Session.save(payload, accessExp);
+  }
+  state.payload = payload;
+  state.sessionExpiresAt = accessExp;
+  state.isAdmin = (payload?.role ?? "").toLowerCase() === "admin";
+
+  updateIdentitySections();
+
+  startCountdown(accessExp, document.getElementById("sessionCountdown"));
+  scheduleSessionPrompt(accessExp);
+}
+
+function updateIdentitySections() {
+  const email = state.payload?.email ?? "Usuario autenticado";
+  const role = state.payload?.role ?? "user";
+  const userMenuEmail = document.getElementById("userMenuEmail");
+  const adminUsersLink = document.getElementById("userMenuUsersLink");
+  const profileEmail = document.getElementById("profileEmail");
+  const profileRole = document.getElementById("profileRole");
+
+  if (userMenuEmail) {
+    userMenuEmail.textContent = email;
+  }
+  if (adminUsersLink) {
+    adminUsersLink.classList.toggle("d-none", !state.isAdmin);
+  }
+  if (profileEmail) {
+    profileEmail.textContent = email;
+  }
+  if (profileRole) {
+    profileRole.textContent = role;
   }
 }

@@ -15,7 +15,7 @@ class SchemaManager
         $logger = new Logger();
 
         try {
-            $pdo = DatabaseConnection::getInstance();
+            $pdo = DatabaseManager::getConnection();
         } catch (\Throwable $e) {
             $logger->error('Database connection failed during schema check: ' . $e->getMessage());
             return ['db' => 'error', 'message' => $e->getMessage()];
@@ -24,15 +24,19 @@ class SchemaManager
         self::ensureUsersTable($pdo, $logger);
         self::ensureFinancialObjectsTable($pdo, $logger);
         self::ensureAccountsTable($pdo, $logger);
-        self::ensurePortfoliosTable($pdo, $logger);
         self::ensurePortfolioTickersTable($pdo, $logger);
+        self::ensureProductsTable($pdo, $logger);
+        self::ensureOrdersTable($pdo, $logger);
         self::seedData($pdo, $logger);
         self::applyRootUserPolicy($pdo, $logger);
+        self::ensureApiLogsTable($pdo, $logger);
 
         return [
             'db' => 'connected',
             'users' => self::countTable($pdo, 'users'),
             'financial_objects' => self::countTable($pdo, 'financial_objects'),
+            'products' => self::countTable($pdo, 'products'),
+            'orders' => self::countTable($pdo, 'orders'),
         ];
     }
 
@@ -84,31 +88,91 @@ class SchemaManager
         ) " . self::TABLE_OPTIONS);
     }
 
-    private static function ensurePortfoliosTable(PDO $pdo, Logger $logger): void
-    {
-        self::renameLegacyTable($pdo, $logger, 'portfolios', 'id');
-
-        $pdo->exec("CREATE TABLE IF NOT EXISTS portfolios (
-            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            account_id INT UNSIGNED NOT NULL UNIQUE,
-            name VARCHAR(120) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            CONSTRAINT fk_portfolios_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
-        ) " . self::TABLE_OPTIONS);
-    }
-
     private static function ensurePortfolioTickersTable(PDO $pdo, Logger $logger): void
     {
         $pdo->exec("CREATE TABLE IF NOT EXISTS portfolio_tickers (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            portfolio_id INT UNSIGNED NOT NULL,
+            account_id INT UNSIGNED NOT NULL,
             financial_object_id INT UNSIGNED NOT NULL,
-            weight DECIMAL(10,4) NOT NULL DEFAULT 0,
+            quantity DECIMAL(18,4) NOT NULL DEFAULT 0,
+            avg_price DECIMAL(18,4) NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            CONSTRAINT fk_pt_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE,
+            CONSTRAINT fk_pt_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
             CONSTRAINT fk_pt_financial_object FOREIGN KEY (financial_object_id) REFERENCES financial_objects(id) ON DELETE CASCADE,
-            UNIQUE KEY unique_portfolio_ticker (portfolio_id, financial_object_id)
+            UNIQUE KEY unique_account_ticker (account_id, financial_object_id)
         ) " . self::TABLE_OPTIONS);
+
+        if (!self::columnExists($pdo, 'portfolio_tickers', 'account_id')) {
+            $logger->info('Adding account_id to portfolio_tickers.');
+            $pdo->exec("ALTER TABLE portfolio_tickers ADD COLUMN account_id INT UNSIGNED NULL AFTER id");
+        }
+
+        if (self::columnExists($pdo, 'portfolio_tickers', 'portfolio_id')) {
+            $logger->info('Migrating portfolio_tickers.portfolio_id to account_id.');
+            $pdo->exec("UPDATE portfolio_tickers SET account_id = portfolio_id WHERE account_id IS NULL");
+            $pdo->exec("ALTER TABLE portfolio_tickers DROP COLUMN portfolio_id");
+        }
+
+        $pdo->exec("ALTER TABLE portfolio_tickers MODIFY COLUMN account_id INT UNSIGNED NOT NULL");
+    }
+
+    private static function ensureProductsTable(PDO $pdo, Logger $logger): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS products (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            sku VARCHAR(120) NOT NULL,
+            price DECIMAL(12,2) NOT NULL DEFAULT 0,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_product_sku (sku)
+        ) " . self::TABLE_OPTIONS);
+
+        self::ensureUniqueIndex($pdo, $logger, 'products', 'unique_product_sku', 'sku');
+    }
+
+    private static function ensureOrdersTable(PDO $pdo, Logger $logger): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS orders (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id INT UNSIGNED NOT NULL,
+            total DECIMAL(12,2) NOT NULL DEFAULT 0,
+            status VARCHAR(50) NOT NULL DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT fk_orders_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) " . self::TABLE_OPTIONS);
+    }
+
+    private static function ensureApiLogsTable(PDO $pdo, Logger $logger): void
+    {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS api_logs (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            level VARCHAR(20) NOT NULL,
+            http_status SMALLINT NOT NULL,
+            method VARCHAR(10) NOT NULL,
+            route VARCHAR(255) NOT NULL,
+            message VARCHAR(500) NOT NULL,
+            exception_class VARCHAR(255) NULL,
+            stack_trace MEDIUMTEXT NULL,
+            request_payload MEDIUMTEXT NULL,
+            query_params TEXT NULL,
+            user_id INT UNSIGNED NULL,
+            client_ip VARCHAR(80) NULL,
+            user_agent VARCHAR(255) NULL,
+            correlation_id VARCHAR(64) NOT NULL
+        ) " . self::TABLE_OPTIONS);
+
+        self::ensureIndex($pdo, $logger, 'api_logs', 'idx_api_logs_status', 'http_status');
+        self::ensureIndex($pdo, $logger, 'api_logs', 'idx_api_logs_created', 'created_at');
+        self::ensureIndex($pdo, $logger, 'api_logs', 'idx_api_logs_corr', 'correlation_id');
+    }
+
+    private static function columnExists(PDO $pdo, string $table, string $column): bool
+    {
+        $stmt = $pdo->prepare("SHOW COLUMNS FROM {$table} LIKE :column");
+        $stmt->execute(['column' => $column]);
+        return $stmt->fetchColumn() !== false;
     }
 
     private static function seedData(PDO $pdo, Logger $logger): void
@@ -245,5 +309,4 @@ class SchemaManager
         }
     }
 
-    // Removed ensureTableEngine/tableIsInnoDb helpers because production runs on MyISAM.
 }

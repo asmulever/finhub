@@ -7,6 +7,7 @@ namespace App\Interfaces;
 use App\Application\AuthService;
 use App\Infrastructure\Config;
 use App\Infrastructure\Logger;
+use App\Infrastructure\RequestContext;
 
 class AuthController extends BaseController
 {
@@ -26,10 +27,12 @@ class AuthController extends BaseController
 
         if (!is_array($input)) {
             $this->logger->warning("Invalid JSON payload for auth login.");
+            $this->logWarning(400, 'Invalid JSON in login');
             http_response_code(400);
             echo json_encode(['error' => 'Invalid JSON']);
             return;
         }
+        RequestContext::setRequestPayload($input);
 
         $email = $input['email'] ?? null;
         $password = $input['password'] ?? null;
@@ -39,6 +42,7 @@ class AuthController extends BaseController
             $tokens = $this->authService->validateCredentials($email, $password);
             if ($tokens !== null) {
                 $this->logger->info("Credential validation successful for email: $email");
+                RequestContext::setUserId($tokens['payload']['uid'] ?? null);
                 $this->setAuthCookies(
                     $tokens['access_token'],
                     $tokens['access_expires_at'],
@@ -56,12 +60,14 @@ class AuthController extends BaseController
             }
 
             $this->logger->warning("Credential validation failed for email: $email");
+            $this->logWarning(401, 'Invalid credentials attempt', ['route' => '/auth/login']);
             http_response_code(401);
             echo json_encode(['status' => 'unauthenticated']);
             return;
         }
 
         $this->logger->error("Bad request: credentials not provided.");
+        $this->logWarning(400, 'Missing credentials', ['route' => '/auth/login']);
         http_response_code(400);
         echo json_encode(['error' => 'Bad Request']);
     }
@@ -70,6 +76,7 @@ class AuthController extends BaseController
     {
         $refreshToken = $_COOKIE['refresh_token'] ?? null;
         if ($refreshToken === null || $refreshToken === '') {
+            $this->logWarning(401, 'Missing refresh token', ['route' => '/auth/refresh']);
             http_response_code(401);
             echo json_encode(['status' => 'no_refresh_token']);
             return;
@@ -77,11 +84,13 @@ class AuthController extends BaseController
 
         $tokens = $this->authService->refreshTokens($refreshToken);
         if ($tokens === null) {
+            $this->logWarning(401, 'Invalid refresh token', ['route' => '/auth/refresh']);
             http_response_code(401);
             echo json_encode(['status' => 'invalid_refresh_token']);
             return;
         }
 
+        RequestContext::setUserId($tokens['payload']['uid'] ?? null);
         $this->setAuthCookies(
             $tokens['access_token'],
             $tokens['access_expires_at'],
@@ -102,6 +111,7 @@ class AuthController extends BaseController
     {
         $token = $this->getAccessTokenFromRequest();
         if ($token === null) {
+            $this->logWarning(401, 'Session check without token', ['route' => '/auth/session']);
             http_response_code(401);
             echo json_encode(['status' => 'unauthenticated']);
             return;
@@ -109,11 +119,13 @@ class AuthController extends BaseController
 
         $payload = $this->authService->decodeToken($token);
         if ($payload === null) {
+            $this->logWarning(401, 'Session check with invalid token', ['route' => '/auth/session']);
             http_response_code(401);
             echo json_encode(['status' => 'unauthenticated']);
             return;
         }
 
+        RequestContext::setUserId(isset($payload->uid) ? (int)$payload->uid : null);
         http_response_code(200);
         echo json_encode([
             'status' => 'valid_token',

@@ -12,11 +12,33 @@
     <a class="navbar-brand fw-semibold" href="#">Finhub Suite</a>
     <div class="ms-auto d-flex align-items-center gap-3">
       <div class="text-light text-end">
-        <div class="fw-semibold" id="userName">Usuario</div>
-        <small id="sessionCountdown" class="text-secondary"></small>
+        <div class="text-secondary small" id="sessionCountdown"></div>
       </div>
-      <button class="btn btn-outline-light btn-sm" id="extendSession">Extender sesión</button>
-      <button class="btn btn-primary btn-sm" id="logoutBtn">Cerrar sesión</button>
+      <div class="dropdown">
+        <button
+          class="btn btn-outline-light dropdown-toggle"
+          type="button"
+          id="userMenuButton"
+          data-bs-toggle="dropdown"
+          aria-expanded="false"
+        >
+          <span id="userMenuEmail">usuario@example.com</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="userMenuButton">
+          <li><a class="dropdown-item" href="#" data-user-action="profile">Mi perfil</a></li>
+          <li><a class="dropdown-item" href="#" data-user-action="preferences">Preferencias</a></li>
+          <li>
+            <a
+              class="dropdown-item d-none"
+              href="#"
+              data-user-action="users"
+              id="userMenuUsersLink"
+            >Usuarios</a>
+          </li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item text-danger" href="#" data-user-action="logout">Cerrar sesión</a></li>
+        </ul>
+      </div>
     </div>
   </nav>
   <div class="container-fluid">
@@ -25,10 +47,9 @@
         <h6 class="text-uppercase text-white-50 mb-3">Menú principal</h6>
         <nav class="nav flex-column gap-1" id="mainNav">
           <a href="#" class="nav-link active" data-section="overview">Resumen</a>
-          <a href="#" class="nav-link" data-section="users" data-role="admin">Usuarios</a>
           <a href="#" class="nav-link" data-section="brokers">Brokers</a>
-          <a href="#" class="nav-link" data-section="tickers">Ticker's</a>
           <a href="#" class="nav-link" data-section="portfolio">Portafolio</a>
+          <a href="#" class="nav-link" data-section="tickers">Ticker's</a>
         </nav>
       </aside>
       <main class="col-md-9 col-lg-10 content-area">
@@ -84,22 +105,18 @@
           <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
               <h3 class="mb-0">Brokers / Cuentas</h3>
-              <p class="text-muted mb-0">Relaciona usuarios con sus cuentas operativas.</p>
+              <p class="text-muted mb-0">Administrá tus cuentas operativas personales.</p>
             </div>
-            <button class="btn btn-outline-secondary btn-sm" id="brokerFormReset" data-role="admin">Nueva cuenta</button>
+            <button class="btn btn-outline-secondary btn-sm" id="brokerFormReset">Nueva cuenta</button>
           </div>
           <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
               <form id="brokerForm" class="row g-3">
-                <div class="col-md-4">
-                  <label class="form-label">Usuario</label>
-                  <select id="brokerUserSelect" class="form-select"></select>
-                </div>
-                <div class="col-md-4">
+                <div class="col-md-5">
                   <label class="form-label">Broker / Cuenta</label>
                   <input type="text" id="brokerName" class="form-control" required>
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-3">
                   <label class="form-label">Moneda</label>
                   <input type="text" id="brokerCurrency" class="form-control" value="USD" maxlength="12">
                 </div>
@@ -109,14 +126,11 @@
                     <label class="form-check-label" for="brokerPrimary">Principal</label>
                   </div>
                 </div>
-                <div class="col-12 d-flex gap-2">
-                  <button class="btn btn-primary" type="submit" id="brokerSaveBtn">Guardar</button>
-                  <div class="text-muted" id="brokerFormStatus"></div>
+                <div class="col-md-2 d-flex align-items-end">
+                  <button class="btn btn-primary w-100" type="submit" id="brokerSaveBtn">Guardar</button>
                 </div>
+                <div class="col-12 text-muted" id="brokerFormStatus"></div>
               </form>
-              <div class="alert alert-info mt-3 d-none" id="brokerReadOnlyNotice">
-                Solo los administradores pueden crear o editar brokers. Consulta a tu equipo para cambios.
-              </div>
             </div>
           </div>
           <div class="card shadow-sm border-0">
@@ -126,7 +140,6 @@
                   <thead>
                     <tr>
                       <th>ID</th>
-                      <th>Usuario</th>
                       <th>Broker</th>
                       <th>Moneda</th>
                       <th>Principal</th>
@@ -141,7 +154,7 @@
           </div>
         </section>
 
-        <section id="section-users" class="dashboard-section">
+        <section id="section-users" class="dashboard-section" data-role="admin">
           <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
               <h3 class="mb-0">Gestión de usuarios</h3>
@@ -189,6 +202,60 @@
                   <tbody id="usersTableBody"></tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="section-profile" class="dashboard-section">
+          <div class="card shadow-sm border-0">
+            <div class="card-body">
+              <h3 class="mb-3">Mi perfil</h3>
+              <p class="text-muted">Vista preliminar para los datos personales del usuario autenticado.</p>
+              <dl class="row">
+                <dt class="col-sm-3">Correo</dt>
+                <dd class="col-sm-9" id="profileEmail">--</dd>
+                <dt class="col-sm-3">Rol</dt>
+                <dd class="col-sm-9" id="profileRole">--</dd>
+                <dt class="col-sm-3">Último acceso</dt>
+                <dd class="col-sm-9" id="profileLastLogin">Se completará en futuras versiones.</dd>
+              </dl>
+            </div>
+          </div>
+        </section>
+
+        <section id="section-preferences" class="dashboard-section">
+          <div class="card shadow-sm border-0">
+            <div class="card-body">
+              <h3 class="mb-3">Preferencias del entorno</h3>
+              <p class="text-muted">
+                Configura opciones como tema, idioma y parámetros específicos de FinHub. Esta vista está
+                preparada para ampliarse con la lógica necesaria.
+              </p>
+              <form class="row g-3" id="preferencesForm">
+                <div class="col-md-4">
+                  <label class="form-label">Tema visual</label>
+                  <select class="form-select" disabled>
+                    <option value="dark">Oscuro (predeterminado)</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Idioma</label>
+                  <select class="form-select" disabled>
+                    <option value="es">Español</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Notificaciones de mercado</label>
+                  <select class="form-select" disabled>
+                    <option value="realtime">Inmediatas</option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <small class="text-muted">
+                    Próximamente podrás editar estas opciones directamente desde esta pantalla.
+                  </small>
+                </div>
+              </form>
             </div>
           </div>
         </section>
@@ -246,55 +313,61 @@
         <section id="section-portfolio" class="dashboard-section">
           <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
-              <h3 class="mb-0">Portafolio</h3>
-              <p class="text-muted mb-0">Selecciona ticker's por usuario y amplía la cartera.</p>
+              <h3 class="mb-0">Portafolio personal</h3>
+              <p class="text-muted mb-0">Gestiona tus posiciones vinculadas a tus brokers.</p>
             </div>
           </div>
           <div class="row g-4">
-            <div class="col-lg-6">
+            <div class="col-lg-4">
               <div class="card shadow-sm border-0 h-100">
                 <div class="card-body">
-                  <div class="mb-3">
-                    <label class="form-label">Usuario</label>
-                    <select id="portfolioUserSelect" class="form-select"></select>
+                  <h5 class="mb-3">Selecciona broker</h5>
+                  <select id="portfolioBrokerSelect" class="form-select"></select>
+                  <div class="alert alert-info mt-3 d-none" id="portfolioNoBrokers">
+                    Primero crea un broker en la pestaña anterior para habilitar tu portafolio.
                   </div>
-                  <div class="mb-3">
-                    <label class="form-label">Ticker existente</label>
-                    <div class="input-group">
-                      <select id="portfolioTickerSelect" class="form-select"></select>
-                      <button class="btn btn-primary" id="addTickerToPortfolio">Agregar al portafolio</button>
-                    </div>
-                  </div>
-                  <div>
-                    <h6 class="text-uppercase text-muted">Ticker's en portafolio</h6>
-                    <div id="portfolioList" class="portfolio-list d-flex flex-wrap gap-2"></div>
-                  </div>
+                  <small class="text-muted" id="portfolioBrokerHint">
+                    Todos los tickers se guardan para el usuario autenticado.
+                  </small>
                 </div>
               </div>
             </div>
-            <div class="col-lg-6">
-              <div class="card shadow-sm border-0 h-100">
+            <div class="col-lg-8">
+              <div class="card shadow-sm border-0">
                 <div class="card-body">
-                  <h5 class="mb-3">Agregar nuevo ticker al catálogo</h5>
-                  <form id="portfolioNewTickerForm" class="row g-3">
-                    <div class="col-md-6">
-                      <label class="form-label">Nombre</label>
-                      <input type="text" class="form-control" id="portfolioTickerName" required>
+                  <form id="portfolioTickerForm" class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                      <label class="form-label">Ticker (catálogo)</label>
+                      <select id="portfolioTickerSelect" class="form-select"></select>
                     </div>
                     <div class="col-md-3">
-                      <label class="form-label">Símbolo</label>
-                      <input type="text" class="form-control" id="portfolioTickerSymbol" required>
+                      <label class="form-label">Cantidad</label>
+                      <input type="number" step="0.0001" min="0" id="portfolioQty" class="form-control" required>
                     </div>
                     <div class="col-md-3">
-                      <label class="form-label">Tipo</label>
-                      <input type="text" class="form-control" id="portfolioTickerType" required>
+                      <label class="form-label">Precio promedio</label>
+                      <input type="number" step="0.0001" min="0" id="portfolioAvgPrice" class="form-control" required>
                     </div>
-                    <div class="col-12 d-flex gap-2">
-                      <button class="btn btn-outline-primary" type="submit">Crear y agregar</button>
-                      <div class="text-muted" id="portfolioTickerStatus"></div>
+                    <div class="col-md-2">
+                      <button class="btn btn-primary w-100" type="submit">Agregar</button>
                     </div>
                   </form>
-                  <small class="text-muted">Al eliminar desde esta vista solo se quita la relación del portafolio. Para borrar o editar un ticker ve a la sección Ticker's.</small>
+                  <div class="text-muted mt-2" id="portfolioTickerStatus"></div>
+                  <div class="table-responsive mt-4">
+                    <table class="table table-hover align-middle">
+                      <thead>
+                        <tr>
+                          <th>Símbolo</th>
+                          <th>Nombre</th>
+                          <th>Cantidad</th>
+                          <th>Precio prom.</th>
+                          <th>Tipo</th>
+                          <th class="text-end">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody id="portfolioTickersBody"></tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>

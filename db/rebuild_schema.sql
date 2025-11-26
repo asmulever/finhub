@@ -35,21 +35,14 @@ CREATE TABLE accounts (
     CONSTRAINT fk_accounts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE portfolios (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    account_id INT UNSIGNED NOT NULL UNIQUE,
-    name VARCHAR(120) NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_portfolios_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 CREATE TABLE portfolio_tickers (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    portfolio_id INT UNSIGNED NOT NULL,
+    account_id INT UNSIGNED NOT NULL,
     financial_object_id INT UNSIGNED NOT NULL,
-    weight DECIMAL(10,4) NOT NULL DEFAULT 0,
+    quantity DECIMAL(18,4) NOT NULL DEFAULT 0,
+    avg_price DECIMAL(18,4) NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_pt_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE,
+    CONSTRAINT fk_pt_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
     CONSTRAINT fk_pt_financial_object FOREIGN KEY (financial_object_id) REFERENCES financial_objects(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_portfolio_ticker (portfolio_id, financial_object_id)
+    UNIQUE KEY unique_account_ticker (account_id, financial_object_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Domain;
+namespace App\Domain\Repository;
 
-interface FinancialObjectRepository
+use App\Domain\FinancialObject;
+
+interface FinancialObjectRepositoryInterface
 {
     /**
      * @return FinancialObject[]

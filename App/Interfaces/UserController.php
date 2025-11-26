@@ -7,6 +7,7 @@ namespace App\Interfaces;
 use App\Application\UserService;
 use App\Infrastructure\JwtService;
 use App\Infrastructure\Logger;
+use App\Infrastructure\RequestContext;
 
 class UserController extends BaseController
 {
@@ -44,6 +45,7 @@ class UserController extends BaseController
         $created = $this->userService->createUser($input);
         if ($created === null) {
             http_response_code(400);
+            $this->logWarning(400, 'Invalid user data', ['route' => RequestContext::getRoute()]);
             echo json_encode(['error' => 'Invalid user data']);
             return;
         }
@@ -69,6 +71,7 @@ class UserController extends BaseController
             return;
         }
 
+        $this->logWarning(400, 'Unable to update user', ['route' => RequestContext::getRoute(), 'user_id' => $id]);
         http_response_code(400);
         echo json_encode(['error' => 'Unable to update user']);
     }
@@ -85,6 +88,7 @@ class UserController extends BaseController
             return;
         }
 
+        $this->logWarning(400, 'Unable to delete user', ['route' => RequestContext::getRoute(), 'user_id' => $id]);
         http_response_code(400);
         echo json_encode(['error' => 'Unable to delete user']);
     }
@@ -96,6 +100,7 @@ class UserController extends BaseController
 
         if ($token === null) {
             $this->logger->warning("Unauthorized access attempt: missing token.");
+            $this->logWarning(401, 'Missing token for admin endpoint', ['route' => RequestContext::getRoute()]);
             http_response_code(401);
             echo json_encode(['error' => 'Unauthorized']);
             return null;
@@ -104,13 +109,16 @@ class UserController extends BaseController
         $payload = $this->jwtService->validateToken($token, 'access');
         if ($payload === null) {
             $this->logger->warning("Unauthorized access attempt: invalid token.");
+            $this->logWarning(401, 'Invalid token for admin endpoint', ['route' => RequestContext::getRoute()]);
             http_response_code(401);
             echo json_encode(['error' => 'Unauthorized']);
             return null;
         }
 
+        $this->recordAuthenticatedUser($payload);
         if (($payload->role ?? '') !== 'admin') {
             $this->logger->warning("Forbidden operation for user {$payload->uid}, requires admin.");
+            $this->logWarning(403, 'Forbidden access to admin endpoint', ['user_id' => $payload->uid ?? null, 'route' => RequestContext::getRoute()]);
             http_response_code(403);
             echo json_encode(['error' => 'Forbidden']);
             return null;
@@ -126,11 +134,13 @@ class UserController extends BaseController
 
         if (!is_array($input)) {
             $this->logger->warning("Invalid JSON payload received.");
+            $this->logWarning(400, 'Invalid JSON body', ['route' => RequestContext::getRoute()]);
             http_response_code(400);
             echo json_encode(['error' => 'Invalid JSON']);
             return null;
         }
 
+        RequestContext::setRequestPayload($input);
         return $input;
     }
 
