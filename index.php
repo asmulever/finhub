@@ -386,6 +386,7 @@ header('Content-Type: text/html; charset=UTF-8');
         </section>
       </div>
     </main>
+    <script src="/frontend/js/logger.js" defer></script>
     <script src="/frontend/js/login.js" defer></script>
   </body>
 </html>

@@ -11,16 +11,17 @@ require_once __DIR__ . '/../lib/FirebaseJWT/ExpiredException.php';
 require_once __DIR__ . '/../lib/FirebaseJWT/SignatureInvalidException.php';
 require_once __DIR__ . '/../lib/FirebaseJWT/BeforeValidException.php';
 
+use App\Application\LogService;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 
 class JwtService
 {
-    private Logger $logger;
+    private LogService $logger;
 
     public function __construct(private readonly string $secretKey)
     {
-        $this->logger = new Logger();
+        $this->logger = LogService::getInstance();
     }
 
     public function generateAccessToken(array $payload, int $ttlSeconds = 300): string

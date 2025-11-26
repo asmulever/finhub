@@ -11,7 +11,7 @@ require_once __DIR__ . '/Security/ApacheRequestHeadersAuthorizationHeaderProvide
 require_once __DIR__ . '/Security/CompositeAuthorizationHeaderProvider.php';
 require_once __DIR__ . '/Security/AccessTokenExtractor.php';
 
-use App\Infrastructure\ApiLogger;
+use App\Application\LogService;
 use App\Infrastructure\RequestContext;
 use App\Interfaces\Security\AccessTokenExtractor;
 use App\Interfaces\Security\ApacheRequestHeadersAuthorizationHeaderProvider;
@@ -22,7 +22,7 @@ use App\Interfaces\Security\ServerArrayAuthorizationHeaderProvider;
 abstract class BaseController
 {
     private ?CompositeAuthorizationHeaderProvider $authorizationProvider = null;
-    private ?ApiLogger $apiLogger = null;
+    private ?LogService $logService = null;
 
     protected function getAccessTokenFromRequest(): ?string
     {
@@ -53,9 +53,18 @@ abstract class BaseController
 
     protected function logWarning(int $status, string $message, array $context = []): void
     {
-        if ($this->apiLogger === null) {
-            $this->apiLogger = ApiLogger::getInstance();
+        $this->logger()->warning($message, array_merge($context, [
+            'http_status' => $status,
+            'origin' => $context['origin'] ?? static::class,
+        ]));
+    }
+
+    protected function logger(): LogService
+    {
+        if ($this->logService === null) {
+            $this->logService = LogService::getInstance();
         }
-        $this->apiLogger->logWarning($message, $status, $context);
+
+        return $this->logService;
     }
 }

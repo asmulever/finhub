@@ -4,21 +4,21 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Repository;
 
+use App\Application\LogService;
 use App\Domain\FinancialObject;
 use App\Domain\Repository\FinancialObjectRepositoryInterface;
 use App\Infrastructure\DatabaseManager;
-use App\Infrastructure\Logger;
 use PDO;
 
 class MysqlFinancialObjectRepository implements FinancialObjectRepositoryInterface
 {
     private PDO $db;
-    private Logger $logger;
+    private LogService $logger;
 
     public function __construct()
     {
         $this->db = DatabaseManager::getConnection();
-        $this->logger = new Logger();
+        $this->logger = LogService::getInstance();
     }
 
     public function findAll(): array

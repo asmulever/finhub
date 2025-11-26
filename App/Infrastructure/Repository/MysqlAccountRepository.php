@@ -7,18 +7,15 @@ namespace App\Infrastructure\Repository;
 use App\Domain\Account;
 use App\Domain\Repository\AccountRepositoryInterface;
 use App\Infrastructure\DatabaseManager;
-use App\Infrastructure\Logger;
 use PDO;
 
 class MysqlAccountRepository implements AccountRepositoryInterface
 {
     private PDO $db;
-    private Logger $logger;
 
     public function __construct()
     {
         $this->db = DatabaseManager::getConnection();
-        $this->logger = new Logger();
     }
 
     public function findById(int $id): ?Account

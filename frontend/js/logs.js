@@ -37,7 +37,9 @@ document.addEventListener("DOMContentLoaded", () => {
       renderLogs(data.data || []);
       renderPagination(data.pagination);
     } catch (error) {
-      console.error("No se pudieron cargar los logs", error);
+      window.FrontendLogger?.error("No se pudieron cargar los logs", {
+        reason: error instanceof Error ? error.message : String(error),
+      });
       logsBody.innerHTML = `
         <tr>
           <td colspan="7">No se pudieron cargar los registros.</td>
@@ -90,7 +92,10 @@ document.addEventListener("DOMContentLoaded", () => {
       renderLogDetail(log);
       modal.classList.add("active");
     } catch (error) {
-      console.error("No se pudo cargar el detalle del log", error);
+      window.FrontendLogger?.error("No se pudo cargar el detalle del log", {
+        reason: error instanceof Error ? error.message : String(error),
+        logId: id,
+      });
     }
   }
 

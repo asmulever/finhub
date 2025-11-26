@@ -7,15 +7,14 @@ namespace App\Application;
 use App\Domain\Repository\UserRepositoryInterface;
 use App\Domain\User;
 use App\Infrastructure\Config;
-use App\Infrastructure\Logger;
 
 class UserService
 {
-    private Logger $logger;
+    private LogService $logger;
 
     public function __construct(private readonly UserRepositoryInterface $userRepository)
     {
-        $this->logger = new Logger();
+        $this->logger = LogService::getInstance();
     }
 
     public function getAllUsers(): array

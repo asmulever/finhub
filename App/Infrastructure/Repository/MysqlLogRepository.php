@@ -10,23 +10,18 @@ use PDO;
 
 class MysqlLogRepository implements LogRepositoryInterface
 {
-    private PDO $db;
-
-    public function __construct()
-    {
-        $this->db = DatabaseManager::getConnection();
-    }
+    private ?PDO $db = null;
 
     public function paginate(array $filters, int $page, int $pageSize): array
     {
         $offset = max(0, ($page - 1) * $pageSize);
         [$whereSql, $params] = $this->buildWhereClause($filters);
 
-        $countStmt = $this->db->prepare("SELECT COUNT(*) FROM api_logs {$whereSql}");
+        $countStmt = $this->getConnection()->prepare("SELECT COUNT(*) FROM api_logs {$whereSql}");
         $countStmt->execute($params);
         $total = (int)$countStmt->fetchColumn();
 
-        $stmt = $this->db->prepare("
+        $stmt = $this->getConnection()->prepare("
             SELECT id, created_at, level, http_status, method, route, message, user_id, correlation_id
             FROM api_logs
             {$whereSql}
@@ -48,7 +43,7 @@ class MysqlLogRepository implements LogRepositoryInterface
 
     public function findById(int $id): ?array
     {
-        $stmt = $this->db->prepare("
+        $stmt = $this->getConnection()->prepare("
             SELECT *
             FROM api_logs
             WHERE id = :id
@@ -57,6 +52,37 @@ class MysqlLogRepository implements LogRepositoryInterface
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row === false ? null : $row;
+    }
+
+    public function store(array $record): void
+    {
+        $stmt = $this->getConnection()->prepare("
+            INSERT INTO api_logs (
+                level, http_status, method, route, message, exception_class,
+                stack_trace, request_payload, query_params, user_id,
+                client_ip, user_agent, correlation_id
+            ) VALUES (
+                :level, :http_status, :method, :route, :message, :exception_class,
+                :stack_trace, :request_payload, :query_params, :user_id,
+                :client_ip, :user_agent, :correlation_id
+            )
+        ");
+
+        $stmt->execute([
+            'level' => $record['level'],
+            'http_status' => $record['http_status'],
+            'method' => $record['method'],
+            'route' => $record['route'],
+            'message' => $record['message'],
+            'exception_class' => $record['exception_class'],
+            'stack_trace' => $record['stack_trace'],
+            'request_payload' => $this->encodeJson($record['request_payload']),
+            'query_params' => $this->encodeJson($record['query_params']),
+            'user_id' => $record['user_id'],
+            'client_ip' => $record['client_ip'],
+            'user_agent' => $record['user_agent'],
+            'correlation_id' => $record['correlation_id'],
+        ]);
     }
 
     /**
@@ -109,5 +135,27 @@ class MysqlLogRepository implements LogRepositoryInterface
         }
 
         return [$whereSql, $params];
+    }
+
+    private function getConnection(): PDO
+    {
+        if ($this->db === null) {
+            $this->db = DatabaseManager::getConnection();
+        }
+
+        return $this->db;
+    }
+
+    private function encodeJson(?array $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        try {
+            return json_encode($value, JSON_THROW_ON_ERROR);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

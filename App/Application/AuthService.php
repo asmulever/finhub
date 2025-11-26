@@ -7,18 +7,17 @@ namespace App\Application;
 use App\Domain\Repository\UserRepositoryInterface;
 use App\Infrastructure\Config;
 use App\Infrastructure\JwtService;
-use App\Infrastructure\Logger;
 
 class AuthService
 {
-    private Logger $logger;
+    private LogService $logger;
     private int $sessionTimeoutSeconds;
 
     public function __construct(
         private readonly UserRepositoryInterface $userRepository,
         private readonly JwtService $jwtService
     ) {
-        $this->logger = new Logger();
+        $this->logger = LogService::getInstance();
         $timeoutMs = (int)Config::getRequired('SESSION_TIMEOUT_MS');
         if ($timeoutMs <= 0) {
             throw new \RuntimeException('SESSION_TIMEOUT_MS must be a positive integer (milliseconds).');
