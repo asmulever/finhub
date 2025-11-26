@@ -56,7 +56,7 @@ class Router
         $this->userController = new UserController($userService, $jwtService);
         $this->accountController = new AccountController($accountService, $jwtService);
         $this->portfolioController = new PortfolioController($portfolioService, $jwtService);
-        $this->logController = new LogController($logService);
+        $this->logController = new LogController($logService, $jwtService);
     }
 
     public function dispatch(string $requestUri, string $requestMethod): void
@@ -225,6 +225,11 @@ class Router
 
         if ($uri === '/logs/frontend' && $method === 'POST') {
             $this->logController->ingestFrontend();
+            return;
+        }
+
+        if ($uri === '/logs/filters' && $method === 'GET') {
+            $this->logController->filters();
             return;
         }
 

@@ -105,6 +105,18 @@ class LogService
         return $this->logRepository->findById($id);
     }
 
+    /**
+     * @return array{
+     *     http_statuses: int[],
+     *     levels: string[],
+     *     routes: string[]
+     * }
+     */
+    public function getFilterOptions(): array
+    {
+        return $this->logRepository->getFilterOptions();
+    }
+
     private function log(string $level, string $message, array $context): void
     {
         if (!$this->shouldLog($level)) {

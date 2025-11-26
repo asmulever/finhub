@@ -18,6 +18,15 @@ interface LogRepositoryInterface
     public function findById(int $id): ?array;
 
     /**
+     * @return array{
+     *     http_statuses: int[],
+     *     levels: string[],
+     *     routes: string[]
+     * }
+     */
+    public function getFilterOptions(): array;
+
+    /**
      * @param array{
      *     level: string,
      *     http_status: int,

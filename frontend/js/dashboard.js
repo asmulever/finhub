@@ -50,6 +50,7 @@ function setupLayout() {
   const tokenPreview = document.getElementById("tokenPreview");
   const userMenuEmail = document.getElementById("userMenuEmail");
   const adminUsersLink = document.getElementById("userMenuUsersLink");
+  const adminLogsLink = document.getElementById("userMenuLogsLink");
 
   tokenPreview.textContent = "Cookie HttpOnly activa";
   if (userMenuEmail) {
@@ -57,6 +58,9 @@ function setupLayout() {
   }
   if (adminUsersLink) {
     adminUsersLink.classList.toggle("d-none", !state.isAdmin);
+  }
+  if (adminLogsLink) {
+    adminLogsLink.classList.toggle("d-none", !state.isAdmin);
   }
 
   document
@@ -1056,6 +1060,7 @@ function updateIdentitySections() {
   const role = state.payload?.role ?? "user";
   const userMenuEmail = document.getElementById("userMenuEmail");
   const adminUsersLink = document.getElementById("userMenuUsersLink");
+  const adminLogsLink = document.getElementById("userMenuLogsLink");
   const profileEmail = document.getElementById("profileEmail");
   const profileRole = document.getElementById("profileRole");
 
@@ -1064,6 +1069,9 @@ function updateIdentitySections() {
   }
   if (adminUsersLink) {
     adminUsersLink.classList.toggle("d-none", !state.isAdmin);
+  }
+  if (adminLogsLink) {
+    adminLogsLink.classList.toggle("d-none", !state.isAdmin);
   }
   if (profileEmail) {
     profileEmail.textContent = email;
