@@ -6,12 +6,16 @@ namespace App\Interfaces;
 
 use App\Application\LogService;
 use App\Infrastructure\RequestContext;
+use App\Infrastructure\JwtService;
 
 class LogController extends BaseController
 {
     private const FRONTEND_LEVELS = ['debug', 'info', 'warning', 'error'];
 
-    public function __construct(private readonly LogService $logService)
+    public function __construct(
+        private readonly LogService $logService,
+        private readonly JwtService $jwtService
+    )
     {
     }
 
@@ -54,6 +58,16 @@ class LogController extends BaseController
 
         http_response_code(200);
         echo json_encode($log);
+    }
+
+    public function filters(): void
+    {
+        if ($this->authorizeAdmin() === null) {
+            return;
+        }
+
+        http_response_code(200);
+        echo json_encode($this->logService->getFilterOptions());
     }
 
     /**
@@ -166,5 +180,35 @@ class LogController extends BaseController
                 $this->logService->error($message, $context);
                 break;
         }
+    }
+
+    private function authorizeAdmin(): ?object
+    {
+        $token = $this->getAccessTokenFromRequest();
+
+        if ($token === null) {
+            $this->logWarning(401, 'Missing token for logs endpoint', ['route' => RequestContext::getRoute()]);
+            http_response_code(401);
+            echo json_encode(['error' => 'Unauthorized']);
+            return null;
+        }
+
+        $payload = $this->jwtService->validateToken($token, 'access');
+        if ($payload === null) {
+            $this->logWarning(401, 'Invalid token for logs endpoint', ['route' => RequestContext::getRoute()]);
+            http_response_code(401);
+            echo json_encode(['error' => 'Unauthorized']);
+            return null;
+        }
+
+        $this->recordAuthenticatedUser($payload);
+        if ((strtolower($payload->role ?? '') !== 'admin')) {
+            $this->logWarning(403, 'Forbidden access to logs endpoint', ['route' => RequestContext::getRoute()]);
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden']);
+            return null;
+        }
+
+        return $payload;
     }
 }

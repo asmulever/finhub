@@ -22,7 +22,7 @@ class MysqlLogRepository implements LogRepositoryInterface
         $total = (int)$countStmt->fetchColumn();
 
         $stmt = $this->getConnection()->prepare("
-            SELECT id, created_at, level, http_status, method, route, message, user_id, correlation_id
+            SELECT id, created_at, level, http_status, method, route, message, correlation_id
             FROM api_logs
             {$whereSql}
             ORDER BY created_at DESC, id DESC
@@ -52,6 +52,19 @@ class MysqlLogRepository implements LogRepositoryInterface
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row === false ? null : $row;
+    }
+
+    public function getFilterOptions(): array
+    {
+        $statusStmt = $this->getConnection()->query('SELECT DISTINCT http_status FROM api_logs ORDER BY http_status');
+        $levelStmt = $this->getConnection()->query("SELECT DISTINCT level FROM api_logs ORDER BY FIELD(level, 'error','warning','info','debug'), level");
+        $routeStmt = $this->getConnection()->query('SELECT DISTINCT route FROM api_logs ORDER BY route');
+
+        return [
+            'http_statuses' => array_values(array_filter(array_map('intval', $statusStmt->fetchAll(PDO::FETCH_COLUMN) ?: []))),
+            'levels' => array_values(array_filter($levelStmt->fetchAll(PDO::FETCH_COLUMN) ?: [], fn($v) => $v !== null && $v !== '')),
+            'routes' => array_values(array_filter($routeStmt->fetchAll(PDO::FETCH_COLUMN) ?: [], fn($v) => $v !== null && $v !== '')),
+        ];
     }
 
     public function store(array $record): void
@@ -120,12 +133,12 @@ class MysqlLogRepository implements LogRepositoryInterface
         }
 
         if (!empty($filters['date_from'])) {
-            $conditions[] = 'created_at >= :date_from';
+            $conditions[] = 'DATE(created_at) >= :date_from';
             $params[':date_from'] = $filters['date_from'];
         }
 
         if (!empty($filters['date_to'])) {
-            $conditions[] = 'created_at <= :date_to';
+            $conditions[] = 'DATE(created_at) <= :date_to';
             $params[':date_to'] = $filters['date_to'];
         }
 

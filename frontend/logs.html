@@ -1,274 +1,313 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FinHub | Registro de Logs</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
-    <style>
-      :root {
-        color-scheme: dark;
-      }
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FinHub | Registro de Logs</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/frontend/css/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      background: #020617;
+      color: #e2e8f0;
+      font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+    }
 
-      body {
-        margin: 0;
-        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-        background: #020617;
-        color: #e2e8f0;
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-      }
+    .logs-container {
+      padding: 24px;
+    }
 
-      header {
-        padding: 24px;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-      }
+    .filters-card {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 18px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
 
-      header h1 {
-        margin: 0;
-        font-size: 1.8rem;
-      }
+    .filters-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+    }
 
-      .content {
-        padding: 24px;
-        flex: 1;
-      }
+    .filters-card label {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
 
-      .filters {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-        gap: 16px;
-        margin-bottom: 24px;
-        background: rgba(15, 23, 42, 0.7);
-        border-radius: 18px;
-        padding: 20px;
-        border: 1px solid rgba(148, 163, 184, 0.2);
-      }
+    .filters-card input,
+    .filters-card select {
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      background: rgba(2, 6, 23, 0.85);
+      color: #e2e8f0;
+    }
 
-      label {
-        font-size: 0.85rem;
-        color: #94a3b8;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 16px;
+      overflow: hidden;
+    }
 
-      input,
-      select {
-        padding: 10px;
-        border-radius: 10px;
-        border: 1px solid rgba(148, 163, 184, 0.3);
-        background: rgba(15, 23, 42, 0.8);
-        color: #e2e8f0;
-      }
+    th,
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+      text-align: left;
+      font-size: 0.95rem;
+    }
 
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        background: rgba(15, 23, 42, 0.9);
-        border-radius: 16px;
-        overflow: hidden;
-      }
+    th {
+      background: rgba(51, 65, 85, 0.6);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.8rem;
+      color: #cbd5f5;
+    }
 
-      th,
-      td {
-        padding: 14px 16px;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-        text-align: left;
-        font-size: 0.95rem;
-      }
+    tr:hover {
+      background: rgba(37, 99, 235, 0.2);
+      cursor: pointer;
+    }
 
-      th {
-        background: rgba(51, 65, 85, 0.6);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        font-size: 0.8rem;
-        color: #cbd5f5;
-      }
+    .badge {
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+    }
 
-      tr:hover {
-        background: rgba(37, 99, 235, 0.2);
-        cursor: pointer;
-      }
+    .badge.error {
+      background: rgba(248, 113, 113, 0.2);
+      color: #fecaca;
+    }
 
-      .badge {
-        padding: 4px 8px;
-        border-radius: 999px;
-        font-size: 0.78rem;
-        text-transform: uppercase;
-      }
+    .badge.warning {
+      background: rgba(250, 204, 21, 0.2);
+      color: #fef3c7;
+    }
 
-      .badge.error {
-        background: rgba(248, 113, 113, 0.2);
-        color: #fecaca;
-      }
+    .badge.info {
+      background: rgba(59, 130, 246, 0.2);
+      color: #bfdbfe;
+    }
 
-      .badge.warning {
-        background: rgba(250, 204, 21, 0.2);
-        color: #fef3c7;
-      }
+    .pagination {
+      margin-top: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
 
-      .badge.info {
-        background: rgba(59, 130, 246, 0.2);
-        color: #bfdbfe;
-      }
+    .pagination button {
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      background: transparent;
+      color: #e2e8f0;
+      cursor: pointer;
+    }
 
-      .pagination {
-        margin-top: 16px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-      }
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.75);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 1050;
+    }
 
-      .pagination button {
-        padding: 10px 16px;
-        border-radius: 10px;
-        border: 1px solid rgba(148, 163, 184, 0.3);
-        background: transparent;
-        color: #e2e8f0;
-        cursor: pointer;
-      }
+    .modal.active {
+      display: flex;
+    }
 
-      .modal {
-        position: fixed;
-        inset: 0;
-        background: rgba(2, 6, 23, 0.75);
-        display: none;
-        align-items: center;
-        justify-content: center;
-        padding: 24px;
-      }
+    .modal-content {
+      background: rgba(15, 23, 42, 0.95);
+      border-radius: 20px;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      width: min(900px, 95vw);
+      max-height: 90vh;
+      overflow: auto;
+      padding: 24px;
+    }
 
-      .modal.active {
-        display: flex;
-      }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
 
-      .modal-content {
-        background: rgba(15, 23, 42, 0.95);
-        border-radius: 20px;
-        border: 1px solid rgba(148, 163, 184, 0.2);
-        width: min(900px, 95vw);
-        max-height: 90vh;
-        overflow: auto;
-        padding: 24px;
-      }
+    pre {
+      background: #0f172a;
+      padding: 16px;
+      border-radius: 12px;
+      overflow: auto;
+      font-size: 0.85rem;
+    }
 
-      .modal-content h2 {
-        margin-top: 0;
-      }
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
 
-      .detail-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 12px;
-        margin-bottom: 16px;
-      }
+    .toolbar h1 {
+      margin: 0;
+    }
 
-      pre {
-        background: #0f172a;
-        padding: 16px;
-        border-radius: 12px;
-        overflow: auto;
-        font-size: 0.85rem;
-      }
+    .btn-back {
+      color: #e2e8f0;
+      border-color: rgba(148, 163, 184, 0.4);
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-3">
+    <a class="navbar-brand fw-semibold" href="/frontend/dashboard.html">Finhub Suite</a>
+    <div class="ms-auto d-flex align-items-center gap-3">
+      <div class="text-light text-end">
+        <div class="text-secondary small">Expira en <span id="sessionCountdown">--</span></div>
+      </div>
+      <div class="dropdown">
+        <button
+          class="btn btn-outline-light dropdown-toggle"
+          type="button"
+          id="userMenuButton"
+          data-bs-toggle="dropdown"
+          aria-expanded="false"
+        >
+          <span id="userMenuEmail">usuario@example.com</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="userMenuButton">
+          <li><a class="dropdown-item" href="#" data-user-action="profile">Mi perfil</a></li>
+          <li><a class="dropdown-item" href="#" data-user-action="preferences">Preferencias</a></li>
+          <li>
+            <a class="dropdown-item d-none" href="/frontend/dashboard.html" data-role="admin-link" data-user-action="users">Usuarios</a>
+          </li>
+          <li>
+            <a class="dropdown-item d-none" href="/frontend/logs.html" data-role="admin-link" data-user-action="logs">Logeos</a>
+          </li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item text-danger" href="#" data-user-action="logout">Cerrar sesión</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
 
-      .close-modal {
-        background: none;
-        border: none;
-        color: #93c5fd;
-        font-size: 1rem;
-        cursor: pointer;
-        margin-left: auto;
-      }
-    </style>
-  </head>
-  <body>
-    <header>
-      <h1>Registro de Logs</h1>
-      <p>Monitorea errores y eventos críticos de FinHub.</p>
-    </header>
-    <div class="content">
-      <form class="filters" id="filters-form">
+  <main class="logs-container">
+    <div class="toolbar">
+      <div>
+        <h1 class="h3 mb-1">Registro de Logs</h1>
+        <p class="text-secondary mb-0">Monitorea errores y eventos críticos de FinHub.</p>
+      </div>
+      <a href="/frontend/dashboard.html" class="btn btn-outline-secondary btn-sm btn-back" id="backButton">← Regresar</a>
+    </div>
+
+    <form class="filters-card" id="filters-form">
+      <div class="filters-grid">
         <label>
           Desde
-          <input type="date" name="date_from" />
+          <input type="date" name="date_from">
         </label>
         <label>
           Hasta
-          <input type="date" name="date_to" />
+          <input type="date" name="date_to">
         </label>
         <label>
           Estado HTTP
-          <input type="number" name="http_status" min="100" max="599" />
+          <select name="http_status" data-dynamic-options>
+            <option value="">Todos</option>
+          </select>
         </label>
         <label>
           Nivel
-          <select name="level">
+          <select name="level" data-dynamic-options>
             <option value="">Todos</option>
-            <option value="error">Error</option>
-            <option value="warning">Warning</option>
-            <option value="info">Info</option>
           </select>
         </label>
         <label>
           Ruta
-          <input type="text" name="route" placeholder="/auth/login" />
+          <select name="route" data-dynamic-options>
+            <option value="">Todos</option>
+          </select>
         </label>
         <label>
           Correlation ID
-          <input type="text" name="correlation_id" />
+          <input
+            type="text"
+            name="correlation_id"
+            placeholder="TODOS"
+            readonly
+          >
         </label>
-      </form>
-      <div id="logs-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Status</th>
-              <th>Método</th>
-              <th>Ruta</th>
-              <th>Nivel</th>
-              <th>Usuario</th>
-              <th>Mensaje</th>
-            </tr>
-          </thead>
-          <tbody id="logs-body">
-            <tr>
-              <td colspan="7">Cargando...</td>
-            </tr>
-          </tbody>
-        </table>
-        <div class="pagination">
-          <button type="button" id="prev-page">Anterior</button>
-          <div id="pagination-info"></div>
-          <button type="button" id="next-page">Siguiente</button>
-        </div>
+      </div>
+    </form>
+
+    <div id="logs-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Status</th>
+            <th>Método</th>
+            <th>Ruta</th>
+            <th>Nivel</th>
+            <th>Mensaje</th>
+          </tr>
+        </thead>
+        <tbody id="logs-body">
+          <tr>
+            <td colspan="7">Cargando...</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="pagination">
+        <button type="button" id="prev-page">Anterior</button>
+        <div id="pagination-info"></div>
+        <button type="button" id="next-page">Siguiente</button>
       </div>
     </div>
+  </main>
 
-    <div class="modal" id="log-modal">
-      <div class="modal-content">
+  <div class="modal" id="log-modal">
+    <div class="modal-content">
+      <div class="d-flex align-items-center mb-3">
+        <h2 class="mb-0 flex-grow-1">Detalle del Log</h2>
         <button class="close-modal" id="close-modal">Cerrar</button>
-        <h2>Detalle del Log</h2>
-        <div class="detail-grid" id="log-detail"></div>
-        <h3>Stack Trace</h3>
-        <pre id="stack-trace">Sin stack trace.</pre>
-        <h3>Payload</h3>
-        <pre id="payload"></pre>
-        <h3>Query Params</h3>
-        <pre id="query-params"></pre>
       </div>
+      <div class="detail-grid" id="log-detail"></div>
+      <h3>Stack Trace</h3>
+      <pre id="stack-trace">Sin stack trace.</pre>
+      <h3>Payload</h3>
+      <pre id="payload"></pre>
+      <h3>Query Params</h3>
+      <pre id="query-params"></pre>
     </div>
+  </div>
 
-    <script src="/frontend/js/logger.js" defer></script>
-    <script src="/frontend/js/api-client.js" defer></script>
-    <script src="/frontend/js/logs.js" defer></script>
-  </body>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js"></script>
+  <script src="/frontend/js/logger.js" defer></script>
+  <script src="/frontend/js/api-client.js" defer></script>
+  <script src="/frontend/js/session.js" defer></script>
+  <script src="/frontend/js/logs.js" defer></script>
+</body>
 </html>
