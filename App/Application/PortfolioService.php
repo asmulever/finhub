@@ -7,18 +7,14 @@ namespace App\Application;
 use App\Domain\Repository\AccountRepositoryInterface;
 use App\Domain\Repository\FinancialObjectRepositoryInterface;
 use App\Domain\Repository\PortfolioTickerRepositoryInterface;
-use App\Infrastructure\Logger;
 
 class PortfolioService
 {
-    private Logger $logger;
-
     public function __construct(
         private readonly AccountRepositoryInterface $accountRepository,
         private readonly PortfolioTickerRepositoryInterface $tickerRepository,
         private readonly FinancialObjectRepositoryInterface $financialObjectRepository
     ) {
-        $this->logger = new Logger();
     }
 
     public function getTickersForBroker(int $userId, int $brokerId): array

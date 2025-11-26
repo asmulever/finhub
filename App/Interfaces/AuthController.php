@@ -6,17 +6,14 @@ namespace App\Interfaces;
 
 use App\Application\AuthService;
 use App\Infrastructure\Config;
-use App\Infrastructure\Logger;
 use App\Infrastructure\RequestContext;
 
 class AuthController extends BaseController
 {
-    private Logger $logger;
     private bool $secureCookies;
 
     public function __construct(private readonly AuthService $authService)
     {
-        $this->logger = new Logger();
         $this->secureCookies = $this->shouldUseSecureCookies();
     }
 
@@ -26,7 +23,7 @@ class AuthController extends BaseController
         $input = json_decode($rawInput, true);
 
         if (!is_array($input)) {
-            $this->logger->warning("Invalid JSON payload for auth login.");
+            $this->logger()->warning("Invalid JSON payload for auth login.", ['origin' => static::class]);
             $this->logWarning(400, 'Invalid JSON in login');
             http_response_code(400);
             echo json_encode(['error' => 'Invalid JSON']);
@@ -38,10 +35,10 @@ class AuthController extends BaseController
         $password = $input['password'] ?? null;
 
         if ($email && $password) {
-            $this->logger->info("Validating credentials for email: $email");
+            $this->logger()->info("Validating credentials for email: $email", ['origin' => static::class]);
             $tokens = $this->authService->validateCredentials($email, $password);
             if ($tokens !== null) {
-                $this->logger->info("Credential validation successful for email: $email");
+                $this->logger()->info("Credential validation successful for email: $email", ['origin' => static::class]);
                 RequestContext::setUserId($tokens['payload']['uid'] ?? null);
                 $this->setAuthCookies(
                     $tokens['access_token'],
@@ -59,14 +56,14 @@ class AuthController extends BaseController
                 return;
             }
 
-            $this->logger->warning("Credential validation failed for email: $email");
+            $this->logger()->warning("Credential validation failed for email: $email", ['origin' => static::class]);
             $this->logWarning(401, 'Invalid credentials attempt', ['route' => '/auth/login']);
             http_response_code(401);
             echo json_encode(['status' => 'unauthenticated']);
             return;
         }
 
-        $this->logger->error("Bad request: credentials not provided.");
+        $this->logger()->error("Bad request: credentials not provided.", ['origin' => static::class]);
         $this->logWarning(400, 'Missing credentials', ['route' => '/auth/login']);
         http_response_code(400);
         echo json_encode(['error' => 'Bad Request']);

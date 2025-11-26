@@ -6,7 +6,9 @@ function isCrossOrigin(apiBaseUrl) {
     const apiOrigin = new URL(apiBaseUrl, window.location.origin).origin;
     return apiOrigin !== window.location.origin;
   } catch (err) {
-    console.warn("No se pudo resolver el origin del API", err);
+    window.FrontendLogger?.warning("No se pudo resolver el origin del API", {
+      reason: err instanceof Error ? err.message : String(err),
+    });
     return false;
   }
 }
@@ -60,7 +62,10 @@ function apiFetch(route, options = {}) {
 
   const refreshPromise = mustExtend
     ? refreshSessionTokens(defaultCredentials).catch((err) => {
-        console.warn("No se pudo extender la sesión antes de la acción.", err);
+        window.FrontendLogger?.warning(
+          "No se pudo extender la sesión antes de la acción.",
+          { reason: err instanceof Error ? err.message : String(err) }
+        );
       })
     : Promise.resolve();
 

@@ -7,17 +7,16 @@ namespace App\Application;
 use App\Domain\Account;
 use App\Domain\Repository\AccountRepositoryInterface;
 use App\Domain\Repository\UserRepositoryInterface;
-use App\Infrastructure\Logger;
 
 class AccountService
 {
-    private Logger $logger;
+    private LogService $logger;
 
     public function __construct(
         private readonly AccountRepositoryInterface $accountRepository,
         private readonly UserRepositoryInterface $userRepository,
     ) {
-        $this->logger = new Logger();
+        $this->logger = LogService::getInstance();
     }
 
     public function listAccounts(int $userId): array

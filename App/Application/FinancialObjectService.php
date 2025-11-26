@@ -6,15 +6,14 @@ namespace App\Application;
 
 use App\Domain\FinancialObject;
 use App\Domain\Repository\FinancialObjectRepositoryInterface;
-use App\Infrastructure\Logger;
 
 class FinancialObjectService
 {
-    private Logger $logger;
+    private LogService $logger;
 
     public function __construct(private readonly FinancialObjectRepositoryInterface $financialObjectRepository)
     {
-        $this->logger = new Logger();
+        $this->logger = LogService::getInstance();
     }
 
     public function getAllFinancialObjects(): array

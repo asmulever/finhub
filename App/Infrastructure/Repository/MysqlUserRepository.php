@@ -4,21 +4,21 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Repository;
 
+use App\Application\LogService;
 use App\Domain\Repository\UserRepositoryInterface;
 use App\Domain\User;
 use App\Infrastructure\DatabaseManager;
-use App\Infrastructure\Logger;
 use PDO;
 
 class MysqlUserRepository implements UserRepositoryInterface
 {
     private PDO $db;
-    private Logger $logger;
+    private LogService $logger;
 
     public function __construct()
     {
         $this->db = DatabaseManager::getConnection();
-        $this->logger = new Logger();
+        $this->logger = LogService::getInstance();
     }
 
     public function findByEmail(string $email): ?User
