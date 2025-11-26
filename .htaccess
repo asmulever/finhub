@@ -1,3 +1,5 @@
+DirectoryIndex index.php
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
@@ -6,10 +8,14 @@
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteRule ^ - [L]
 
-    # Allow preflight/OPTIONS to reach front controller
+    # Route every /api request through the API front controller
+    RewriteRule ^api$ api/index.php [QSA,L]
+    RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+
+    # Allow preflight/OPTIONS for non-API routes to reach the UI controller
     RewriteCond %{REQUEST_METHOD} OPTIONS
     RewriteRule ^ index.php [QSA,L]
 
-    # Route everything else through the front controller
+    # Route everything else through the UI front controller
     RewriteRule ^ index.php [QSA,L]
 </IfModule>

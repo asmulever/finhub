@@ -2,20 +2,22 @@
 
 declare(strict_types=1);
 
-namespace App\Infrastructure;
+namespace App\Infrastructure\Repository;
 
 use App\Domain\Account;
-use App\Domain\AccountRepository;
+use App\Domain\Repository\AccountRepositoryInterface;
+use App\Infrastructure\DatabaseManager;
+use App\Infrastructure\Logger;
 use PDO;
 
-class MysqlAccountRepository implements AccountRepository
+class MysqlAccountRepository implements AccountRepositoryInterface
 {
     private PDO $db;
     private Logger $logger;
 
     public function __construct()
     {
-        $this->db = DatabaseConnection::getInstance();
+        $this->db = DatabaseManager::getConnection();
         $this->logger = new Logger();
     }
 

@@ -1,5 +1,5 @@
 // Utilidad mínima para decidir si la API es cross-origin y construir las URLs.
-const API_BASE_URL = window.API_BASE_URL || "/index.php";
+const API_BASE_URL = window.API_BASE_URL || "/api";
 
 function isCrossOrigin(apiBaseUrl) {
   try {
@@ -36,7 +36,7 @@ function buildApiUrl(route) {
 }
 
 const SESSION_REFRESH_PATH = "/auth/refresh";
-const SESSION_EXEMPT_ROUTES = new Set([
+const SESSION_EXEMPT_PATHS = new Set([
   "/auth/login",
   "/auth/logout",
   SESSION_REFRESH_PATH,
@@ -48,21 +48,23 @@ function apiFetch(route, options = {}) {
   const url = buildApiUrl(route);
   const defaultCredentials = API_IS_CROSS_ORIGIN ? "include" : "same-origin";
   const requestOptions = { credentials: defaultCredentials, ...fetchOptions };
+  const routePath = getRoutePath(route);
+  const hasSession =
+    typeof Session !== "undefined" &&
+    Session.getPayload() !== null &&
+    !Session.isExpired(Session.getExpiresAt());
+  const mustExtend =
+    !skipSessionExtend &&
+    hasSession &&
+    !SESSION_EXEMPT_PATHS.has(routePath);
 
-  return fetch(url, requestOptions).then(async (response) => {
-    if (
-      response.ok &&
-      !skipSessionExtend &&
-      !SESSION_EXEMPT_ROUTES.has(route)
-    ) {
-      try {
-        await refreshSessionTokens(defaultCredentials);
-      } catch (err) {
-        console.warn("No se pudo refrescar la sesión tras la acción.", err);
-      }
-    }
-    return response;
-  });
+  const refreshPromise = mustExtend
+    ? refreshSessionTokens(defaultCredentials).catch((err) => {
+        console.warn("No se pudo extender la sesión antes de la acción.", err);
+      })
+    : Promise.resolve();
+
+  return refreshPromise.then(() => fetch(url, requestOptions));
 }
 
 async function refreshSessionTokens(credentialsMode) {
@@ -74,12 +76,49 @@ async function refreshSessionTokens(credentialsMode) {
     method: "POST",
     credentials:
       credentialsMode ?? (API_IS_CROSS_ORIGIN ? "include" : "same-origin"),
-  }).finally(() => {
-    sessionRefreshPromise = null;
-  });
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        throw new Error(`Refresh failed: ${response.status}`);
+      }
 
-  const response = await sessionRefreshPromise;
-  if (!response.ok) {
-    throw new Error(`Refresh failed: ${response.status}`);
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const data = await response.json();
+        const payload = data.payload ?? null;
+        const accessExp = data.access_expires_at ?? payload?.exp ?? null;
+
+        if (payload && accessExp && typeof Session !== "undefined") {
+          Session.save(payload, accessExp);
+          window.dispatchEvent(
+            new CustomEvent("session:refreshed", {
+              detail: { payload, accessExp },
+            })
+          );
+        }
+      }
+
+      return true;
+    })
+    .finally(() => {
+      sessionRefreshPromise = null;
+    });
+
+  await sessionRefreshPromise;
+}
+
+function getRoutePath(route) {
+  try {
+    const absolute = new URL(route, window.location.origin);
+    const trimmed = trimTrailingSlash(absolute.pathname);
+    return trimmed === "" ? "/" : trimmed;
+  } catch {
+    const normalized = normalizeRoute(route);
+    const absolute = new URL(normalized, window.location.origin);
+    const trimmed = trimTrailingSlash(absolute.pathname);
+    return trimmed === "" ? "/" : trimmed;
   }
 }
+
+window.apiFetch = apiFetch;
+window.buildApiUrl = buildApiUrl;

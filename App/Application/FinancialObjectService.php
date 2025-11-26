@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace App\Application;
 
 use App\Domain\FinancialObject;
-use App\Domain\FinancialObjectRepository;
+use App\Domain\Repository\FinancialObjectRepositoryInterface;
 use App\Infrastructure\Logger;
 
 class FinancialObjectService
 {
     private Logger $logger;
 
-    public function __construct(private readonly FinancialObjectRepository $financialObjectRepository)
+    public function __construct(private readonly FinancialObjectRepositoryInterface $financialObjectRepository)
     {
         $this->logger = new Logger();
     }

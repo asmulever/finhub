@@ -2,20 +2,22 @@
 
 declare(strict_types=1);
 
-namespace App\Infrastructure;
+namespace App\Infrastructure\Repository;
 
 use App\Domain\FinancialObject;
-use App\Domain\FinancialObjectRepository;
+use App\Domain\Repository\FinancialObjectRepositoryInterface;
+use App\Infrastructure\DatabaseManager;
+use App\Infrastructure\Logger;
 use PDO;
 
-class MysqlFinancialObjectRepository implements FinancialObjectRepository
+class MysqlFinancialObjectRepository implements FinancialObjectRepositoryInterface
 {
     private PDO $db;
     private Logger $logger;
 
     public function __construct()
     {
-        $this->db = DatabaseConnection::getInstance();
+        $this->db = DatabaseManager::getConnection();
         $this->logger = new Logger();
     }
 

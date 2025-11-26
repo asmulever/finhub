@@ -25,6 +25,11 @@ class Config
         return self::$instance[$key];
     }
 
+    public static function bootstrap(): void
+    {
+        self::ensureLoaded();
+    }
+
     private static function ensureLoaded(): void
     {
         if (!self::$loaded) {

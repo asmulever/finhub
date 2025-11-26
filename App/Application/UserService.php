@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Application;
 
+use App\Domain\Repository\UserRepositoryInterface;
 use App\Domain\User;
-use App\Domain\UserRepository;
 use App\Infrastructure\Config;
 use App\Infrastructure\Logger;
 
@@ -13,7 +13,7 @@ class UserService
 {
     private Logger $logger;
 
-    public function __construct(private readonly UserRepository $userRepository)
+    public function __construct(private readonly UserRepositoryInterface $userRepository)
     {
         $this->logger = new Logger();
     }
@@ -23,7 +23,13 @@ class UserService
         $this->logger->info('Fetching all users.');
         try {
             $users = $this->userRepository->findAll();
-            return array_map(fn(User $user) => $user->toArray(), $users);
+            $activeUsers = array_values(
+                array_filter(
+                    $users,
+                    static fn(User $user): bool => $user->isActive()
+                )
+            );
+            return array_map(fn(User $user) => $user->toArray(), $activeUsers);
         } catch (\Exception $e) {
             $this->logger->error('Error fetching users: ' . $e->getMessage());
             return [];
@@ -43,7 +49,8 @@ class UserService
 
         try {
             $hashed = password_hash($password, PASSWORD_DEFAULT);
-            $user = new User(null, strtolower($email), $hashed, $role, $this->shouldUsersBeActive());
+            $isActive = $this->shouldActivateUser($email);
+            $user = new User(null, strtolower($email), $hashed, $role, $isActive);
             $id = $this->userRepository->save($user);
 
             return [
@@ -102,8 +109,14 @@ class UserService
         }
     }
 
-    private function shouldUsersBeActive(): bool
+    private function shouldActivateUser(string $email): bool
     {
+        $normalized = strtolower($email);
+        $rootEmail = strtolower(Config::get('ROOT_EMAIL', 'root@example.com'));
+        if ($normalized !== $rootEmail) {
+            return true;
+        }
+
         return Config::get('ENABLE_ROOT_USER', '0') === '1';
     }
 }

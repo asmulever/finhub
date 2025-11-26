@@ -7,6 +7,7 @@ namespace App\Interfaces;
 use App\Application\FinancialObjectService;
 use App\Infrastructure\JwtService;
 use App\Infrastructure\Logger;
+use App\Infrastructure\RequestContext;
 
 class FinancialObjectController extends BaseController
 {
@@ -48,6 +49,7 @@ class FinancialObjectController extends BaseController
         $created = $this->financialObjectService->createFinancialObject($input);
         if ($created === null) {
             http_response_code(400);
+            $this->logWarning(400, 'Invalid financial object data', ['route' => RequestContext::getRoute()]);
             echo json_encode(['error' => 'Invalid financial object data']);
             return;
         }
@@ -74,6 +76,7 @@ class FinancialObjectController extends BaseController
             return;
         }
 
+        $this->logWarning(400, 'Unable to update financial object', ['route' => RequestContext::getRoute()]);
         http_response_code(400);
         echo json_encode(['error' => 'Unable to update financial object']);
     }
@@ -91,6 +94,7 @@ class FinancialObjectController extends BaseController
             return;
         }
 
+        $this->logWarning(400, 'Unable to delete financial object', ['route' => RequestContext::getRoute()]);
         http_response_code(400);
         echo json_encode(['error' => 'Unable to delete financial object']);
     }
@@ -102,6 +106,7 @@ class FinancialObjectController extends BaseController
 
         if ($token === null) {
             $this->logger->warning("Unauthorized access attempt: missing token.");
+            $this->logWarning(401, 'Missing token', ['route' => RequestContext::getRoute()]);
             http_response_code(401);
             echo json_encode(['error' => 'Unauthorized']);
             return null;
@@ -110,13 +115,17 @@ class FinancialObjectController extends BaseController
         $payload = $this->jwtService->validateToken($token, 'access');
         if ($payload === null) {
             $this->logger->warning("Unauthorized access attempt: invalid token.");
+            $this->logWarning(401, 'Invalid token', ['route' => RequestContext::getRoute()]);
             http_response_code(401);
             echo json_encode(['error' => 'Unauthorized']);
             return null;
         }
 
+        $this->recordAuthenticatedUser($payload);
+
         if ($requireAdmin && (($payload->role ?? '') !== 'admin')) {
             $this->logger->warning("Forbidden operation for user {$payload->uid}, requires admin.");
+            $this->logWarning(403, 'Forbidden access', ['route' => RequestContext::getRoute(), 'user_id' => $payload->uid ?? null]);
             http_response_code(403);
             echo json_encode(['error' => 'Forbidden']);
             return null;
@@ -132,11 +141,13 @@ class FinancialObjectController extends BaseController
 
         if (!is_array($input)) {
             $this->logger->warning("Invalid JSON payload received.");
+            $this->logWarning(400, 'Invalid JSON body', ['route' => RequestContext::getRoute()]);
             http_response_code(400);
             echo json_encode(['error' => 'Invalid JSON']);
             return null;
         }
 
+        RequestContext::setRequestPayload($input);
         return $input;
     }
 
