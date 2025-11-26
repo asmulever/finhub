@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure;
 
+use App\Application\LogService;
 use PDO;
 
 class SchemaManager
@@ -12,12 +13,12 @@ class SchemaManager
 
     public static function ensureSchema(): array
     {
-        $logger = new Logger();
+        $logger = LogService::getInstance();
 
         try {
             $pdo = DatabaseManager::getConnection();
         } catch (\Throwable $e) {
-            $logger->error('Database connection failed during schema check: ' . $e->getMessage());
+            $logger->error('Database connection failed during schema check: ' . $e->getMessage(), ['origin' => 'schema']);
             return ['db' => 'error', 'message' => $e->getMessage()];
         }
 
@@ -40,7 +41,7 @@ class SchemaManager
         ];
     }
 
-    private static function ensureUsersTable(PDO $pdo, Logger $logger): void
+    private static function ensureUsersTable(PDO $pdo, LogService $logger): void
     {
         $pdo->exec("CREATE TABLE IF NOT EXISTS users (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -56,7 +57,7 @@ class SchemaManager
         self::addColumnIfMissing($pdo, $logger, 'users', 'created_at', "TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
     }
 
-    private static function ensureFinancialObjectsTable(PDO $pdo, Logger $logger): void
+    private static function ensureFinancialObjectsTable(PDO $pdo, LogService $logger): void
     {
         $pdo->exec("CREATE TABLE IF NOT EXISTS financial_objects (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -73,7 +74,7 @@ class SchemaManager
         self::ensureUniqueIndex($pdo, $logger, 'financial_objects', 'unique_symbol', 'symbol');
     }
 
-    private static function ensureAccountsTable(PDO $pdo, Logger $logger): void
+    private static function ensureAccountsTable(PDO $pdo, LogService $logger): void
     {
         self::renameLegacyTable($pdo, $logger, 'accounts', 'id');
 
@@ -88,7 +89,7 @@ class SchemaManager
         ) " . self::TABLE_OPTIONS);
     }
 
-    private static function ensurePortfolioTickersTable(PDO $pdo, Logger $logger): void
+    private static function ensurePortfolioTickersTable(PDO $pdo, LogService $logger): void
     {
         $pdo->exec("CREATE TABLE IF NOT EXISTS portfolio_tickers (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -103,12 +104,12 @@ class SchemaManager
         ) " . self::TABLE_OPTIONS);
 
         if (!self::columnExists($pdo, 'portfolio_tickers', 'account_id')) {
-            $logger->info('Adding account_id to portfolio_tickers.');
+            $logger->info('Adding account_id to portfolio_tickers.', ['origin' => 'schema']);
             $pdo->exec("ALTER TABLE portfolio_tickers ADD COLUMN account_id INT UNSIGNED NULL AFTER id");
         }
 
         if (self::columnExists($pdo, 'portfolio_tickers', 'portfolio_id')) {
-            $logger->info('Migrating portfolio_tickers.portfolio_id to account_id.');
+            $logger->info('Migrating portfolio_tickers.portfolio_id to account_id.', ['origin' => 'schema']);
             $pdo->exec("UPDATE portfolio_tickers SET account_id = portfolio_id WHERE account_id IS NULL");
             $pdo->exec("ALTER TABLE portfolio_tickers DROP COLUMN portfolio_id");
         }
@@ -116,7 +117,7 @@ class SchemaManager
         $pdo->exec("ALTER TABLE portfolio_tickers MODIFY COLUMN account_id INT UNSIGNED NOT NULL");
     }
 
-    private static function ensureProductsTable(PDO $pdo, Logger $logger): void
+    private static function ensureProductsTable(PDO $pdo, LogService $logger): void
     {
         $pdo->exec("CREATE TABLE IF NOT EXISTS products (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -131,7 +132,7 @@ class SchemaManager
         self::ensureUniqueIndex($pdo, $logger, 'products', 'unique_product_sku', 'sku');
     }
 
-    private static function ensureOrdersTable(PDO $pdo, Logger $logger): void
+    private static function ensureOrdersTable(PDO $pdo, LogService $logger): void
     {
         $pdo->exec("CREATE TABLE IF NOT EXISTS orders (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -143,7 +144,7 @@ class SchemaManager
         ) " . self::TABLE_OPTIONS);
     }
 
-    private static function ensureApiLogsTable(PDO $pdo, Logger $logger): void
+    private static function ensureApiLogsTable(PDO $pdo, LogService $logger): void
     {
         $pdo->exec("CREATE TABLE IF NOT EXISTS api_logs (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -175,11 +176,11 @@ class SchemaManager
         return $stmt->fetchColumn() !== false;
     }
 
-    private static function seedData(PDO $pdo, Logger $logger): void
+    private static function seedData(PDO $pdo, LogService $logger): void
     {
         $foCount = self::countTable($pdo, 'financial_objects');
         if ($foCount === 0) {
-            $logger->info('Seeding default financial objects.');
+            $logger->info('Seeding default financial objects.', ['origin' => 'schema']);
             $pdo->exec("INSERT INTO financial_objects (name, symbol, type) VALUES 
                 ('S&P 500 ETF', 'SPY', 'etf'),
                 ('Apple Inc', 'AAPL', 'stock'),
@@ -190,7 +191,7 @@ class SchemaManager
         }
     }
 
-    private static function applyRootUserPolicy(PDO $pdo, Logger $logger): void
+    private static function applyRootUserPolicy(PDO $pdo, LogService $logger): void
     {
         $enabled = Config::get('ENABLE_ROOT_USER', '0');
         $rootEmail = Config::getRequired('ROOT_EMAIL');
@@ -204,7 +205,7 @@ class SchemaManager
             if ($existingId !== false) {
                 $update = $pdo->prepare("UPDATE users SET is_active = 0 WHERE id = :id");
                 $update->execute(['id' => $existingId]);
-                $logger->info("Root user {$rootEmail} marked inactive due to ENABLE_ROOT_USER=0.");
+                $logger->info("Root user {$rootEmail} marked inactive due to ENABLE_ROOT_USER=0.", ['origin' => 'schema']);
             }
             return;
         }
@@ -222,7 +223,7 @@ class SchemaManager
                 'role' => $fullAdminRole,
                 'is_active' => 1,
             ]);
-            $logger->info("Root user {$rootEmail} created via ENABLE_ROOT_USER flag.");
+            $logger->info("Root user {$rootEmail} created via ENABLE_ROOT_USER flag.", ['origin' => 'schema']);
             return;
         }
 
@@ -232,37 +233,37 @@ class SchemaManager
             'role' => $fullAdminRole,
             'id' => $existingId,
         ]);
-        $logger->info("Root user {$rootEmail} updated to maintain admin status.");
+        $logger->info("Root user {$rootEmail} updated to maintain admin status.", ['origin' => 'schema']);
     }
 
-    private static function addColumnIfMissing(PDO $pdo, Logger $logger, string $table, string $column, string $definition): void
+    private static function addColumnIfMissing(PDO $pdo, LogService $logger, string $table, string $column, string $definition): void
     {
         $stmt = $pdo->prepare("SHOW COLUMNS FROM {$table} LIKE :column");
         $stmt->execute(['column' => $column]);
         $exists = $stmt->fetchColumn();
 
         if ($exists === false) {
-            $logger->info("Adding missing column {$column} to {$table}");
+            $logger->info("Adding missing column {$column} to {$table}", ['origin' => 'schema']);
             try {
                 $pdo->exec("ALTER TABLE {$table} ADD COLUMN {$column} {$definition}");
             } catch (\PDOException $e) {
-                $logger->warning("Could not add column {$column} to {$table}: " . $e->getMessage());
+                $logger->warning("Could not add column {$column} to {$table}: " . $e->getMessage(), ['origin' => 'schema']);
             }
         }
     }
 
-    private static function ensureUniqueIndex(PDO $pdo, Logger $logger, string $table, string $indexName, string $column): void
+    private static function ensureUniqueIndex(PDO $pdo, LogService $logger, string $table, string $indexName, string $column): void
     {
         $stmt = $pdo->prepare("SHOW INDEX FROM {$table} WHERE Key_name = :index");
         $stmt->execute(['index' => $indexName]);
         $exists = $stmt->fetchColumn();
 
         if ($exists === false) {
-            $logger->info("Adding missing unique index {$indexName} on {$table}({$column})");
+            $logger->info("Adding missing unique index {$indexName} on {$table}({$column})", ['origin' => 'schema']);
             try {
                 $pdo->exec("ALTER TABLE {$table} ADD UNIQUE KEY {$indexName} ({$column})");
             } catch (\PDOException $e) {
-                $logger->warning("Could not create unique index {$indexName} on {$table}: " . $e->getMessage());
+                $logger->warning("Could not create unique index {$indexName} on {$table}: " . $e->getMessage(), ['origin' => 'schema']);
             }
         }
     }
@@ -272,7 +273,7 @@ class SchemaManager
         $stmt = $pdo->query("SELECT COUNT(*) FROM {$table}");
         return (int)$stmt->fetchColumn();
     }
-    private static function ensureIndex(PDO $pdo, Logger $logger, string $table, string $indexName, string $column): void
+    private static function ensureIndex(PDO $pdo, LogService $logger, string $table, string $indexName, string $column): void
     {
         $stmt = $pdo->prepare("SHOW INDEX FROM {$table} WHERE Key_name = :index");
         $stmt->execute(['index' => $indexName]);
@@ -280,12 +281,12 @@ class SchemaManager
             try {
                 $pdo->exec("CREATE INDEX {$indexName} ON {$table} ({$column})");
             } catch (\PDOException $e) {
-                $logger->warning("Could not create index {$indexName} on {$table}: " . $e->getMessage());
+                $logger->warning("Could not create index {$indexName} on {$table}: " . $e->getMessage(), ['origin' => 'schema']);
             }
         }
     }
 
-    private static function renameLegacyTable(PDO $pdo, Logger $logger, string $table, string $column): void
+    private static function renameLegacyTable(PDO $pdo, LogService $logger, string $table, string $column): void
     {
         $stmt = $pdo->prepare("SHOW TABLES LIKE :table");
         $stmt->execute(['table' => $table]);
@@ -304,7 +305,7 @@ class SchemaManager
         $type = strtolower((string)($info['Type'] ?? ''));
         if (str_contains($type, 'char')) {
             $legacyName = "{$table}_legacy";
-            $logger->warning("Renaming legacy table {$table} to {$legacyName}");
+            $logger->warning("Renaming legacy table {$table} to {$legacyName}", ['origin' => 'schema']);
             $pdo->exec("RENAME TABLE {$table} TO {$legacyName}");
         }
     }

@@ -7,18 +7,15 @@ namespace App\Infrastructure\Repository;
 use App\Domain\Order;
 use App\Domain\Repository\OrderRepositoryInterface;
 use App\Infrastructure\DatabaseManager;
-use App\Infrastructure\Logger;
 use PDO;
 
 class MysqlOrderRepository implements OrderRepositoryInterface
 {
     private PDO $db;
-    private Logger $logger;
 
     public function __construct()
     {
         $this->db = DatabaseManager::getConnection();
-        $this->logger = new Logger();
     }
 
     public function findAll(): array

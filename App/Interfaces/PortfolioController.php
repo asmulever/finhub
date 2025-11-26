@@ -6,18 +6,14 @@ namespace App\Interfaces;
 
 use App\Application\PortfolioService;
 use App\Infrastructure\JwtService;
-use App\Infrastructure\Logger;
 use App\Infrastructure\RequestContext;
 
 class PortfolioController extends BaseController
 {
-    private Logger $logger;
-
     public function __construct(
         private readonly PortfolioService $portfolioService,
         private readonly JwtService $jwtService
     ) {
-        $this->logger = new Logger();
     }
 
     public function show(): void
@@ -68,7 +64,7 @@ class PortfolioController extends BaseController
             http_response_code(201);
             echo json_encode($created);
         } catch (\Throwable $e) {
-            $this->logger->warning('Unable to add ticker: ' . $e->getMessage());
+            $this->logger()->warning('Unable to add ticker: ' . $e->getMessage(), ['origin' => static::class]);
             http_response_code(400);
             $this->logWarning(400, $e->getMessage(), ['route' => RequestContext::getRoute()]);
             echo json_encode(['error' => $e->getMessage()]);
@@ -92,7 +88,7 @@ class PortfolioController extends BaseController
             http_response_code(200);
             echo json_encode(['status' => 'updated']);
         } catch (\Throwable $e) {
-            $this->logger->warning('Unable to update ticker: ' . $e->getMessage());
+            $this->logger()->warning('Unable to update ticker: ' . $e->getMessage(), ['origin' => static::class]);
             http_response_code(400);
             $this->logWarning(400, $e->getMessage(), ['route' => RequestContext::getRoute()]);
             echo json_encode(['error' => $e->getMessage()]);
@@ -110,7 +106,7 @@ class PortfolioController extends BaseController
             $this->portfolioService->deleteTicker((int)$payload->uid, $tickerId);
             http_response_code(204);
         } catch (\Throwable $e) {
-            $this->logger->warning('Unable to delete ticker: ' . $e->getMessage());
+            $this->logger()->warning('Unable to delete ticker: ' . $e->getMessage(), ['origin' => static::class]);
             http_response_code(400);
             $this->logWarning(400, $e->getMessage(), ['route' => RequestContext::getRoute()]);
             echo json_encode(['error' => $e->getMessage()]);

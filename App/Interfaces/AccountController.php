@@ -6,18 +6,14 @@ namespace App\Interfaces;
 
 use App\Application\AccountService;
 use App\Infrastructure\JwtService;
-use App\Infrastructure\Logger;
 use App\Infrastructure\RequestContext;
 
 class AccountController extends BaseController
 {
-    private Logger $logger;
-
     public function __construct(
         private readonly AccountService $accountService,
         private readonly JwtService $jwtService
     ) {
-        $this->logger = new Logger();
     }
 
     public function list(): void
@@ -100,7 +96,7 @@ class AccountController extends BaseController
 
     private function authorize(): ?object
     {
-        $this->logger->info('Authorizing request for accounts.');
+        $this->logger()->info('Authorizing request for accounts.', ['origin' => static::class]);
         $token = $this->getAccessTokenFromRequest();
 
         if ($token === null) {
@@ -128,7 +124,7 @@ class AccountController extends BaseController
         $input = json_decode($rawInput, true);
 
         if (!is_array($input)) {
-            $this->logger->warning('Invalid JSON payload for accounts controller.');
+            $this->logger()->warning('Invalid JSON payload for accounts controller.', ['origin' => static::class]);
             $this->logWarning(400, 'Invalid JSON body', ['route' => RequestContext::getRoute()]);
             http_response_code(400);
             echo json_encode(['error' => 'Invalid JSON']);

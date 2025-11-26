@@ -23,7 +23,6 @@ class DatabaseManager
         $user = Config::getRequired('DB_USERNAME');
         $password = Config::getRequired('DB_PASSWORD');
 
-        $logger = new Logger();
         $lastException = null;
 
         foreach ($hosts as $host) {
@@ -35,16 +34,13 @@ class DatabaseManager
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 ]);
                 self::$pdo = $pdo;
-                $logger->info("Database connection to {$dbName} at {$host} established successfully.");
                 return self::$pdo;
             } catch (PDOException $e) {
                 $lastException = $e;
-                $logger->warning("Database connection attempt to {$host} failed: " . $e->getMessage());
             }
         }
 
         $error = $lastException?->getMessage() ?? 'Unable to connect to any configured host.';
-        $logger->error("Database connection failed after trying hosts: " . implode(', ', $hosts) . ". Error: {$error}");
         throw new \RuntimeException("Database connection failed: {$error}", 0, $lastException);
     }
 

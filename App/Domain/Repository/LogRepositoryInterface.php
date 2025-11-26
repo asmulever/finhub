@@ -16,4 +16,23 @@ interface LogRepositoryInterface
      * @return array<string,mixed>|null
      */
     public function findById(int $id): ?array;
+
+    /**
+     * @param array{
+     *     level: string,
+     *     http_status: int,
+     *     method: string,
+     *     route: string,
+     *     message: string,
+     *     exception_class: ?string,
+     *     stack_trace: ?string,
+     *     request_payload: ?array,
+     *     query_params: ?array,
+     *     user_id: ?int,
+     *     client_ip: ?string,
+     *     user_agent: ?string,
+     *     correlation_id: string
+     * } $record
+     */
+    public function store(array $record): void;
 }

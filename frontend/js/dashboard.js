@@ -230,7 +230,9 @@ async function handleUserFormSubmit(event) {
           payload
         );
       } catch (err) {
-        console.warn("PUT /users failed, retrying via POST", err);
+        window.FrontendLogger?.warning("PUT /users failed, retrying via POST", {
+          reason: err instanceof Error ? err.message : String(err),
+        });
         await requestWithAuth(
           `/users/${state.editingUserId}/update`,
           "POST",
@@ -321,7 +323,10 @@ async function deleteUser(userId) {
     await requestWithAuth(`/users/${userId}`, "DELETE");
     await loadUsers();
   } catch (err) {
-    console.warn("DELETE fallback to POST", err);
+    window.FrontendLogger?.warning("DELETE fallback to POST", {
+      reason: err instanceof Error ? err.message : String(err),
+      userId,
+    });
     try {
       await requestWithAuth(`/users/${userId}/delete`, "POST");
       await loadUsers();
@@ -465,7 +470,13 @@ async function handleBrokerFormSubmit(event) {
           payload
         );
       } catch (err) {
-        console.warn("PUT /accounts failed, retrying via POST", err);
+        window.FrontendLogger?.warning(
+          "PUT /accounts failed, retrying via POST",
+          {
+            reason: err instanceof Error ? err.message : String(err),
+            accountId: state.editingAccountId,
+          }
+        );
         await requestWithAuth(
           `/accounts/${state.editingAccountId}/update`,
           "POST",
@@ -765,7 +776,13 @@ async function deleteAccountBroker(accountId) {
     await loadAccounts();
     await loadPortfolio();
   } catch (err) {
-    console.warn("DELETE /accounts fallo, reintentando via POST", err);
+    window.FrontendLogger?.warning(
+      "DELETE /accounts failed, retrying via POST",
+      {
+        reason: err instanceof Error ? err.message : String(err),
+        accountId,
+      }
+    );
     try {
       await requestWithAuth(`/accounts/${accountId}/delete`, "POST");
       await loadAccounts();
@@ -819,7 +836,10 @@ async function fetchProtected(route) {
     }
     return await res.json();
   } catch (err) {
-    console.warn(`Error fetching ${route}`, err);
+    window.FrontendLogger?.warning(`Error fetching ${route}`, {
+      reason: err instanceof Error ? err.message : String(err),
+      route,
+    });
     return null;
   }
 }
@@ -829,7 +849,10 @@ async function fetchPublic(route) {
     const res = await apiFetch(route);
     return await res.json();
   } catch (err) {
-    console.warn(`Error fetching ${route}`, err);
+    window.FrontendLogger?.warning(`Error fetching ${route}`, {
+      reason: err instanceof Error ? err.message : String(err),
+      route,
+    });
     return null;
   }
 }
@@ -851,7 +874,9 @@ async function fetchSession() {
     Session.save(payload, accessExp);
     return { payload, access_expires_at: accessExp };
   } catch (err) {
-    console.error("No se pudo validar la sesión", err);
+    window.FrontendLogger?.error("No se pudo validar la sesión", {
+      reason: err instanceof Error ? err.message : String(err),
+    });
     redirectToLogin();
     return null;
   }
@@ -862,7 +887,9 @@ async function logoutAndRedirect() {
   try {
     await apiFetch("/auth/logout", { method: "POST", skipSessionExtend: true });
   } catch (err) {
-    console.warn("No se pudo cerrar la sesión en el servidor", err);
+    window.FrontendLogger?.warning("No se pudo cerrar la sesión en el servidor", {
+      reason: err instanceof Error ? err.message : String(err),
+    });
   }
   redirectToLogin();
 }
@@ -999,7 +1026,9 @@ async function refreshSession({ silent = false } = {}) {
     applySessionPayload(payload, accessExp);
     return true;
   } catch (err) {
-    console.error(err);
+    window.FrontendLogger?.error("No se pudo extender la sesión", {
+      reason: err instanceof Error ? err.message : String(err),
+    });
     if (!silent) {
       alert(err.message || "No se pudo extender la sesión.");
     }
