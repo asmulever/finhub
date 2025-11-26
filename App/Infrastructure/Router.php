@@ -4,23 +4,14 @@ declare(strict_types=1);
 
 namespace App\Infrastructure;
 
-use App\Application\AccountService;
-use App\Application\AuthService;
-use App\Application\FinancialObjectService;
 use App\Application\LogService;
-use App\Application\PortfolioService;
-use App\Application\UserService;
-use App\Infrastructure\Repository\MysqlAccountRepository;
-use App\Infrastructure\Repository\MysqlFinancialObjectRepository;
-use App\Infrastructure\Repository\MysqlLogRepository;
-use App\Infrastructure\Repository\MysqlPortfolioTickerRepository;
-use App\Infrastructure\Repository\MysqlUserRepository;
 use App\Interfaces\AccountController;
 use App\Interfaces\AuthController;
 use App\Interfaces\FinancialObjectController;
 use App\Interfaces\LogController;
 use App\Interfaces\PortfolioController;
 use App\Interfaces\UserController;
+use App\Infrastructure\Container;
 
 class Router
 {
@@ -32,31 +23,17 @@ class Router
     private LogController $logController;
     private LogService $logService;
 
-    public function __construct()
+    public function __construct(private readonly Container $container)
     {
-        $logRepository = new MysqlLogRepository();
-        $logService = new LogService($logRepository);
-        LogService::registerInstance($logService);
-        $this->logService = $logService;
+        // Ensure LogService is initialized before repositories request the singleton.
+        $this->logService = $container->get(LogService::class);
 
-        $userRepository = new MysqlUserRepository();
-        $financialObjectRepository = new MysqlFinancialObjectRepository();
-        $accountRepository = new MysqlAccountRepository();
-        $portfolioTickerRepository = new MysqlPortfolioTickerRepository();
-
-        $jwtService = new JwtService(Config::getRequired('JWT_SECRET'));
-        $authService = new AuthService($userRepository, $jwtService);
-        $financialObjectService = new FinancialObjectService($financialObjectRepository);
-        $userService = new UserService($userRepository);
-        $accountService = new AccountService($accountRepository, $userRepository);
-        $portfolioService = new PortfolioService($accountRepository, $portfolioTickerRepository, $financialObjectRepository);
-
-        $this->authController = new AuthController($authService);
-        $this->financialObjectController = new FinancialObjectController($financialObjectService, $jwtService);
-        $this->userController = new UserController($userService, $jwtService);
-        $this->accountController = new AccountController($accountService, $jwtService);
-        $this->portfolioController = new PortfolioController($portfolioService, $jwtService);
-        $this->logController = new LogController($logService, $jwtService);
+        $this->authController = $container->get(AuthController::class);
+        $this->financialObjectController = $container->get(FinancialObjectController::class);
+        $this->userController = $container->get(UserController::class);
+        $this->accountController = $container->get(AccountController::class);
+        $this->portfolioController = $container->get(PortfolioController::class);
+        $this->logController = $container->get(LogController::class);
     }
 
     public function dispatch(string $requestUri, string $requestMethod): void
