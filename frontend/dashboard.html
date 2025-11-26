@@ -12,11 +12,33 @@
     <a class="navbar-brand fw-semibold" href="#">Finhub Suite</a>
     <div class="ms-auto d-flex align-items-center gap-3">
       <div class="text-light text-end">
-        <div class="fw-semibold" id="userName">Usuario</div>
-        <small id="sessionCountdown" class="text-secondary"></small>
+        <div class="text-secondary small" id="sessionCountdown"></div>
       </div>
-      <button class="btn btn-outline-light btn-sm" id="extendSession">Extender sesión</button>
-      <button class="btn btn-primary btn-sm" id="logoutBtn">Cerrar sesión</button>
+      <div class="dropdown">
+        <button
+          class="btn btn-outline-light dropdown-toggle"
+          type="button"
+          id="userMenuButton"
+          data-bs-toggle="dropdown"
+          aria-expanded="false"
+        >
+          <span id="userMenuEmail">usuario@example.com</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="userMenuButton">
+          <li><a class="dropdown-item" href="#" data-user-action="profile">Mi perfil</a></li>
+          <li><a class="dropdown-item" href="#" data-user-action="preferences">Preferencias</a></li>
+          <li>
+            <a
+              class="dropdown-item d-none"
+              href="#"
+              data-user-action="users"
+              id="userMenuUsersLink"
+            >Usuarios</a>
+          </li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item text-danger" href="#" data-user-action="logout">Cerrar sesión</a></li>
+        </ul>
+      </div>
     </div>
   </nav>
   <div class="container-fluid">
@@ -25,7 +47,6 @@
         <h6 class="text-uppercase text-white-50 mb-3">Menú principal</h6>
         <nav class="nav flex-column gap-1" id="mainNav">
           <a href="#" class="nav-link active" data-section="overview">Resumen</a>
-          <a href="#" class="nav-link" data-section="users" data-role="admin">Usuarios</a>
           <a href="#" class="nav-link" data-section="brokers">Brokers</a>
           <a href="#" class="nav-link" data-section="portfolio">Portafolio</a>
           <a href="#" class="nav-link" data-section="tickers">Ticker's</a>
@@ -133,7 +154,7 @@
           </div>
         </section>
 
-        <section id="section-users" class="dashboard-section">
+        <section id="section-users" class="dashboard-section" data-role="admin">
           <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
               <h3 class="mb-0">Gestión de usuarios</h3>
@@ -181,6 +202,60 @@
                   <tbody id="usersTableBody"></tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="section-profile" class="dashboard-section">
+          <div class="card shadow-sm border-0">
+            <div class="card-body">
+              <h3 class="mb-3">Mi perfil</h3>
+              <p class="text-muted">Vista preliminar para los datos personales del usuario autenticado.</p>
+              <dl class="row">
+                <dt class="col-sm-3">Correo</dt>
+                <dd class="col-sm-9" id="profileEmail">--</dd>
+                <dt class="col-sm-3">Rol</dt>
+                <dd class="col-sm-9" id="profileRole">--</dd>
+                <dt class="col-sm-3">Último acceso</dt>
+                <dd class="col-sm-9" id="profileLastLogin">Se completará en futuras versiones.</dd>
+              </dl>
+            </div>
+          </div>
+        </section>
+
+        <section id="section-preferences" class="dashboard-section">
+          <div class="card shadow-sm border-0">
+            <div class="card-body">
+              <h3 class="mb-3">Preferencias del entorno</h3>
+              <p class="text-muted">
+                Configura opciones como tema, idioma y parámetros específicos de FinHub. Esta vista está
+                preparada para ampliarse con la lógica necesaria.
+              </p>
+              <form class="row g-3" id="preferencesForm">
+                <div class="col-md-4">
+                  <label class="form-label">Tema visual</label>
+                  <select class="form-select" disabled>
+                    <option value="dark">Oscuro (predeterminado)</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Idioma</label>
+                  <select class="form-select" disabled>
+                    <option value="es">Español</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Notificaciones de mercado</label>
+                  <select class="form-select" disabled>
+                    <option value="realtime">Inmediatas</option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <small class="text-muted">
+                    Próximamente podrás editar estas opciones directamente desde esta pantalla.
+                  </small>
+                </div>
+              </form>
             </div>
           </div>
         </section>

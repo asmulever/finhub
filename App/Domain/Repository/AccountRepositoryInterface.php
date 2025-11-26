@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Domain;
+namespace App\Domain\Repository;
 
-interface AccountRepository
+use App\Domain\Account;
+
+interface AccountRepositoryInterface
 {
     public function findById(int $id): ?Account;
 

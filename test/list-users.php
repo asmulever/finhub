@@ -1,14 +1,13 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../App/Infrastructure/Config.php';
-require_once __DIR__ . '/../App/Infrastructure/DatabaseConnection.php';
+use App\Infrastructure\DatabaseManager;
 
-use App\Infrastructure\Config;
-use App\Infrastructure\DatabaseConnection;
+require_once __DIR__ . '/../App/vendor/autoload.php';
+load_env();
 
 try {
-    $pdo = DatabaseConnection::getInstance();
+    $pdo = DatabaseManager::getConnection();
     $stmt = $pdo->query("SELECT id, email, role, is_active, created_at FROM users ORDER BY is_active DESC, id ASC");
     $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {

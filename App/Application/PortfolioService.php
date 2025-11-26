@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Application;
 
-use App\Domain\AccountRepository;
-use App\Domain\FinancialObjectRepository;
-use App\Domain\PortfolioTickerRepository;
+use App\Domain\Repository\AccountRepositoryInterface;
+use App\Domain\Repository\FinancialObjectRepositoryInterface;
+use App\Domain\Repository\PortfolioTickerRepositoryInterface;
 use App\Infrastructure\Logger;
 
 class PortfolioService
@@ -14,9 +14,9 @@ class PortfolioService
     private Logger $logger;
 
     public function __construct(
-        private readonly AccountRepository $accountRepository,
-        private readonly PortfolioTickerRepository $tickerRepository,
-        private readonly FinancialObjectRepository $financialObjectRepository
+        private readonly AccountRepositoryInterface $accountRepository,
+        private readonly PortfolioTickerRepositoryInterface $tickerRepository,
+        private readonly FinancialObjectRepositoryInterface $financialObjectRepository
     ) {
         $this->logger = new Logger();
     }

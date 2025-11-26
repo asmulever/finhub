@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Application;
 
+use App\Domain\Repository\UserRepositoryInterface;
 use App\Domain\User;
-use App\Domain\UserRepository;
 use App\Infrastructure\Config;
 use App\Infrastructure\Logger;
 
@@ -13,7 +13,7 @@ class UserService
 {
     private Logger $logger;
 
-    public function __construct(private readonly UserRepository $userRepository)
+    public function __construct(private readonly UserRepositoryInterface $userRepository)
     {
         $this->logger = new Logger();
     }

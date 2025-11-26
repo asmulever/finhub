@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application;
 
-use App\Domain\UserRepository;
+use App\Domain\Repository\UserRepositoryInterface;
 use App\Infrastructure\Config;
 use App\Infrastructure\JwtService;
 use App\Infrastructure\Logger;
@@ -15,7 +15,7 @@ class AuthService
     private int $sessionTimeoutSeconds;
 
     public function __construct(
-        private readonly UserRepository $userRepository,
+        private readonly UserRepositoryInterface $userRepository,
         private readonly JwtService $jwtService
     ) {
         $this->logger = new Logger();

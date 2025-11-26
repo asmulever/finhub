@@ -7,6 +7,7 @@ namespace App\Interfaces;
 use App\Application\PortfolioService;
 use App\Infrastructure\JwtService;
 use App\Infrastructure\Logger;
+use App\Infrastructure\RequestContext;
 
 class PortfolioController extends BaseController
 {
@@ -28,6 +29,7 @@ class PortfolioController extends BaseController
 
         $brokerId = isset($_GET['broker_id']) ? (int)$_GET['broker_id'] : 0;
         if ($brokerId <= 0) {
+            $this->logWarning(400, 'Missing broker_id', ['route' => RequestContext::getRoute()]);
             http_response_code(400);
             echo json_encode(['error' => 'broker_id is required']);
             return;
@@ -37,6 +39,7 @@ class PortfolioController extends BaseController
             $tickers = $this->portfolioService->getTickersForBroker((int)$payload->uid, $brokerId);
         } catch (\Throwable $e) {
             http_response_code(400);
+            $this->logWarning(400, $e->getMessage(), ['route' => RequestContext::getRoute()]);
             echo json_encode(['error' => $e->getMessage()]);
             return;
         }
@@ -67,6 +70,7 @@ class PortfolioController extends BaseController
         } catch (\Throwable $e) {
             $this->logger->warning('Unable to add ticker: ' . $e->getMessage());
             http_response_code(400);
+            $this->logWarning(400, $e->getMessage(), ['route' => RequestContext::getRoute()]);
             echo json_encode(['error' => $e->getMessage()]);
         }
     }
@@ -90,6 +94,7 @@ class PortfolioController extends BaseController
         } catch (\Throwable $e) {
             $this->logger->warning('Unable to update ticker: ' . $e->getMessage());
             http_response_code(400);
+            $this->logWarning(400, $e->getMessage(), ['route' => RequestContext::getRoute()]);
             echo json_encode(['error' => $e->getMessage()]);
         }
     }
@@ -107,6 +112,7 @@ class PortfolioController extends BaseController
         } catch (\Throwable $e) {
             $this->logger->warning('Unable to delete ticker: ' . $e->getMessage());
             http_response_code(400);
+            $this->logWarning(400, $e->getMessage(), ['route' => RequestContext::getRoute()]);
             echo json_encode(['error' => $e->getMessage()]);
         }
     }
@@ -118,10 +124,12 @@ class PortfolioController extends BaseController
 
         if (!is_array($input)) {
             http_response_code(400);
+            $this->logWarning(400, 'Invalid JSON body', ['route' => RequestContext::getRoute()]);
             echo json_encode(['error' => 'Invalid JSON']);
             return null;
         }
 
+        RequestContext::setRequestPayload($input);
         return $input;
     }
 
@@ -129,6 +137,7 @@ class PortfolioController extends BaseController
     {
         $token = $this->getAccessTokenFromRequest();
         if ($token === null) {
+            $this->logWarning(401, 'Missing token for portfolio routes', ['route' => RequestContext::getRoute()]);
             http_response_code(401);
             echo json_encode(['error' => 'Unauthorized']);
             return null;
@@ -136,11 +145,13 @@ class PortfolioController extends BaseController
 
         $payload = $this->jwtService->validateToken($token, 'access');
         if ($payload === null) {
+            $this->logWarning(401, 'Invalid token for portfolio routes', ['route' => RequestContext::getRoute()]);
             http_response_code(401);
             echo json_encode(['error' => 'Unauthorized']);
             return null;
         }
 
+        $this->recordAuthenticatedUser($payload);
         return $payload;
     }
 }

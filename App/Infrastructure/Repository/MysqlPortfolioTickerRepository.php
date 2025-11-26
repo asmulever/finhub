@@ -2,18 +2,19 @@
 
 declare(strict_types=1);
 
-namespace App\Infrastructure;
+namespace App\Infrastructure\Repository;
 
-use App\Domain\PortfolioTickerRepository;
+use App\Domain\Repository\PortfolioTickerRepositoryInterface;
+use App\Infrastructure\DatabaseManager;
 use PDO;
 
-class MysqlPortfolioTickerRepository implements PortfolioTickerRepository
+class MysqlPortfolioTickerRepository implements PortfolioTickerRepositoryInterface
 {
     private PDO $db;
 
     public function __construct()
     {
-        $this->db = DatabaseConnection::getInstance();
+        $this->db = DatabaseManager::getConnection();
     }
 
     public function findDetailedByBroker(int $brokerId, int $userId): array

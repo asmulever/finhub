@@ -47,20 +47,26 @@ window.addEventListener("session:refreshed", (event) => {
 });
 
 function setupLayout() {
-  const userName = document.getElementById("userName");
   const tokenPreview = document.getElementById("tokenPreview");
-  const sessionCountdown = document.getElementById("sessionCountdown");
-  const logoutBtn = document.getElementById("logoutBtn");
-  const extendBtn = document.getElementById("extendSession");
+  const userMenuEmail = document.getElementById("userMenuEmail");
+  const adminUsersLink = document.getElementById("userMenuUsersLink");
 
-  userName.textContent = state.payload?.email ?? "Usuario autenticado";
   tokenPreview.textContent = "Cookie HttpOnly activa";
+  if (userMenuEmail) {
+    userMenuEmail.textContent = state.payload?.email ?? "Usuario autenticado";
+  }
+  if (adminUsersLink) {
+    adminUsersLink.classList.toggle("d-none", !state.isAdmin);
+  }
 
-  logoutBtn.addEventListener("click", () => {
-    logoutAndRedirect();
-  });
-
-  extendBtn.addEventListener("click", () => refreshSession());
+  document
+    .querySelectorAll('[data-user-action]')
+    .forEach((item) =>
+      item.addEventListener("click", (event) => {
+        event.preventDefault();
+        handleUserMenuAction(item.dataset.userAction);
+      })
+    );
 
   document
     .querySelectorAll("#mainNav .nav-link")
@@ -113,6 +119,8 @@ function setupLayout() {
       state.selectedBrokerId = event.target.value || null;
       await loadPortfolio();
     });
+
+  updateIdentitySections();
 }
 
 function showSection(section) {
@@ -132,6 +140,30 @@ function showSection(section) {
     `#mainNav .nav-link[data-section="${section}"]`
   );
   activeLink?.classList.add("active");
+}
+
+function handleUserMenuAction(action) {
+  switch (action) {
+    case "profile":
+      showSection("profile");
+      refreshSession({ silent: true }).catch(() => {});
+      break;
+    case "preferences":
+      showSection("preferences");
+      refreshSession({ silent: true }).catch(() => {});
+      break;
+    case "users":
+      if (state.isAdmin) {
+        showSection("users");
+        refreshSession({ silent: true }).catch(() => {});
+      }
+      break;
+    case "logout":
+      logoutAndRedirect();
+      break;
+    default:
+      break;
+  }
 }
 
 async function loadInitialData() {
@@ -838,7 +870,7 @@ async function logoutAndRedirect() {
 function redirectToLogin() {
   clearSessionTimers();
   Session.clear();
-  window.location.href = "../index.html";
+  window.location.href = "../index.php";
 }
 
 function clearSessionTimers() {
@@ -984,11 +1016,30 @@ function applySessionPayload(payload, accessExp) {
   state.sessionExpiresAt = accessExp;
   state.isAdmin = (payload?.role ?? "").toLowerCase() === "admin";
 
-  const userName = document.getElementById("userName");
-  if (userName) {
-    userName.textContent = payload.email ?? "Usuario autenticado";
-  }
+  updateIdentitySections();
 
   startCountdown(accessExp, document.getElementById("sessionCountdown"));
   scheduleSessionPrompt(accessExp);
+}
+
+function updateIdentitySections() {
+  const email = state.payload?.email ?? "Usuario autenticado";
+  const role = state.payload?.role ?? "user";
+  const userMenuEmail = document.getElementById("userMenuEmail");
+  const adminUsersLink = document.getElementById("userMenuUsersLink");
+  const profileEmail = document.getElementById("profileEmail");
+  const profileRole = document.getElementById("profileRole");
+
+  if (userMenuEmail) {
+    userMenuEmail.textContent = email;
+  }
+  if (adminUsersLink) {
+    adminUsersLink.classList.toggle("d-none", !state.isAdmin);
+  }
+  if (profileEmail) {
+    profileEmail.textContent = email;
+  }
+  if (profileRole) {
+    profileRole.textContent = role;
+  }
 }
