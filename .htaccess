@@ -2,20 +2,27 @@ DirectoryIndex index.php
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
+    RewriteBase /
 
-    # Leave existing files and directories untouched
+    # 1. API: todo lo que empiece con /api -> /api/index.php
+    RewriteRule ^api$ api/index.php [QSA,L]
+    RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+
+    # 2. Dejar pasar archivos o directorios reales
     RewriteCond %{REQUEST_FILENAME} -f [OR]
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteRule ^ - [L]
 
-    # Route every /api request through the API front controller
-    RewriteRule ^api$ api/index.php [QSA,L]
-    RewriteRule ^api/(.*)$ api/index.php [QSA,L]
-
-    # Allow preflight/OPTIONS for non-API routes to reach the UI controller
+    # 3. Preflight CORS: AWS/Ajax/etc. -> UI controller
     RewriteCond %{REQUEST_METHOD} OPTIONS
     RewriteRule ^ index.php [QSA,L]
 
-    # Route everything else through the UI front controller
+    # 4. UI: cualquier otra ruta a index.php
     RewriteRule ^ index.php [QSA,L]
 </IfModule>
+
+# --------------------------------------------------------------------
+# NO AGREGAR CSP NI SECURITY HEADERS AQUÍ
+# InfinityFree ya inyecta sus propios headers
+# y si agregás otros, Chrome rompe assets y scripts.
+# --------------------------------------------------------------------
