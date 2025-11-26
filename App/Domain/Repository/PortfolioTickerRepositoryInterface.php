@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Domain;
+namespace App\Domain\Repository;
 
-interface PortfolioTickerRepository
+interface PortfolioTickerRepositoryInterface
 {
     /**
      * @return array<int, array<string,mixed>>

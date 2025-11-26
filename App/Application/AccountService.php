@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Application;
 
 use App\Domain\Account;
-use App\Domain\AccountRepository;
-use App\Domain\UserRepository;
+use App\Domain\Repository\AccountRepositoryInterface;
+use App\Domain\Repository\UserRepositoryInterface;
 use App\Infrastructure\Logger;
 
 class AccountService
@@ -14,8 +14,8 @@ class AccountService
     private Logger $logger;
 
     public function __construct(
-        private readonly AccountRepository $accountRepository,
-        private readonly UserRepository $userRepository,
+        private readonly AccountRepositoryInterface $accountRepository,
+        private readonly UserRepositoryInterface $userRepository,
     ) {
         $this->logger = new Logger();
     }

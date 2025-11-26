@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Domain;
+namespace App\Domain\Repository;
 
-interface UserRepository
+use App\Domain\User;
+
+interface UserRepositoryInterface
 {
     public function findByEmail(string $email): ?User;
     public function findById(int $id): ?User;

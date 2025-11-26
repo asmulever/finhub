@@ -1,5 +1,5 @@
 // Utilidad mínima para decidir si la API es cross-origin y construir las URLs.
-const API_BASE_URL = window.API_BASE_URL || "/index.php";
+const API_BASE_URL = window.API_BASE_URL || "/api";
 
 function isCrossOrigin(apiBaseUrl) {
   try {
