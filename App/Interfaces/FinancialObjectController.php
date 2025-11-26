@@ -6,18 +6,14 @@ namespace App\Interfaces;
 
 use App\Application\FinancialObjectService;
 use App\Infrastructure\JwtService;
-use App\Infrastructure\Logger;
 use App\Infrastructure\RequestContext;
 
 class FinancialObjectController extends BaseController
 {
-    private Logger $logger;
-
     public function __construct(
         private readonly FinancialObjectService $financialObjectService,
         private readonly JwtService $jwtService
     ) {
-        $this->logger = new Logger();
     }
 
     public function list(): void
@@ -27,11 +23,11 @@ class FinancialObjectController extends BaseController
             return;
         }
 
-        $this->logger->info("Authorization successful. Fetching financial objects for user {$payload->uid}.");
+        $this->logger()->info("Authorization successful. Fetching financial objects for user {$payload->uid}.", ['origin' => static::class]);
         $objects = $this->financialObjectService->getAllFinancialObjects();
         http_response_code(200);
         echo json_encode($objects);
-        $this->logger->info("Successfully returned " . count($objects) . " financial objects.");
+        $this->logger()->info("Successfully returned " . count($objects) . " financial objects.", ['origin' => static::class]);
     }
 
     public function create(): void
@@ -101,11 +97,11 @@ class FinancialObjectController extends BaseController
 
     private function authorize(bool $requireAdmin = false): ?object
     {
-        $this->logger->info("Authorizing request for financial objects.");
+        $this->logger()->info("Authorizing request for financial objects.", ['origin' => static::class]);
         $token = $this->getAccessTokenFromRequest();
 
         if ($token === null) {
-            $this->logger->warning("Unauthorized access attempt: missing token.");
+            $this->logger()->warning("Unauthorized access attempt: missing token.", ['origin' => static::class]);
             $this->logWarning(401, 'Missing token', ['route' => RequestContext::getRoute()]);
             http_response_code(401);
             echo json_encode(['error' => 'Unauthorized']);
@@ -114,7 +110,7 @@ class FinancialObjectController extends BaseController
 
         $payload = $this->jwtService->validateToken($token, 'access');
         if ($payload === null) {
-            $this->logger->warning("Unauthorized access attempt: invalid token.");
+            $this->logger()->warning("Unauthorized access attempt: invalid token.", ['origin' => static::class]);
             $this->logWarning(401, 'Invalid token', ['route' => RequestContext::getRoute()]);
             http_response_code(401);
             echo json_encode(['error' => 'Unauthorized']);
@@ -124,7 +120,7 @@ class FinancialObjectController extends BaseController
         $this->recordAuthenticatedUser($payload);
 
         if ($requireAdmin && (($payload->role ?? '') !== 'admin')) {
-            $this->logger->warning("Forbidden operation for user {$payload->uid}, requires admin.");
+            $this->logger()->warning("Forbidden operation for user {$payload->uid}, requires admin.", ['origin' => static::class]);
             $this->logWarning(403, 'Forbidden access', ['route' => RequestContext::getRoute(), 'user_id' => $payload->uid ?? null]);
             http_response_code(403);
             echo json_encode(['error' => 'Forbidden']);
@@ -140,7 +136,7 @@ class FinancialObjectController extends BaseController
         $input = json_decode($rawInput, true);
 
         if (!is_array($input)) {
-            $this->logger->warning("Invalid JSON payload received.");
+            $this->logger()->warning("Invalid JSON payload received.", ['origin' => static::class]);
             $this->logWarning(400, 'Invalid JSON body', ['route' => RequestContext::getRoute()]);
             http_response_code(400);
             echo json_encode(['error' => 'Invalid JSON']);

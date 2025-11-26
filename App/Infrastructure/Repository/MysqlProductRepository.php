@@ -7,18 +7,15 @@ namespace App\Infrastructure\Repository;
 use App\Domain\Product;
 use App\Domain\Repository\ProductRepositoryInterface;
 use App\Infrastructure\DatabaseManager;
-use App\Infrastructure\Logger;
 use PDO;
 
 class MysqlProductRepository implements ProductRepositoryInterface
 {
     private PDO $db;
-    private Logger $logger;
 
     public function __construct()
     {
         $this->db = DatabaseManager::getConnection();
-        $this->logger = new Logger();
     }
 
     public function findAll(): array

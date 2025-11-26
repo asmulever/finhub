@@ -30,10 +30,15 @@ class Router
     private AccountController $accountController;
     private PortfolioController $portfolioController;
     private LogController $logController;
-    private ApiLogger $apiLogger;
+    private LogService $logService;
 
     public function __construct()
     {
+        $logRepository = new MysqlLogRepository();
+        $logService = new LogService($logRepository);
+        LogService::registerInstance($logService);
+        $this->logService = $logService;
+
         $userRepository = new MysqlUserRepository();
         $financialObjectRepository = new MysqlFinancialObjectRepository();
         $accountRepository = new MysqlAccountRepository();
@@ -45,15 +50,13 @@ class Router
         $userService = new UserService($userRepository);
         $accountService = new AccountService($accountRepository, $userRepository);
         $portfolioService = new PortfolioService($accountRepository, $portfolioTickerRepository, $financialObjectRepository);
-        $logService = new LogService(new MysqlLogRepository());
 
         $this->authController = new AuthController($authService);
         $this->financialObjectController = new FinancialObjectController($financialObjectService, $jwtService);
         $this->userController = new UserController($userService, $jwtService);
         $this->accountController = new AccountController($accountService, $jwtService);
         $this->portfolioController = new PortfolioController($portfolioService, $jwtService);
-        $this->logController = new LogController($logService);
-        $this->apiLogger = ApiLogger::bootstrap();
+        $this->logController = new LogController($logService, $jwtService);
     }
 
     public function dispatch(string $requestUri, string $requestMethod): void
@@ -220,6 +223,16 @@ class Router
             return;
         }
 
+        if ($uri === '/logs/frontend' && $method === 'POST') {
+            $this->logController->ingestFrontend();
+            return;
+        }
+
+        if ($uri === '/logs/filters' && $method === 'GET') {
+            $this->logController->filters();
+            return;
+        }
+
         if ($uri === '/logs' && $method === 'GET') {
             $this->logController->list();
             return;
@@ -231,7 +244,11 @@ class Router
         }
 
         http_response_code(404);
-        $this->apiLogger->logWarning('Route not found', 404, ['route' => $uri]);
+        $this->logService->warning('Route not found', [
+            'route' => $uri,
+            'http_status' => 404,
+            'origin' => 'router',
+        ]);
         echo json_encode([
             'error' => 'Not Found',
             'correlation_id' => RequestContext::getCorrelationId(),
@@ -256,7 +273,7 @@ class Router
     private function respondWithException(\Throwable $e): void
     {
         http_response_code(500);
-        $this->apiLogger->logException($e, 500);
+        $this->logService->logException($e, 500, ['origin' => 'router']);
         echo json_encode([
             'error' => 'internal_error',
             'correlation_id' => RequestContext::getCorrelationId(),
@@ -266,7 +283,10 @@ class Router
     private function respondMethodNotAllowed(): void
     {
         http_response_code(405);
-        $this->apiLogger->logWarning('Method not allowed', 405);
+        $this->logService->warning('Method not allowed', [
+            'http_status' => 405,
+            'origin' => 'router',
+        ]);
         echo json_encode([
             'error' => 'Method Not Allowed',
             'correlation_id' => RequestContext::getCorrelationId(),

@@ -100,7 +100,9 @@
         window.location.href = redirectUrl;
       }, 800);
     } catch (error) {
-      console.error("Error al iniciar sesión:", error);
+      window.FrontendLogger?.error("Error al iniciar sesión desde login.js", {
+        reason: error instanceof Error ? error.message : String(error),
+      });
       setMessage("No se pudo contactar con la API. Intenta nuevamente.", "danger");
     }
   }
