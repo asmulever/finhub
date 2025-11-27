@@ -30,6 +30,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   setupLayout();
+  const requestedSection =
+    new URLSearchParams(window.location.search).get("section") || "overview";
+  if (!showSection(requestedSection)) {
+    showSection("overview");
+  }
   loadInitialData();
   startCountdown(
     state.sessionExpiresAt,
@@ -76,8 +81,11 @@ function setupLayout() {
     .querySelectorAll("#mainNav .nav-link")
     .forEach((link) =>
       link.addEventListener("click", (event) => {
-        event.preventDefault();
         const section = link.dataset.section;
+        if (!section) {
+          return;
+        }
+        event.preventDefault();
         showSection(section);
         refreshSession({ silent: true }).catch(() => {});
       })
@@ -128,6 +136,11 @@ function setupLayout() {
 }
 
 function showSection(section) {
+  const target = document.getElementById(`section-${section}`);
+  if (!target) {
+    return false;
+  }
+
   document
     .querySelectorAll(".dashboard-section")
     .forEach((el) => el.classList.remove("active"));
@@ -135,15 +148,37 @@ function showSection(section) {
     .querySelectorAll("#mainNav .nav-link")
     .forEach((link) => link.classList.remove("active"));
 
-  const target = document.getElementById(`section-${section}`);
-  if (target) {
-    target.classList.add("active");
-  }
-
+  target.classList.add("active");
   const activeLink = document.querySelector(
     `#mainNav .nav-link[data-section="${section}"]`
   );
   activeLink?.classList.add("active");
+
+  return true;
+}
+
+function handleUserMenuAction(action) {
+  switch (action) {
+    case "profile":
+      showSection("profile");
+      refreshSession({ silent: true }).catch(() => {});
+      break;
+    case "preferences":
+      showSection("preferences");
+      refreshSession({ silent: true }).catch(() => {});
+      break;
+    case "users":
+      if (state.isAdmin) {
+        showSection("users");
+        refreshSession({ silent: true }).catch(() => {});
+      }
+      break;
+    case "logout":
+      logoutAndRedirect();
+      break;
+    default:
+      break;
+  }
 }
 
 function handleUserMenuAction(action) {

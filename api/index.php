@@ -7,6 +7,7 @@ use App\Application\AuthService;
 use App\Application\FinancialObjectService;
 use App\Application\LogService;
 use App\Application\PortfolioService;
+use App\Application\QuotesService;
 use App\Application\UserService;
 use App\Domain\Repository\AccountRepositoryInterface;
 use App\Domain\Repository\FinancialObjectRepositoryInterface;
@@ -15,6 +16,8 @@ use App\Domain\Repository\PortfolioTickerRepositoryInterface;
 use App\Domain\Repository\UserRepositoryInterface;
 use App\Infrastructure\Config;
 use App\Infrastructure\Container;
+use App\Infrastructure\EnvManager;
+use App\Infrastructure\FinnhubService;
 use App\Infrastructure\DatabaseManager;
 use App\Infrastructure\Repository\MysqlAccountRepository;
 use App\Infrastructure\Repository\MysqlFinancialObjectRepository;
@@ -27,6 +30,8 @@ use App\Interfaces\AccountController;
 use App\Interfaces\AuthController;
 use App\Interfaces\FinancialObjectController;
 use App\Interfaces\LogController;
+use App\Interfaces\QuotesController;
+use App\Interfaces\SettingsController;
 use App\Interfaces\PortfolioController;
 use App\Interfaces\UserController;
 
@@ -46,6 +51,11 @@ $container->set(LogService::class, function (Container $c): LogService {
 });
 
 $container->set(JwtService::class, fn() => new JwtService(Config::getRequired('JWT_SECRET')));
+$container->set(FinnhubService::class, fn() => new FinnhubService(
+    Config::getRequired('FINNHUB_API_KEY'),
+    Config::get('X_FINNHUB_SECRET')
+));
+$container->set(EnvManager::class, fn() => new EnvManager());
 
 $container->set(UserRepositoryInterface::class, fn() => new MysqlUserRepository());
 $container->set(FinancialObjectRepositoryInterface::class, fn() => new MysqlFinancialObjectRepository());
@@ -75,6 +85,14 @@ $container->set(PortfolioService::class, fn(Container $c) => new PortfolioServic
     $c->get(PortfolioTickerRepositoryInterface::class),
     $c->get(FinancialObjectRepositoryInterface::class)
 ));
+$container->set(QuotesService::class, fn(Container $c) => new QuotesService(
+    $c->get(FinnhubService::class),
+    __DIR__ . '/../storage/cache/quotes',
+    (bool)Config::get('CRON_ACTIVO', false),
+    max(60, (int)Config::get('CRON_INTERVALO', 60)),
+    Config::get('CRON_HR_START', '09:00'),
+    Config::get('CRON_HR_END', '18:00')
+));
 
 $container->set(AuthController::class, fn(Container $c) => new AuthController($c->get(AuthService::class)));
 $container->set(UserController::class, fn(Container $c) => new UserController(
@@ -95,6 +113,13 @@ $container->set(PortfolioController::class, fn(Container $c) => new PortfolioCon
 ));
 $container->set(LogController::class, fn(Container $c) => new LogController(
     $c->get(LogService::class),
+    $c->get(JwtService::class)
+));
+$container->set(QuotesController::class, fn(Container $c) => new QuotesController(
+    $c->get(QuotesService::class)
+));
+$container->set(SettingsController::class, fn(Container $c) => new SettingsController(
+    $c->get(EnvManager::class),
     $c->get(JwtService::class)
 ));
 
