@@ -13,6 +13,7 @@ use App\Interfaces\QuotesController;
 use App\Interfaces\SettingsController;
 use App\Interfaces\PortfolioController;
 use App\Interfaces\UserController;
+use App\Interfaces\EtlController;
 use App\Infrastructure\Container;
 
 class Router
@@ -26,6 +27,7 @@ class Router
     private LogService $logService;
     private QuotesController $quotesController;
     private SettingsController $settingsController;
+    private EtlController $etlController;
 
     public function __construct(private readonly Container $container)
     {
@@ -40,6 +42,7 @@ class Router
         $this->logController = $container->get(LogController::class);
         $this->quotesController = $container->get(QuotesController::class);
         $this->settingsController = $container->get(SettingsController::class);
+        $this->etlController = $container->get(EtlController::class);
     }
 
     public function dispatch(string $requestUri, string $requestMethod): void
@@ -87,26 +90,6 @@ class Router
                 'environment' => getenv('APP_ENV') ?: 'production',
                 'database' => $healthStatus,
             ]);
-            return;
-        }
-
-        if ($uri === '/quotes/categories' && $method === 'GET') {
-            $this->quotesController->categories();
-            return;
-        }
-
-        if (preg_match('#^/quotes/([A-Za-z0-9\^\-\._]+)$#', $uri, $matches) && $method === 'GET') {
-            $this->quotesController->list($matches[1]);
-            return;
-        }
-
-        if ($uri === '/settings/finnhub' && $method === 'GET') {
-            $this->settingsController->showFinnhub();
-            return;
-        }
-
-        if ($uri === '/settings/finnhub' && $method === 'POST') {
-            $this->settingsController->updateFinnhub();
             return;
         }
 
@@ -243,6 +226,26 @@ class Router
 
         if (preg_match('#^/logs/(\d+)$#', $uri, $matches) && $method === 'GET') {
             $this->logController->show((int)$matches[1]);
+            return;
+        }
+
+        if ($uri === '/etl/ingest' && $method === 'GET') {
+            $this->etlController->ingest();
+            return;
+        }
+
+        if ($uri === '/etl/normalize-prices' && $method === 'GET') {
+            $this->etlController->normalizePrices();
+            return;
+        }
+
+        if ($uri === '/etl/calc-indicators' && $method === 'GET') {
+            $this->etlController->calcIndicators();
+            return;
+        }
+
+        if ($uri === '/etl/calc-signals' && $method === 'GET') {
+            $this->etlController->calcSignals();
             return;
         }
 

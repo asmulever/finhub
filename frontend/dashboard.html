@@ -109,55 +109,6 @@
           </div>
         </section>
 
-        <section id="section-quotes" class="dashboard-section">
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-                <div>
-                  <h3 class="mb-1">FinHub · Cotizador dinámico</h3>
-                  <p class="text-muted mb-0">Fuente de datos: Finnhub.io (free tier)</p>
-                </div>
-                <div class="text-end">
-                  <small class="text-muted d-block">Expiración de sesión</small>
-                  <strong id="sessionExpiration">--</strong>
-                </div>
-              </div>
-              <div class="row g-3 align-items-end mb-3">
-                <div class="col-auto">
-                  <label class="form-label mb-1" for="categorySelect">Categoría</label>
-                  <select id="categorySelect" class="form-select form-select-sm"></select>
-                </div>
-                <div class="col">
-                  <div id="status" class="text-muted small"></div>
-                </div>
-              </div>
-              <div class="table-responsive">
-                <table class="table table-dark table-hover mb-0 quotes-table">
-                  <thead>
-                    <tr>
-                      <th>Símbolo</th>
-                      <th>Precio</th>
-                      <th>Cambio</th>
-                      <th>%</th>
-                      <th>Abrió</th>
-                      <th>Máx</th>
-                      <th>Mín</th>
-                    </tr>
-                  </thead>
-                  <tbody id="quotesBody">
-                    <tr>
-                      <td colspan="7" class="text-center">Cargando...</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div class="text-muted small mt-3">
-                Última actualización: <span id="updatedAt">--</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
         <section id="section-brokers" class="dashboard-section">
           <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
@@ -440,6 +391,5 @@
   <script src="js/api-client.js?v=1"></script>
   <script src="js/session.js?v=4"></script>
   <script src="js/dashboard.js?v=5"></script>
-  <script src="js/quotes.js?v=1"></script>
 </body>
 </html>
