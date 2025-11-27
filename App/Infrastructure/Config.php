@@ -38,6 +38,13 @@ class Config
         }
     }
 
+    public static function refresh(): void
+    {
+        self::$instance = [];
+        self::$loaded = false;
+        self::ensureLoaded();
+    }
+
     private static function load(): void
     {
         $envFile = dirname(__DIR__, 2) . '/.env';

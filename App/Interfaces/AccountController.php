@@ -118,21 +118,4 @@ class AccountController extends BaseController
         return $payload;
     }
 
-    private function getJsonInput(): ?array
-    {
-        $rawInput = file_get_contents('php://input');
-        $input = json_decode($rawInput, true);
-
-        if (!is_array($input)) {
-            $this->logger()->warning('Invalid JSON payload for accounts controller.', ['origin' => static::class]);
-            $this->logWarning(400, 'Invalid JSON body', ['route' => RequestContext::getRoute()]);
-            http_response_code(400);
-            echo json_encode(['error' => 'Invalid JSON']);
-            return null;
-        }
-
-        RequestContext::setRequestPayload($input);
-        return $input;
-    }
-
 }
