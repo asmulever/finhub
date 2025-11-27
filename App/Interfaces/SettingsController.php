@@ -27,8 +27,6 @@ class SettingsController extends BaseController
         echo json_encode([
             'ok' => true,
             'settings' => [
-                'SESSION_TIMEOUT_MS' => (int)($data['SESSION_TIMEOUT_MS'] ?? 600000),
-                'LOG_LEVEL' => strtolower($data['LOG_LEVEL'] ?? 'debug'),
                 'USR_KEY' => $data['USR_KEY'] ?? '',
                 'FINNHUB_API_KEY' => $data['FINNHUB_API_KEY'] ?? '',
                 'X_FINNHUB_SECRET' => $data['X_FINNHUB_SECRET'] ?? '',
@@ -53,12 +51,6 @@ class SettingsController extends BaseController
 
         $interval = max(60, (int)($input['CRON_INTERVALO'] ?? 60));
         $cronActive = (int)($input['CRON_ACTIVO'] ?? 0);
-        $sessionTimeout = max(1000, (int)($input['SESSION_TIMEOUT_MS'] ?? 600000));
-        $logLevel = strtolower(trim((string)($input['LOG_LEVEL'] ?? 'debug')));
-        $allowedLogLevels = ['debug', 'info', 'warning', 'error'];
-        if (!in_array($logLevel, $allowedLogLevels, true)) {
-            $logLevel = 'debug';
-        }
         $start = $this->sanitizeTime($input['CRON_HR_START'] ?? '09:00');
         $end = $this->sanitizeTime($input['CRON_HR_END'] ?? '18:00');
 
@@ -83,8 +75,6 @@ class SettingsController extends BaseController
             'CRON_INTERVALO' => (string)$interval,
             'CRON_HR_START' => $start,
             'CRON_HR_END' => $end,
-            'SESSION_TIMEOUT_MS' => (string)$sessionTimeout,
-            'LOG_LEVEL' => $logLevel,
         ];
 
         $this->envManager->update($pairs);
