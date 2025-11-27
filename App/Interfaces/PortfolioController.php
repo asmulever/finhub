@@ -113,22 +113,6 @@ class PortfolioController extends BaseController
         }
     }
 
-    private function getJsonInput(): ?array
-    {
-        $rawInput = file_get_contents('php://input');
-        $input = json_decode($rawInput, true);
-
-        if (!is_array($input)) {
-            http_response_code(400);
-            $this->logWarning(400, 'Invalid JSON body', ['route' => RequestContext::getRoute()]);
-            echo json_encode(['error' => 'Invalid JSON']);
-            return null;
-        }
-
-        RequestContext::setRequestPayload($input);
-        return $input;
-    }
-
     private function authorize(): ?object
     {
         $token = $this->getAccessTokenFromRequest();
