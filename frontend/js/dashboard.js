@@ -132,7 +132,6 @@ function setupLayout() {
       await loadPortfolio();
     });
 
-  setupPreferencesPanel();
   updateIdentitySections();
 }
 
@@ -1089,90 +1088,6 @@ function applySessionPayload(payload, accessExp) {
 
   startCountdown(accessExp, document.getElementById("sessionCountdown"));
   scheduleSessionPrompt(accessExp);
-}
-
-function setupPreferencesPanel() {
-  const form = document.getElementById("preferencesForm");
-  const messageEl = document.getElementById("preferencesMessage");
-  if (!form) {
-    return;
-  }
-
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (messageEl) {
-      messageEl.textContent = "Guardando...";
-    }
-    const payload = buildPreferencesPayload(form);
-    try {
-      const response = await requestWithAuth("/settings/finnhub", "POST", payload);
-      if (!response) {
-        throw new Error("No se pudo guardar la configuración.");
-      }
-      messageEl.textContent = response.message || "Guardado correctamente.";
-      if (response.ok) {
-        loadPreferencesForm(form, messageEl).catch(() => {});
-      }
-    } catch (err) {
-      if (messageEl) {
-        messageEl.textContent =
-          err instanceof Error ? err.message : "Error al guardar la configuración.";
-      }
-    }
-  });
-
-  loadPreferencesForm(form, messageEl).catch((err) => {
-    if (messageEl) {
-      messageEl.textContent =
-        err instanceof Error ? err.message : "No se pudo cargar la configuración.";
-    }
-  });
-}
-
-async function loadPreferencesForm(form, messageEl) {
-  if (!form) return;
-  if (messageEl) {
-    messageEl.textContent = "Cargando configuración...";
-  }
-  const data = await fetchProtected("/settings/finnhub");
-  if (!data || !data.ok) {
-    throw new Error(data?.error || "No se pudo cargar la configuración.");
-  }
-  Object.entries(data.settings).forEach(([key, value]) => {
-    const element = form.elements.namedItem(key);
-    if (element) {
-      element.value = value;
-    }
-  });
-  if (messageEl) {
-    messageEl.textContent = "";
-  }
-}
-
-function buildPreferencesPayload(form) {
-  const entries = Object.fromEntries(new FormData(form).entries());
-  const sessionTimeout = Math.max(
-    1000,
-    parseInt(entries.SESSION_TIMEOUT_MS ?? "0", 10) || 1000
-  );
-  const logLevelInput = (entries.LOG_LEVEL ?? "debug").toLowerCase();
-  const allowedLogLevels = ["debug", "info", "warning", "error"];
-  const logLevel = allowedLogLevels.includes(logLevelInput)
-    ? logLevelInput
-    : "debug";
-  const cronActive = parseInt(entries.CRON_ACTIVO ?? "0", 10);
-  const cronInterval = Math.max(
-    60,
-    parseInt(entries.CRON_INTERVALO ?? "60", 10) || 60
-  );
-
-  return {
-    ...entries,
-    SESSION_TIMEOUT_MS: sessionTimeout,
-    LOG_LEVEL: logLevel,
-    CRON_ACTIVO: cronActive ? 1 : 0,
-    CRON_INTERVALO: cronInterval,
-  };
 }
 
 function updateIdentitySections() {
