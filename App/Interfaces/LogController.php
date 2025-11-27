@@ -21,7 +21,7 @@ class LogController extends BaseController
 
     public function list(): void
     {
-        if ($this->authorizeAdmin() === null) {
+        if ($this->authorizeAdmin($this->jwtService) === null) {
             return;
         }
 
@@ -44,7 +44,7 @@ class LogController extends BaseController
 
     public function show(int $id): void
     {
-        if ($this->authorizeAdmin() === null) {
+        if ($this->authorizeAdmin($this->jwtService) === null) {
             return;
         }
 
@@ -62,7 +62,7 @@ class LogController extends BaseController
 
     public function filters(): void
     {
-        if ($this->authorizeAdmin() === null) {
+        if ($this->authorizeAdmin($this->jwtService) === null) {
             return;
         }
 
@@ -182,33 +182,4 @@ class LogController extends BaseController
         }
     }
 
-    private function authorizeAdmin(): ?object
-    {
-        $token = $this->getAccessTokenFromRequest();
-
-        if ($token === null) {
-            $this->logWarning(401, 'Missing token for logs endpoint', ['route' => RequestContext::getRoute()]);
-            http_response_code(401);
-            echo json_encode(['error' => 'Unauthorized']);
-            return null;
-        }
-
-        $payload = $this->jwtService->validateToken($token, 'access');
-        if ($payload === null) {
-            $this->logWarning(401, 'Invalid token for logs endpoint', ['route' => RequestContext::getRoute()]);
-            http_response_code(401);
-            echo json_encode(['error' => 'Unauthorized']);
-            return null;
-        }
-
-        $this->recordAuthenticatedUser($payload);
-        if ((strtolower($payload->role ?? '') !== 'admin')) {
-            $this->logWarning(403, 'Forbidden access to logs endpoint', ['route' => RequestContext::getRoute()]);
-            http_response_code(403);
-            echo json_encode(['error' => 'Forbidden']);
-            return null;
-        }
-
-        return $payload;
-    }
 }

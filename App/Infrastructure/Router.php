@@ -9,6 +9,8 @@ use App\Interfaces\AccountController;
 use App\Interfaces\AuthController;
 use App\Interfaces\FinancialObjectController;
 use App\Interfaces\LogController;
+use App\Interfaces\QuotesController;
+use App\Interfaces\SettingsController;
 use App\Interfaces\PortfolioController;
 use App\Interfaces\UserController;
 use App\Infrastructure\Container;
@@ -22,6 +24,8 @@ class Router
     private PortfolioController $portfolioController;
     private LogController $logController;
     private LogService $logService;
+    private QuotesController $quotesController;
+    private SettingsController $settingsController;
 
     public function __construct(private readonly Container $container)
     {
@@ -34,6 +38,8 @@ class Router
         $this->accountController = $container->get(AccountController::class);
         $this->portfolioController = $container->get(PortfolioController::class);
         $this->logController = $container->get(LogController::class);
+        $this->quotesController = $container->get(QuotesController::class);
+        $this->settingsController = $container->get(SettingsController::class);
     }
 
     public function dispatch(string $requestUri, string $requestMethod): void
@@ -81,6 +87,26 @@ class Router
                 'environment' => getenv('APP_ENV') ?: 'production',
                 'database' => $healthStatus,
             ]);
+            return;
+        }
+
+        if ($uri === '/quotes/categories' && $method === 'GET') {
+            $this->quotesController->categories();
+            return;
+        }
+
+        if (preg_match('#^/quotes/([A-Za-z0-9\^\-\._]+)$#', $uri, $matches) && $method === 'GET') {
+            $this->quotesController->list($matches[1]);
+            return;
+        }
+
+        if ($uri === '/settings/finnhub' && $method === 'GET') {
+            $this->settingsController->showFinnhub();
+            return;
+        }
+
+        if ($uri === '/settings/finnhub' && $method === 'POST') {
+            $this->settingsController->updateFinnhub();
             return;
         }
 
