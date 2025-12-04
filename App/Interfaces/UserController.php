@@ -4,14 +4,22 @@ declare(strict_types=1);
 
 namespace App\Interfaces;
 
-use App\Application\UserService;
+use App\Application\User\CreateUserUseCase;
+use App\Application\User\DeleteUserUseCase;
+use App\Application\User\Exception\UserNotFoundException;
+use App\Application\User\Exception\UserValidationException;
+use App\Application\User\ListUsersUseCase;
+use App\Application\User\UpdateUserUseCase;
 use App\Infrastructure\JwtService;
 use App\Infrastructure\RequestContext;
 
 class UserController extends BaseController
 {
     public function __construct(
-        private readonly UserService $userService,
+        private readonly ListUsersUseCase $listUsers,
+        private readonly CreateUserUseCase $createUser,
+        private readonly UpdateUserUseCase $updateUser,
+        private readonly DeleteUserUseCase $deleteUser,
         private readonly JwtService $jwtService
     ) {
     }
@@ -22,7 +30,7 @@ class UserController extends BaseController
             return;
         }
 
-        $users = $this->userService->getAllUsers();
+        $users = $this->listUsers->execute();
         http_response_code(200);
         echo json_encode($users);
     }
@@ -38,11 +46,12 @@ class UserController extends BaseController
             return;
         }
 
-        $created = $this->userService->createUser($input);
-        if ($created === null) {
-            http_response_code(400);
-            $this->logWarning(400, 'Invalid user data', ['route' => RequestContext::getRoute()]);
-            echo json_encode(['error' => 'Invalid user data']);
+        try {
+            $created = $this->createUser->execute($input);
+        } catch (UserValidationException $e) {
+            http_response_code(422);
+            $this->logWarning(422, 'Invalid user data', ['route' => RequestContext::getRoute()]);
+            echo json_encode(['error' => $e->getMessage()]);
             return;
         }
 
@@ -61,15 +70,22 @@ class UserController extends BaseController
             return;
         }
 
-        if ($this->userService->updateUser($id, $input)) {
-            http_response_code(200);
-            echo json_encode(['status' => 'updated']);
+        try {
+            $this->updateUser->execute($id, $input);
+        } catch (UserValidationException $e) {
+            http_response_code(422);
+            $this->logWarning(422, $e->getMessage(), ['route' => RequestContext::getRoute(), 'user_id' => $id]);
+            echo json_encode(['error' => $e->getMessage()]);
+            return;
+        } catch (UserNotFoundException $e) {
+            http_response_code(404);
+            $this->logWarning(404, $e->getMessage(), ['route' => RequestContext::getRoute(), 'user_id' => $id]);
+            echo json_encode(['error' => 'User not found']);
             return;
         }
 
-        $this->logWarning(400, 'Unable to update user', ['route' => RequestContext::getRoute(), 'user_id' => $id]);
-        http_response_code(400);
-        echo json_encode(['error' => 'Unable to update user']);
+        http_response_code(200);
+        echo json_encode(['status' => 'updated']);
     }
 
     public function delete(int $id): void
@@ -78,15 +94,17 @@ class UserController extends BaseController
             return;
         }
 
-        if ($this->userService->deleteUser($id)) {
-            http_response_code(200);
-            echo json_encode(['status' => 'deleted']);
+        try {
+            $this->deleteUser->execute($id);
+        } catch (UserNotFoundException $e) {
+            http_response_code(404);
+            $this->logWarning(404, $e->getMessage(), ['route' => RequestContext::getRoute(), 'user_id' => $id]);
+            echo json_encode(['error' => 'User not found']);
             return;
         }
 
-        $this->logWarning(400, 'Unable to delete user', ['route' => RequestContext::getRoute(), 'user_id' => $id]);
-        http_response_code(400);
-        echo json_encode(['error' => 'Unable to delete user']);
+        http_response_code(200);
+        echo json_encode(['status' => 'deleted']);
     }
 
 }

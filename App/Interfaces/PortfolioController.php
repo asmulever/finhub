@@ -18,7 +18,7 @@ class PortfolioController extends BaseController
 
     public function show(): void
     {
-        $payload = $this->authorize();
+        $payload = $this->authorize($this->jwtService);
         if ($payload === null) {
             return;
         }
@@ -49,7 +49,7 @@ class PortfolioController extends BaseController
 
     public function addTicker(): void
     {
-        $payload = $this->authorize();
+        $payload = $this->authorize($this->jwtService);
         if ($payload === null) {
             return;
         }
@@ -73,7 +73,7 @@ class PortfolioController extends BaseController
 
     public function updateTicker(int $tickerId): void
     {
-        $payload = $this->authorize();
+        $payload = $this->authorize($this->jwtService);
         if ($payload === null) {
             return;
         }
@@ -97,7 +97,7 @@ class PortfolioController extends BaseController
 
     public function deleteTicker(int $tickerId): void
     {
-        $payload = $this->authorize();
+        $payload = $this->authorize($this->jwtService);
         if ($payload === null) {
             return;
         }
@@ -113,25 +113,5 @@ class PortfolioController extends BaseController
         }
     }
 
-    private function authorize(): ?object
-    {
-        $token = $this->getAccessTokenFromRequest();
-        if ($token === null) {
-            $this->logWarning(401, 'Missing token for portfolio routes', ['route' => RequestContext::getRoute()]);
-            http_response_code(401);
-            echo json_encode(['error' => 'Unauthorized']);
-            return null;
-        }
 
-        $payload = $this->jwtService->validateToken($token, 'access');
-        if ($payload === null) {
-            $this->logWarning(401, 'Invalid token for portfolio routes', ['route' => RequestContext::getRoute()]);
-            http_response_code(401);
-            echo json_encode(['error' => 'Unauthorized']);
-            return null;
-        }
-
-        $this->recordAuthenticatedUser($payload);
-        return $payload;
-    }
 }
