@@ -14,19 +14,28 @@ let state = {
 };
 
 let sessionCountdownInterval = null;
-let sessionPromptTimeout = null;
-let sessionPromptCountdownInterval = null;
 
-document.addEventListener("DOMContentLoaded", async () => {
-  const sessionInfo = await fetchSession();
-  if (!sessionInfo) return;
+document.addEventListener("DOMContentLoaded", () => {
+  const sessionPayload =
+    typeof Session !== "undefined" ? Session.getPayload() : null;
+  const sessionExpiresAt =
+    typeof Session !== "undefined" ? Session.getExpiresAt() : null;
+  if (
+    !sessionPayload ||
+    !sessionExpiresAt ||
+    (typeof Session !== "undefined" &&
+      Session.isExpired &&
+      Session.isExpired(sessionExpiresAt))
+  ) {
+    redirectToLogin();
+    return;
+  }
 
   state = {
     ...state,
-    payload: sessionInfo.payload,
-    sessionExpiresAt: sessionInfo.access_expires_at,
-    isAdmin:
-      (sessionInfo.payload?.role ?? "").toLowerCase() === "admin",
+    payload: sessionPayload,
+    sessionExpiresAt,
+    isAdmin: (sessionPayload?.role ?? "").toLowerCase() === "admin",
   };
 
   setupLayout();
@@ -40,15 +49,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.sessionExpiresAt,
     document.getElementById("sessionCountdown")
   );
-  scheduleSessionPrompt(state.sessionExpiresAt);
-});
-
-window.addEventListener("session:refreshed", (event) => {
-  const detail = event.detail || {};
-  if (!detail.payload || !detail.accessExp) {
-    return;
-  }
-  applySessionPayload(detail.payload, detail.accessExp);
 });
 
 function setupLayout() {
@@ -77,19 +77,18 @@ function setupLayout() {
       })
     );
 
-  document
-    .querySelectorAll("#mainNav .nav-link")
-    .forEach((link) =>
-      link.addEventListener("click", (event) => {
-        const section = link.dataset.section;
-        if (!section) {
-          return;
-        }
-        event.preventDefault();
-        showSection(section);
-        refreshSession({ silent: true }).catch(() => {});
-      })
-    );
+    document
+      .querySelectorAll("#mainNav .nav-link")
+      .forEach((link) =>
+        link.addEventListener("click", (event) => {
+          const section = link.dataset.section;
+          if (!section) {
+            return;
+          }
+          event.preventDefault();
+          showSection(section);
+        })
+      );
 
   if (!state.isAdmin) {
     document
@@ -161,16 +160,13 @@ function handleUserMenuAction(action) {
   switch (action) {
     case "profile":
       showSection("profile");
-      refreshSession({ silent: true }).catch(() => {});
       break;
     case "preferences":
       showSection("preferences");
-      refreshSession({ silent: true }).catch(() => {});
       break;
     case "users":
       if (state.isAdmin) {
         showSection("users");
-        refreshSession({ silent: true }).catch(() => {});
       }
       break;
     case "logout":
@@ -872,40 +868,8 @@ async function fetchPublic(route) {
   }
 }
 
-async function fetchSession() {
-  try {
-    const res = await apiFetch("/auth/session");
-    if (!res.ok) {
-      redirectToLogin();
-      return null;
-    }
-    const data = await res.json();
-    const payload = data.payload ?? null;
-    const accessExp = data.access_expires_at ?? payload?.exp ?? null;
-    if (!payload || !accessExp) {
-      redirectToLogin();
-      return null;
-    }
-    Session.save(payload, accessExp);
-    return { payload, access_expires_at: accessExp };
-  } catch (err) {
-    window.FrontendLogger?.error("No se pudo validar la sesión", {
-      reason: err instanceof Error ? err.message : String(err),
-    });
-    redirectToLogin();
-    return null;
-  }
-}
-
 async function logoutAndRedirect() {
   clearSessionTimers();
-  try {
-    await apiFetch("/auth/logout", { method: "POST", skipSessionExtend: true });
-  } catch (err) {
-    window.FrontendLogger?.warning("No se pudo cerrar la sesión en el servidor", {
-      reason: err instanceof Error ? err.message : String(err),
-    });
-  }
   redirectToLogin();
 }
 
@@ -920,14 +884,6 @@ function clearSessionTimers() {
     clearInterval(sessionCountdownInterval);
     sessionCountdownInterval = null;
   }
-  if (sessionPromptTimeout) {
-    clearTimeout(sessionPromptTimeout);
-    sessionPromptTimeout = null;
-  }
-  if (sessionPromptCountdownInterval) {
-    clearInterval(sessionPromptCountdownInterval);
-    sessionPromptCountdownInterval = null;
-  }
 }
 
 function startCountdown(exp, element) {
@@ -940,9 +896,7 @@ function startCountdown(exp, element) {
     if (secondsLeft <= 0) {
       element.textContent = "Sesión expirada";
       if (sessionCountdownInterval) clearInterval(sessionCountdownInterval);
-      if (!document.getElementById("sessionExtendPrompt")) {
-        showExtendPrompt();
-      }
+      redirectToLogin();
       return;
     }
     element.textContent = `Expira en ${formatDuration(secondsLeft)}`;
@@ -952,118 +906,10 @@ function startCountdown(exp, element) {
   sessionCountdownInterval = setInterval(update, 1000);
 }
 
-function scheduleSessionPrompt(exp) {
-  if (!exp) return;
-  if (sessionPromptTimeout) clearTimeout(sessionPromptTimeout);
-  const now = Math.floor(Date.now() / 1000);
-  const msUntilPrompt = Math.max(exp - now, 0) * 1000;
-  sessionPromptTimeout = setTimeout(() => showExtendPrompt(), msUntilPrompt);
-}
-
-function showExtendPrompt() {
-  const existing = document.getElementById("sessionExtendPrompt");
-  if (existing) return;
-  sessionPromptTimeout = null;
-
-  const overlay = document.createElement("div");
-  overlay.id = "sessionExtendPrompt";
-  overlay.style.position = "fixed";
-  overlay.style.inset = "0";
-  overlay.style.background = "rgba(0,0,0,0.5)";
-  overlay.style.display = "flex";
-  overlay.style.alignItems = "center";
-  overlay.style.justifyContent = "center";
-  overlay.style.zIndex = "1050";
-
-  overlay.innerHTML = `
-    <div style="background:#fff; padding:24px; border-radius:12px; max-width:420px; width:90%; box-shadow:0 10px 30px rgba(0,0,0,0.25); text-align:center;">
-      <h5 style="margin-bottom:12px;">Extender sesión</h5>
-      <p style="margin-bottom:12px;">Tu sesión de 5 minutos llegó al límite. ¿Quieres extenderla?</p>
-      <p style="font-size:14px; color:#6c757d; margin-bottom:16px;">Se cerrará automáticamente en <span data-countdown>20</span>s.</p>
-      <div style="display:flex; gap:10px; justify-content:center;">
-        <button type="button" class="btn btn-primary" data-action="extend">Extender</button>
-        <button type="button" class="btn btn-outline-secondary" data-action="logout">Salir</button>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(overlay);
-
-  const countdownEl = overlay.querySelector("[data-countdown]");
-  let remaining = 20;
-  if (sessionPromptCountdownInterval) {
-    clearInterval(sessionPromptCountdownInterval);
-  }
-  sessionPromptCountdownInterval = setInterval(() => {
-    remaining -= 1;
-    if (countdownEl) countdownEl.textContent = remaining;
-    if (remaining <= 0) {
-      clearInterval(sessionPromptCountdownInterval);
-      overlay.remove();
-      logoutAndRedirect();
-    }
-  }, 1000);
-
-  overlay
-    .querySelector('[data-action="extend"]')
-    ?.addEventListener("click", async () => {
-      clearInterval(sessionPromptCountdownInterval);
-      sessionPromptCountdownInterval = null;
-      overlay.remove();
-      await refreshSession({ silent: true });
-    });
-
-  overlay
-    .querySelector('[data-action="logout"]')
-    ?.addEventListener("click", () => {
-      clearInterval(sessionPromptCountdownInterval);
-      sessionPromptCountdownInterval = null;
-      overlay.remove();
-      logoutAndRedirect();
-    });
-}
-
 function formatDuration(seconds) {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${mins}m ${secs}s`;
-}
-
-async function refreshSession({ silent = false } = {}) {
-  try {
-    const res = await apiFetch("/auth/refresh", { method: "POST" });
-    if (!res.ok) throw new Error("No se pudo extender la sesión.");
-    const data = await res.json();
-    const payload = data.payload ?? null;
-    const accessExp = data.access_expires_at ?? payload?.exp ?? null;
-    if (!payload || !accessExp) throw new Error("Respuesta de sesión incompleta.");
-
-    applySessionPayload(payload, accessExp);
-    return true;
-  } catch (err) {
-    window.FrontendLogger?.error("No se pudo extender la sesión", {
-      reason: err instanceof Error ? err.message : String(err),
-    });
-    if (!silent) {
-      alert(err.message || "No se pudo extender la sesión.");
-    }
-    redirectToLogin();
-    return false;
-  }
-}
-
-function applySessionPayload(payload, accessExp) {
-  if (typeof Session !== "undefined") {
-    Session.save(payload, accessExp);
-  }
-  state.payload = payload;
-  state.sessionExpiresAt = accessExp;
-  state.isAdmin = (payload?.role ?? "").toLowerCase() === "admin";
-
-  updateIdentitySections();
-
-  startCountdown(accessExp, document.getElementById("sessionCountdown"));
-  scheduleSessionPrompt(accessExp);
 }
 
 function updateIdentitySections() {

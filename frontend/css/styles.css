@@ -93,16 +93,3 @@ body {
 .portfolio-list .badge {
   font-size: 0.95rem;
 }
-
-.quotes-table th,
-.quotes-table td {
-  vertical-align: middle;
-}
-
-.quotes-table .change-positive {
-  color: #34d399;
-}
-
-.quotes-table .change-negative {
-  color: #f87171;
-}
