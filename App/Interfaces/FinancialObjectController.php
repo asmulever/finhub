@@ -18,7 +18,7 @@ class FinancialObjectController extends BaseController
 
     public function list(): void
     {
-        $payload = $this->authorize();
+        $payload = $this->authorize($this->jwtService);
         if ($payload === null) {
             return;
         }
@@ -32,7 +32,7 @@ class FinancialObjectController extends BaseController
 
     public function create(): void
     {
-        $payload = $this->authorize(requireAdmin: true);
+        $payload = $this->authorize($this->jwtService, true);
         if ($payload === null) {
             return;
         }
@@ -56,7 +56,7 @@ class FinancialObjectController extends BaseController
 
     public function update(int $id): void
     {
-        $payload = $this->authorize(requireAdmin: true);
+        $payload = $this->authorize($this->jwtService, true);
         if ($payload === null) {
             return;
         }
@@ -79,7 +79,7 @@ class FinancialObjectController extends BaseController
 
     public function delete(int $id): void
     {
-        $payload = $this->authorize(requireAdmin: true);
+        $payload = $this->authorize($this->jwtService, true);
         if ($payload === null) {
             return;
         }
@@ -95,39 +95,5 @@ class FinancialObjectController extends BaseController
         echo json_encode(['error' => 'Unable to delete financial object']);
     }
 
-    private function authorize(bool $requireAdmin = false): ?object
-    {
-        $this->logger()->info("Authorizing request for financial objects.", ['origin' => static::class]);
-        $token = $this->getAccessTokenFromRequest();
-
-        if ($token === null) {
-            $this->logger()->warning("Unauthorized access attempt: missing token.", ['origin' => static::class]);
-            $this->logWarning(401, 'Missing token', ['route' => RequestContext::getRoute()]);
-            http_response_code(401);
-            echo json_encode(['error' => 'Unauthorized']);
-            return null;
-        }
-
-        $payload = $this->jwtService->validateToken($token, 'access');
-        if ($payload === null) {
-            $this->logger()->warning("Unauthorized access attempt: invalid token.", ['origin' => static::class]);
-            $this->logWarning(401, 'Invalid token', ['route' => RequestContext::getRoute()]);
-            http_response_code(401);
-            echo json_encode(['error' => 'Unauthorized']);
-            return null;
-        }
-
-        $this->recordAuthenticatedUser($payload);
-
-        if ($requireAdmin && (($payload->role ?? '') !== 'admin')) {
-            $this->logger()->warning("Forbidden operation for user {$payload->uid}, requires admin.", ['origin' => static::class]);
-            $this->logWarning(403, 'Forbidden access', ['route' => RequestContext::getRoute(), 'user_id' => $payload->uid ?? null]);
-            http_response_code(403);
-            echo json_encode(['error' => 'Forbidden']);
-            return null;
-        }
-
-        return $payload;
-    }
 
 }

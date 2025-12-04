@@ -4,45 +4,17 @@ declare(strict_types=1);
 
 namespace App\Interfaces;
 
-require_once __DIR__ . '/Security/AuthorizationHeaderProvider.php';
-require_once __DIR__ . '/Security/ServerArrayAuthorizationHeaderProvider.php';
-require_once __DIR__ . '/Security/GetAllHeadersAuthorizationHeaderProvider.php';
-require_once __DIR__ . '/Security/ApacheRequestHeadersAuthorizationHeaderProvider.php';
-require_once __DIR__ . '/Security/CompositeAuthorizationHeaderProvider.php';
-require_once __DIR__ . '/Security/AccessTokenExtractor.php';
-
 use App\Application\LogService;
+use App\Infrastructure\IdentityProviderFactory;
+use App\Infrastructure\IdentityProviderInterface;
 use App\Infrastructure\JwtService;
 use App\Infrastructure\RequestContext;
-use App\Interfaces\Security\AccessTokenExtractor;
-use App\Interfaces\Security\ApacheRequestHeadersAuthorizationHeaderProvider;
-use App\Interfaces\Security\CompositeAuthorizationHeaderProvider;
-use App\Interfaces\Security\GetAllHeadersAuthorizationHeaderProvider;
-use App\Interfaces\Security\ServerArrayAuthorizationHeaderProvider;
 
 abstract class BaseController
 {
-    private ?CompositeAuthorizationHeaderProvider $authorizationProvider = null;
+    private ?IdentityProviderInterface $identityProvider = null;
+    private ?JwtService $guardedJwtService = null;
     private ?LogService $logService = null;
-
-    protected function getAccessTokenFromRequest(): ?string
-    {
-        if ($this->authorizationProvider === null) {
-            $this->authorizationProvider = new CompositeAuthorizationHeaderProvider([
-                new ServerArrayAuthorizationHeaderProvider(),
-                new GetAllHeadersAuthorizationHeaderProvider(),
-                new ApacheRequestHeadersAuthorizationHeaderProvider(),
-            ]);
-        }
-
-        $token = AccessTokenExtractor::extract($this->authorizationProvider);
-        if (is_string($token) && $token !== '') {
-            return $token;
-        }
-
-        $cookieToken = $_COOKIE['access_token'] ?? null;
-        return (is_string($cookieToken) && $cookieToken !== '') ? $cookieToken : null;
-    }
 
     protected function recordAuthenticatedUser(object $payload): void
     {
@@ -69,26 +41,14 @@ abstract class BaseController
         return $this->logService;
     }
 
-    protected function authorizeAdmin(JwtService $jwtService): ?object
+    protected function authorize(JwtService $jwtService, bool $requireAdmin = false): ?object
     {
-        $token = $this->getAccessTokenFromRequest();
-        if ($token === null) {
-            $this->logWarning(401, 'Missing token for admin endpoint', ['route' => RequestContext::getRoute()]);
-            http_response_code(401);
-            echo json_encode(['error' => 'Unauthorized']);
-            return null;
-        }
-
-        $payload = $jwtService->validateToken($token, 'access');
+        $payload = $this->getIdentityProvider($jwtService)->authorize(RequestContext::getRoute(), static::class);
         if ($payload === null) {
-            $this->logWarning(401, 'Invalid token for admin endpoint', ['route' => RequestContext::getRoute()]);
-            http_response_code(401);
-            echo json_encode(['error' => 'Unauthorized']);
             return null;
         }
 
-        $this->recordAuthenticatedUser($payload);
-        if (($payload->role ?? '') !== 'admin') {
+        if ($requireAdmin && (($payload->role ?? '') !== 'admin')) {
             $this->logWarning(403, 'Forbidden access to admin endpoint', ['user_id' => $payload->uid ?? null, 'route' => RequestContext::getRoute()]);
             http_response_code(403);
             echo json_encode(['error' => 'Forbidden']);
@@ -96,6 +56,26 @@ abstract class BaseController
         }
 
         return $payload;
+    }
+
+    protected function authorizeAdmin(JwtService $jwtService): ?object
+    {
+        return $this->authorize($jwtService, true);
+    }
+
+    private function getIdentityProvider(JwtService $jwtService): IdentityProviderInterface
+    {
+        if ($this->identityProvider === null || $this->guardedJwtService !== $jwtService) {
+            $this->identityProvider = IdentityProviderFactory::create($jwtService);
+            $this->guardedJwtService = $jwtService;
+        }
+
+        return $this->identityProvider;
+    }
+
+    protected function getAccessTokenFromRequest(JwtService $jwtService): ?string
+    {
+        return $this->getIdentityProvider($jwtService)->extractAccessToken();
     }
 
     protected function getJsonInput(): ?array

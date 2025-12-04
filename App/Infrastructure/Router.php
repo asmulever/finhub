@@ -9,8 +9,6 @@ use App\Interfaces\AccountController;
 use App\Interfaces\AuthController;
 use App\Interfaces\FinancialObjectController;
 use App\Interfaces\LogController;
-use App\Interfaces\QuotesController;
-use App\Interfaces\SettingsController;
 use App\Interfaces\PortfolioController;
 use App\Interfaces\UserController;
 use App\Interfaces\EtlController;
@@ -25,8 +23,6 @@ class Router
     private PortfolioController $portfolioController;
     private LogController $logController;
     private LogService $logService;
-    private QuotesController $quotesController;
-    private SettingsController $settingsController;
     private EtlController $etlController;
 
     public function __construct(private readonly Container $container)
@@ -40,8 +36,6 @@ class Router
         $this->accountController = $container->get(AccountController::class);
         $this->portfolioController = $container->get(PortfolioController::class);
         $this->logController = $container->get(LogController::class);
-        $this->quotesController = $container->get(QuotesController::class);
-        $this->settingsController = $container->get(SettingsController::class);
         $this->etlController = $container->get(EtlController::class);
     }
 
