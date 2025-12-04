@@ -4,28 +4,37 @@ declare(strict_types=1);
 
 namespace App\Application;
 
+use App\Application\Auth\Exception\InvalidCredentialsException;
+use App\Application\Auth\Exception\InvalidRefreshTokenException;
+use App\Application\Auth\TokenServiceInterface;
+use App\Application\LogService;
 use App\Domain\Repository\UserRepositoryInterface;
-use App\Infrastructure\Config;
-use App\Infrastructure\JwtService;
 
 class AuthService
 {
     private LogService $logger;
     private int $sessionTimeoutSeconds;
+    private int $refreshTokenTtlSeconds;
 
     public function __construct(
         private readonly UserRepositoryInterface $userRepository,
-        private readonly JwtService $jwtService
+        private readonly TokenServiceInterface $tokenService,
+        int $sessionTimeoutSeconds,
+        int $refreshTokenTtlSeconds
     ) {
         $this->logger = LogService::getInstance();
-        $timeoutMs = (int)Config::getRequired('SESSION_TIMEOUT_MS');
-        if ($timeoutMs <= 0) {
-            throw new \RuntimeException('SESSION_TIMEOUT_MS must be a positive integer (milliseconds).');
+        if ($sessionTimeoutSeconds < 1) {
+            throw new \InvalidArgumentException('SESSION_TIMEOUT_MS must resolve to at least 1 second.');
         }
-        $this->sessionTimeoutSeconds = (int)max(1, ceil($timeoutMs / 1000));
+        if ($refreshTokenTtlSeconds < 1) {
+            throw new \InvalidArgumentException('JWT_REFRESH_TTL_SECONDS must be a positive integer.');
+        }
+
+        $this->sessionTimeoutSeconds = $sessionTimeoutSeconds;
+        $this->refreshTokenTtlSeconds = $refreshTokenTtlSeconds;
     }
 
-    public function validateCredentials(string $email, string $password): ?array
+    public function validateCredentials(string $email, string $password): array
     {
         $this->logger->info("Login attempt for email: $email");
         $user = $this->userRepository->findByEmail($email);
@@ -36,35 +45,29 @@ class AuthService
         }
 
         $this->logger->warning("Failed login attempt for email: $email");
-        return null;
-    }
-
-    public function validateToken(string $token): bool
-    {
-        $payload = $this->jwtService->validateToken($token, 'access');
-        return $payload !== null;
+        throw new InvalidCredentialsException('Invalid credentials provided.');
     }
 
     public function decodeToken(string $token): ?object
     {
-        return $this->jwtService->validateToken($token, 'access');
+        return $this->tokenService->validateToken($token, 'access');
     }
 
-    public function refreshTokens(string $refreshToken): ?array
+    public function refreshTokens(string $refreshToken): array
     {
-        $payload = $this->jwtService->validateToken($refreshToken, 'refresh');
+        $payload = $this->tokenService->validateToken($refreshToken, 'refresh');
         if ($payload === null) {
-            return null;
+            throw new InvalidRefreshTokenException('Refresh token is not valid.');
         }
 
         $userId = isset($payload->uid) ? (int)$payload->uid : null;
         if ($userId === null) {
-            return null;
+            throw new InvalidRefreshTokenException('Refresh token missing user identifier.');
         }
 
         $user = $this->userRepository->findById($userId);
         if ($user === null || !$user->isActive()) {
-            return null;
+            throw new InvalidRefreshTokenException('User not available for refresh.');
         }
 
         return $this->issueTokensForUser($user);
@@ -78,14 +81,14 @@ class AuthService
             'role' => $user->getRole(),
         ];
 
-        $accessToken = $this->jwtService->generateAccessToken($payload, $this->sessionTimeoutSeconds);
-        $refreshToken = $this->jwtService->generateRefreshToken(['uid' => $user->getId()], 604800); // 7 days
+        $accessToken = $this->tokenService->generateAccessToken($payload, $this->sessionTimeoutSeconds);
+        $refreshToken = $this->tokenService->generateRefreshToken(['uid' => $user->getId()], $this->refreshTokenTtlSeconds);
 
-        $decodedAccess = $this->jwtService->validateToken($accessToken, 'access');
+        $decodedAccess = $this->tokenService->validateToken($accessToken, 'access');
         $accessExp = $decodedAccess->exp ?? (time() + $this->sessionTimeoutSeconds);
 
-        $decodedRefresh = $this->jwtService->validateToken($refreshToken, 'refresh');
-        $refreshExp = $decodedRefresh->exp ?? (time() + 604800);
+        $decodedRefresh = $this->tokenService->validateToken($refreshToken, 'refresh');
+        $refreshExp = $decodedRefresh->exp ?? (time() + $this->refreshTokenTtlSeconds);
 
         return [
             'payload' => $payload + ['exp' => $accessExp],

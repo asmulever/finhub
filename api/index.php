@@ -2,8 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Application\AccountService;
+use App\Application\Account\CreateAccountUseCase;
+use App\Application\Account\DeleteAccountUseCase;
+use App\Application\Account\ListAccountsUseCase;
+use App\Application\Account\UpdateAccountUseCase;
 use App\Application\AuthService;
+use App\Application\Auth\TokenServiceInterface;
 use App\Application\FinancialObjectService;
 use App\Application\EtlJobRunner;
 use App\Application\EtlIngestService;
@@ -15,7 +19,10 @@ use App\Application\StubRavaPriceSourceClient;
 use App\Application\FinnhubPriceDataSource;
 use App\Application\LogService;
 use App\Application\PortfolioService;
-use App\Application\UserService;
+use App\Application\User\CreateUserUseCase;
+use App\Application\User\DeleteUserUseCase;
+use App\Application\User\ListUsersUseCase;
+use App\Application\User\UpdateUserUseCase;
 use App\Domain\Repository\AccountRepositoryInterface;
 use App\Domain\Repository\FinancialObjectRepositoryInterface;
 use App\Domain\Repository\InstrumentRepositoryInterface;
@@ -64,6 +71,9 @@ require_once __DIR__ . '/../App/Infrastructure/SecurityHeaders.php';
 apply_security_headers();
 
 $container = new Container();
+$sessionTimeoutMs = (int)Config::getRequired('SESSION_TIMEOUT_MS');
+$sessionTimeoutSeconds = (int)max(1, ceil($sessionTimeoutMs / 1000));
+$refreshTokenTtlSeconds = (int)Config::getRequired('JWT_REFRESH_TTL_SECONDS');
 
 $container->set(LogRepositoryInterface::class, fn() => new MysqlLogRepository());
 $container->set(LogService::class, function (Container $c): LogService {
@@ -73,6 +83,7 @@ $container->set(LogService::class, function (Container $c): LogService {
 });
 
 $container->set(JwtService::class, fn() => new JwtService(Config::getRequired('JWT_SECRET')));
+$container->set(TokenServiceInterface::class, fn(Container $c) => $c->get(JwtService::class));
 $container->set(FinnhubService::class, fn() => new FinnhubService(
     Config::getRequired('FINNHUB_API_KEY'),
     Config::get('X_FINNHUB_SECRET')
@@ -97,16 +108,41 @@ $container->set(PortfolioTickerRepositoryInterface::class, fn() => new MysqlPort
 
 $container->set(AuthService::class, fn(Container $c) => new AuthService(
     $c->get(UserRepositoryInterface::class),
-    $c->get(JwtService::class)
+    $c->get(TokenServiceInterface::class),
+    $sessionTimeoutSeconds,
+    $refreshTokenTtlSeconds
 ));
 
-$container->set(UserService::class, fn(Container $c) => new UserService(
+$container->set(ListUsersUseCase::class, fn(Container $c) => new ListUsersUseCase(
     $c->get(UserRepositoryInterface::class)
 ));
 
-$container->set(AccountService::class, fn(Container $c) => new AccountService(
-    $c->get(AccountRepositoryInterface::class),
+$container->set(CreateUserUseCase::class, fn(Container $c) => new CreateUserUseCase(
     $c->get(UserRepositoryInterface::class)
+));
+
+$container->set(UpdateUserUseCase::class, fn(Container $c) => new UpdateUserUseCase(
+    $c->get(UserRepositoryInterface::class)
+));
+
+$container->set(DeleteUserUseCase::class, fn(Container $c) => new DeleteUserUseCase(
+    $c->get(UserRepositoryInterface::class)
+));
+
+$container->set(ListAccountsUseCase::class, fn(Container $c) => new ListAccountsUseCase(
+    $c->get(AccountRepositoryInterface::class)
+));
+
+$container->set(CreateAccountUseCase::class, fn(Container $c) => new CreateAccountUseCase(
+    $c->get(AccountRepositoryInterface::class)
+));
+
+$container->set(UpdateAccountUseCase::class, fn(Container $c) => new UpdateAccountUseCase(
+    $c->get(AccountRepositoryInterface::class)
+));
+
+$container->set(DeleteAccountUseCase::class, fn(Container $c) => new DeleteAccountUseCase(
+    $c->get(AccountRepositoryInterface::class)
 ));
 
 $container->set(FinancialObjectService::class, fn(Container $c) => new FinancialObjectService(
@@ -159,13 +195,22 @@ $container->set(EtlSignalService::class, fn(Container $c) => new EtlSignalServic
     $c->get(SignalDailyRepositoryInterface::class)
 ));
 
-$container->set(AuthController::class, fn(Container $c) => new AuthController($c->get(AuthService::class)));
+$container->set(AuthController::class, fn(Container $c) => new AuthController(
+    $c->get(AuthService::class),
+    $c->get(JwtService::class)
+));
 $container->set(UserController::class, fn(Container $c) => new UserController(
-    $c->get(UserService::class),
+    $c->get(ListUsersUseCase::class),
+    $c->get(CreateUserUseCase::class),
+    $c->get(UpdateUserUseCase::class),
+    $c->get(DeleteUserUseCase::class),
     $c->get(JwtService::class)
 ));
 $container->set(AccountController::class, fn(Container $c) => new AccountController(
-    $c->get(AccountService::class),
+    $c->get(ListAccountsUseCase::class),
+    $c->get(CreateAccountUseCase::class),
+    $c->get(UpdateAccountUseCase::class),
+    $c->get(DeleteAccountUseCase::class),
     $c->get(JwtService::class)
 ));
 $container->set(FinancialObjectController::class, fn(Container $c) => new FinancialObjectController(
