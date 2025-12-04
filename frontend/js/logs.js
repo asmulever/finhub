@@ -37,15 +37,25 @@ document.addEventListener("DOMContentLoaded", async () => {
   queryEl = document.getElementById("query-params");
   correlationInput = form?.querySelector('input[name="correlation_id"]');
 
-  const sessionInfo = await bootstrapSession();
-  if (!sessionInfo) {
+  const sessionPayload =
+    typeof Session !== "undefined" ? Session.getPayload() : null;
+  const sessionExpiresAt =
+    typeof Session !== "undefined" ? Session.getExpiresAt() : null;
+  if (
+    !sessionPayload ||
+    !sessionExpiresAt ||
+    (typeof Session !== "undefined" &&
+      Session.isExpired &&
+      Session.isExpired(sessionExpiresAt))
+  ) {
+    redirectToLogin();
     return;
   }
 
-  LOGS_STATE.payload = sessionInfo.payload;
-  LOGS_STATE.sessionExpiresAt = sessionInfo.access_expires_at;
+  LOGS_STATE.payload = sessionPayload;
+  LOGS_STATE.sessionExpiresAt = sessionExpiresAt;
   LOGS_STATE.isAdmin =
-    (sessionInfo.payload?.role ?? "").toLowerCase() === "admin";
+    (sessionPayload?.role ?? "").toLowerCase() === "admin";
 
   if (!LOGS_STATE.isAdmin) {
     window.location.href = "/frontend/dashboard.html";
@@ -59,21 +69,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupCorrelationInput();
   registerUiEvents();
   fetchLogs();
-});
-
-window.addEventListener("session:refreshed", (event) => {
-  const detail = event.detail || {};
-  if (!detail.payload || !detail.accessExp) {
-    return;
-  }
-
-  LOGS_STATE.payload = detail.payload;
-  LOGS_STATE.sessionExpiresAt = detail.accessExp;
-  LOGS_STATE.isAdmin =
-    (detail.payload?.role ?? "").toLowerCase() === "admin";
-
-  setupNavigation();
-  startCountdown(LOGS_STATE.sessionExpiresAt);
 });
 
 async function fetchLogs(page = 1) {
@@ -344,34 +339,6 @@ function getTodayString() {
   return `${year}-${month}-${day}`;
 }
 
-async function bootstrapSession() {
-  try {
-    const response = await apiFetch("/auth/session");
-    if (!response.ok) {
-      throw new Error(`Status ${response.status}`);
-    }
-
-    const data = await response.json();
-    const payload = data.payload ?? null;
-    const accessExp = data.access_expires_at ?? payload?.exp ?? null;
-    if (!payload || !accessExp) {
-      throw new Error("Respuesta de sesión incompleta");
-    }
-
-    if (typeof Session !== "undefined") {
-      Session.save(payload, accessExp);
-    }
-
-    return { payload, access_expires_at: accessExp };
-  } catch (error) {
-    window.FrontendLogger?.warning("No se pudo validar la sesión en logs", {
-      reason: error instanceof Error ? error.message : String(error),
-    });
-    redirectToLogin();
-    return null;
-  }
-}
-
 async function loadFilterOptions() {
   try {
     const response = await apiFetch("/logs/filters");
@@ -466,18 +433,10 @@ function handleUserMenuAction(action) {
 
 async function logoutAndRedirect() {
   clearCountdown();
-  try {
-    await apiFetch("/auth/logout", { method: "POST", skipSessionExtend: true });
-  } catch (error) {
-    window.FrontendLogger?.warning("No se pudo cerrar la sesión en logs", {
-      reason: error instanceof Error ? error.message : String(error),
-    });
-  } finally {
-    if (typeof Session !== "undefined") {
-      Session.clear();
-    }
-    window.location.href = "/index.php";
+  if (typeof Session !== "undefined") {
+    Session.clear();
   }
+  window.location.href = "/index.php";
 }
 
 function redirectToLogin() {
