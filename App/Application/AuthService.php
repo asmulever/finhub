@@ -27,7 +27,7 @@ class AuthService
             throw new \InvalidArgumentException('SESSION_TIMEOUT_MS must resolve to at least 1 second.');
         }
         if ($refreshTokenTtlSeconds < 1) {
-            throw new \InvalidArgumentException('JWT_REFRESH_TTL_SECONDS must be a positive integer.');
+            throw new \InvalidArgumentException('Refresh token TTL must be a positive integer.');
         }
 
         $this->sessionTimeoutSeconds = $sessionTimeoutSeconds;

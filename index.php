@@ -386,7 +386,9 @@ header('Content-Type: text/html; charset=UTF-8');
         </section>
       </div>
     </main>
+    <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js"></script>
     <script src="/frontend/js/logger.js" defer></script>
+    <script src="/frontend/js/session.js?v=4" defer></script>
     <script src="/frontend/js/login.js" defer></script>
   </body>
 </html>

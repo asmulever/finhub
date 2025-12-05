@@ -21,7 +21,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const sessionExpiresAt =
     typeof Session !== "undefined" ? Session.getExpiresAt() : null;
   const hasValidSession =
-    typeof Session !== "undefined" && Session.hasActiveSession();
+    typeof Session !== "undefined" &&
+    typeof Session.hasActiveSession === "function" &&
+    Session.hasActiveSession();
 
   if (!sessionPayload || !sessionExpiresAt || !hasValidSession) {
     redirectToLogin();
