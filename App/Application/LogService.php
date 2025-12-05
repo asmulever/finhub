@@ -187,7 +187,21 @@ class LogService
             $record['message']
         );
 
-        @file_put_contents($this->logFilePath, $line . PHP_EOL, FILE_APPEND);
+        $this->prependLineToFile($line);
+    }
+
+    private function prependLineToFile(string $line): void
+    {
+        $existing = @file_get_contents($this->logFilePath);
+        if ($existing === false) {
+            $existing = '';
+        }
+
+        @file_put_contents(
+            $this->logFilePath,
+            $line . PHP_EOL . $existing,
+            LOCK_EX
+        );
     }
 
     /**

@@ -228,6 +228,11 @@ class Router
             return;
         }
 
+        if ($uri === '/etl/status' && $method === 'GET') {
+            $this->etlController->status();
+            return;
+        }
+
         if ($uri === '/etl/normalize-prices' && $method === 'GET') {
             $this->etlController->normalizePrices();
             return;
