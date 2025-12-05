@@ -76,7 +76,7 @@ final class ApplicationContainerFactory
 
         $sessionTimeoutMs = (int)Config::getRequired('SESSION_TIMEOUT_MS');
         $sessionTimeoutSeconds = (int)max(1, ceil($sessionTimeoutMs / 1000));
-        $refreshTokenTtlSeconds = (int)Config::getRequired('JWT_REFRESH_TTL_SECONDS');
+        $refreshTokenTtlSeconds = $sessionTimeoutSeconds;
 
         $container->set(LogRepositoryInterface::class, fn() => new MysqlLogRepository());
         $container->set(LogService::class, function (Container $c): LogService {
