@@ -25,7 +25,7 @@ class MysqlLogRepository implements LogRepositoryInterface
             SELECT id, created_at, level, http_status, method, route, message, correlation_id
             FROM api_logs
             {$whereSql}
-            ORDER BY created_at DESC, id DESC
+            ORDER BY id DESC
             LIMIT :limit OFFSET :offset
         ");
         foreach ($params as $key => $value) {

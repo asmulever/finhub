@@ -90,7 +90,10 @@
       }
 
       if (payload?.payload && payload?.access_expires_at && typeof Session !== "undefined") {
-        Session.save(payload.payload, payload.access_expires_at);
+        Session.save(payload.payload, payload.access_expires_at, {
+          access: payload?.access_token ?? null,
+          refresh: payload?.refresh_token ?? null,
+        });
       }
 
       const redirectUrl =
