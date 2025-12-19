@@ -152,7 +152,8 @@ final class ApiDispatcher
      */
     private function sendError(\Throwable $throwable, string $traceId): void
     {
-        $status = $throwable->getCode() >= 100 && $throwable->getCode() < 600 ? $throwable->getCode() : 500;
+        $code = (int) $throwable->getCode();
+        $status = $code >= 100 && $code < 600 ? $code : 500;
         $message = $status === 404 ? 'not_found' : 'unexpected_error';
         $payload = [
             'error' => [

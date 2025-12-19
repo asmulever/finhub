@@ -80,8 +80,7 @@ const render = () => {
       authStore.setToken(response.token);
       authStore.setProfile(response.user);
       window.location.href = '/Frontend/Dashboard.html';
-    } catch (err) {
-      console.error(err) ;
+    } catch (err) {      
       const message = err?.error?.message ?? 'No se pudo iniciar sesión';
       errorMessage.textContent = message;
     }
