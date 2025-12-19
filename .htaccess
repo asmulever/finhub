@@ -5,8 +5,8 @@ DirectoryIndex index.php
     RewriteBase /
 
     # 1. API: todo lo que empiece con /api -> /api/index.php
-    RewriteRule ^api$ api/index.php [QSA,L]
-    RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+    RewriteRule ^api$ BkEndApi/index.php [QSA,L]
+    RewriteRule ^api/(.*)$ BkEndApi/index.php [QSA,L]
 
     # 2. Dejar pasar archivos o directorios reales
     RewriteCond %{REQUEST_FILENAME} -f [OR]

@@ -46,8 +46,7 @@ export const apiClient = async (path, options = {}) => {
   if (token) {
     composedHeaders.Authorization = `Bearer ${token}`;
   }
-
-  console.log(buildUrl(path));
+  
   const response = await fetch(buildUrl(path), {
     method,
     credentials: 'include',
@@ -55,6 +54,7 @@ export const apiClient = async (path, options = {}) => {
     body: body === undefined ? undefined : JSON.stringify(body),
     ...rest,
   });
+  console.log(response);
 
   const payload = await parsePayload(response);
   if (!response.ok) {
