@@ -1,0 +1,213 @@
+# REQUERIMIENTO FRONTEND — FINHUB (Frontend + Integración Backend)
+**Stack objetivo:** HTML5 + CSS + JavaScript (ES Modules).  
+**Objetivo:** Implementar UI web que consuma la API `/api` del backend FinHub (PHP 8.2), incluyendo login como landing y navegación post-login con control de sesión por token.
+
+---
+
+## 0) Frameworks y librerías permitidas (restricción explícita)
+
+### front-req-000: Frameworks permitidos (lista cerrada)
+El frontend **solo puede utilizar** los siguientes frameworks/librerías.  
+Cualquier otra tecnología queda **prohibida** salvo autorización explícita.
+
+**Permitidos:**
+- **Bootstrap 5.x** (solo CSS o CSS+JS) vía CDN.
+- **Tailwind CSS** vía CDN (modo utility-first, sin build step).
+- **Font Awesome** vía CDN (para íconos; opcional).
+- **jQuery 3.x+** únicamente para manipulaciones DOM puntuales, eventos simples y llamadas AJAX básicas; no se permiten plugins pesados, UI kits o arquitecturas basadas en `$(document).ready()`.
+
+**Opcionales (pueden combinarse si tiene sentido y reduce ruido):**
+- Bootstrap **y/o** Tailwind (permitida la combinación siempre que se justifique la coherencia visual).
+
+**Nota adicional:** el código nuevo debe priorizar JS moderno (ES Modules, funciones puras, manejo explícito de estado); jQuery se introduce sólo si reduce ruido o mejora compatibilidad puntual, y nunca reemplaza la lógica de negocio del frontend.
+
+**Prohibidos explícitamente:**
+- React, Vue, Angular, Svelte.
+- Next.js, Nuxt, Astro.
+- Vite, Webpack, Parcel, Rollup.
+- TypeScript.
+- Vanilla JavaScript (sin módulos ni patrones estructurados).
+- Cualquier framework SPA pesado o con build pipeline.
+
+**Justificación técnica:**
+- Mantener coherencia con backend PHP simple.
+- Evitar tooling adicional, build steps y dependencias innecesarias.
+- Facilitar mantenimiento y lectura por OpenAI Codex y humanos.
+
+---
+
+## 1) Convenciones generales
+
+### front-req-001: Alcance
+El frontend debe proveer:
+- Landing/Login (pantalla principal).
+- Flujo de autenticación con token Bearer.
+- Base para vistas autenticadas (layout común) y control de acceso por rol.
+
+### front-req-002: Relación con backend
+El frontend se relaciona con el backend usando los endpoints y contratos definidos en:
+- **Identity**: `req-101` (auth y usuarios), `req-030` (Bearer token), `req-031` (roles).
+- **Convenciones API**: `req-020..024` (JSON, versionado, paginación).
+- **Errores**: `req-700` (estructura de errores).
+
+### front-req-003: Versionado y base URL
+- Toda llamada debe apuntar a `/api/...` (alineado con `req-021`).
+- La base URL del backend debe ser configurable (ej: `config.js`). Prohibido hardcodear.
+
+### front-req-004: Autenticación
+- Guardar el token en `localStorage` (o `sessionStorage` si se define).
+- Enviar siempre:
+  - `Authorization: Bearer <token>` (backend `req-030`).
+- Ante 401, limpiar token y redirigir a `/login`.
+
+---
+
+## 2) Assets y branding
+
+### front-req-010: Logo obligatorio
+- Integrar el logo `full_logoweb.png` en la carpeta `logo/`.
+- Visible en la landing/login.
+
+### front-req-011: Favicon obligatorio
+- Cada vista debe integrar `favicon.png`.
+- Definido en el HTML base para toda navegación.
+
+### front-req-012: Frase de marketing
+- La pantalla de login debe funcionar como landing.
+- Incluir una **frase de marketing atractiva** claramente visible.
+
+---
+
+## 3) Pantalla Landing/Login
+
+### front-req-100: Ruta y composición
+- Ruta: `/login` (o `/` redirigiendo a `/login` si no hay sesión).
+- Componentes mínimos:
+  - Logo (`front-req-010`)
+  - Frase de marketing (`front-req-012`)
+  - Formulario de login
+  - Mensajes de error del backend
+  - Botón “Ingresar”
+
+### front-req-101: Campos del formulario
+- Email:
+  - `type="email"`, requerido.
+- Password:
+  - `type="password"`, requerido.
+  - Toggle de visibilidad (ver `front-req-102`).
+
+### front-req-102: Mostrar/ocultar password con emoji
+- El input de password debe incluir un **emoji clickeable** (ej: 👁️ / 🙈).
+- Al click:
+  - Alternar `type="password"` ↔ `type="text"`.
+  - Cambiar el emoji o su estado visual.
+- Accesibilidad:
+  - Usar `button` con `aria-label`.
+
+### front-req-103: Envío y validación
+- Validación mínima en cliente:
+  - Email válido.
+  - Password no vacío.
+- Request:
+  - **POST** `/api/auth/login` (backend `req-101`)
+  - Body JSON `{ "email": "...", "password": "..." }`
+  - Header `Content-Type: application/json`.
+
+### front-req-104: Manejo de respuesta
+- OK:
+  - Persistir token.
+  - Redirigir a `/app` o `/dashboard`.
+- Error:
+  - Mostrar `error.message` del backend (`req-700`).
+  - No mostrar detalles técnicos.
+
+### front-req-105: Landing extendido con experiencia inmersiva
+- El login funciona como landing y comparte espacio con logo, frase de marketing y pequeñas descripciones del servicio.
+- La vista completa debe tener un degradado diagonal que comienza claro en la esquina superior izquierda, oscurece hasta la mitad de la pantalla y vuelve a aclarar la esquina inferior derecha.
+- Integrar una frase de marketing atractiva y una breve descripción del servicio (p.ej. “Conecta tus portafolios con inteligencia de mercado, precios automáticos y trazabilidad completa”) en la sección hero junto al logo.
+- El panel de login debe presentar una animación de deslizamiento (slide-in) desde abajo y fundirse en el contenido al cargarse la página, manteniendo la interacción accesible (máscara de colores y contraste alto).
+- El formulario de login debe tener todos los inputs (usuario y contraseña) con el mismo ancho, centrados, manteniendo simetría en la distancia a los márgenes y compartiendo el mismo ancho que el botón “Ingresar”; el botón de revelar contraseña se ubica del lado izquierdo y centrado verticalmente para facilitar el alcance.
+- Se requiere un checkbox “Recordar usuario” y un enlace “Registrar nuevo usuario” dentro del panel del formulario que complementen el flujo de acceso.
+
+### front-req-106: Dashboard integrado con toolbar
+- La página `/Frontend/Dashboard.html` debe mostrar un dashboard autenticado con una toolbar superior como menú principal.
+- En la esquina izquierda de la toolbar va solo el logo del sistema; del lado derecho un botón con el nombre/rol del usuario que abre un menú desplegable con las opciones “ABM de clientes” y “Cerrar sesión”.
+- “ABM de clientes” presenta una vista dentro del dashboard que explica las acciones de administración de clientes; “Cerrar sesión” llama a `/api/auth/logout`, limpia el token y redirige al login.
+- La toolbar incluye botones de navegación rápida (Resumen, Portafolios, Precios) que vuelven al contenido principal.
+- El área principal se organiza en tarjetas con perfil, portafolios resumidos y última cotización, manteniendo espíritu de branding azul oscuro y bordes suaves.
+
+---
+
+## 4) Vistas autenticadas
+
+### front-req-200: Layout autenticado común
+- Header con logo y acción “Salir”.
+- Favicon activo.
+- Contenedor principal.
+- Manejo global de errores.
+
+### front-req-201: Perfil de usuario
+- Al cargar `/app`:
+  - **GET** `/api/me` (backend `req-101`).
+- Si 401:
+  - Logout forzado y redirect a login.
+- Leer rol (`admin` / `user`) para habilitar UI (backend `req-031`).
+
+### front-req-202: Logout
+- Acción “Salir”:
+  - **POST** `/api/auth/logout` (si aplica).
+- Siempre:
+  - Borrar token.
+  - Redirigir a `/login`.
+
+---
+
+## 5) Cliente HTTP y errores
+
+### front-req-300: Cliente HTTP centralizado
+Implementar `apiClient.js` que:
+- Use `fetch`.
+- Inyecte `Authorization` automáticamente.
+- Parsee JSON.
+- Normalice errores.
+
+### front-req-301: Manejo de errores
+- `400`: validación.
+- `401`: sesión inválida → logout.
+- `403`: acceso denegado.
+- `404`: no encontrado.
+- `500`: error genérico (usar `trace_id` solo para soporte).
+
+---
+
+## 6) Estructura mínima
+
+### front-req-900: Estructura recomendada
+- `public/`
+  - `index.html`
+  - `favicon.png`
+  - `logo/full_logoweb.png`
+- `Frontend/`
+  - `pages/login.js`
+  - `pages/Dashboard.js`
+  - `components/passwordToggle.js`
+  - `apicliente.js`
+  - `auth/authStore.js`
+
+### front-req-901: Restricción de configuración
+- Prohibido hardcodear:
+  - URL de API
+  - Tokens
+  - Orígenes
+- Todo configurable vía archivo JS de config.
+
+---
+
+## 7) Trazabilidad Backend ↔ Frontend
+
+- Login UI → **POST** `/api/auth/login` → backend `req-101`
+- Token → `Authorization: Bearer` → backend `req-030`
+- Perfil → **GET** `/api/me` → backend `req-101`
+- Roles UI → backend `req-031`
+- Errores → backend `req-700`
+- Versionado → backend `req-021`

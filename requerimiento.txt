@@ -1,0 +1,416 @@
+REQUERIMIENTO BACKEND — FINHUB (PHP 8.2 + MySQL 8, DDD, Repository, Bounded Context Enforced)
+Patrones y reglas arquitectónicas (lista explícita)
+
+Patrones obligatorios
+
+DDD (Domain-Driven Design) con capas: Domain / Application / Infrastructure / Interfaces.
+
+Repository Pattern (interfaces en Domain o Application; implementación solo en Infrastructure).
+
+Service Layer (Application Services orquestan casos de uso).
+
+DTOs (Request/Response DTOs en Application/Interfaces; no exponer entidades del Domain).
+
+Factories / Named Constructors (creación de entidades/VOs con invariantes).
+
+Value Objects (Email, PasswordHash, Money, Currency, DateRange, InstrumentSymbol, etc.).
+
+Specification / Policy (validaciones de negocio complejas, reglas de acceso, elegibilidad).
+
+Result Pattern (éxito/error tipado, sin excepciones para flujo normal).
+
+Transaction Script (solo dentro de Application Service) coordinando repos + UoW.
+
+Unit of Work (opcional, si se implementa, centraliza transacciones).
+
+Ports & Adapters (Hexagonal light): Application depende de interfaces; Infrastructure las implementa.
+
+Bounded Context Enforced (regla obligatoria)
+
+Cada contexto tiene su propio namespace, contratos y repos.
+
+Prohibido importar entidades de un contexto en otro; solo se permite comunicación vía DTOs o ACL (Anti-Corruption Layer).
+
+SharedKernel mínimo: tipos utilitarios (DateTime, UUID/Token, Result), nunca entidades.
+
+1) Alcance y objetivos
+
+req-000: Objetivo general
+Implementar un backend para FinHub que gestione usuarios y portafolios, instrumentos financieros, precios históricos, e ingesta/actualización automática, garantizando arquitectura DDD estricta, repositorios, trazabilidad e idempotencia.
+
+req-001: Tecnologías y restricciones
+
+PHP 8.2 sin frameworks y sin Composer (si usás autoload, debe ser autoload manual simple).
+
+MySQL 8.
+
+Apache 2.4 (si aplica hosting) con rutas limpias vía .htaccess.
+
+Configuración solo por .env (sin valores hardcode).
+
+API JSON (request/response), stateless, sin sesiones PHP.
+
+2) Arquitectura, estructura y reglas de capas
+
+req-010: Capas DDD obligatorias
+
+src/Domain: entidades, VO, reglas de negocio, interfaces de repos, políticas/specs.
+
+src/Application: casos de uso, servicios de aplicación, DTOs, puertos (interfaces), mapeos.
+
+src/Infrastructure: PDO, repos MySQL, migraciones SQL, implementaciones concretas (logger, auth, etc.).
+
+src/Interfaces: controladores HTTP, routing, middleware, validación de entrada, serialización.
+
+req-011: Dependencias permitidas
+
+Domain no depende de Infrastructure ni de Interfaces.
+
+Application puede depender de Domain.
+
+Infrastructure depende de Application/Domain (para implementar interfaces).
+
+Interfaces depende de Application (para ejecutar casos de uso).
+
+req-012: Boundered Context Enforced
+Definir como mínimo estos Bounded Contexts (namespaces separados):
+
+Identity (usuarios, roles, auth)
+
+Portfolio (portafolios y holdings)
+
+MarketData (instrumentos, precios, fuentes)
+
+Ingestion (jobs, ejecución por cron, trazabilidad ETL)
+
+Audit (logs de auditoría, eventos relevantes)
+
+req-013: Comunicación entre contextos (ACL)
+
+Portfolio no puede leer tablas de Identity directamente: usa un IdentityAcl (Application) o UserReaderPort.
+
+Ingestion publica resultados en MarketData vía MarketDataPort (DTOs), no entidades compartidas.
+
+3) Convenciones HTTP y API
+
+req-020: API JSON
+
+Content-Type: application/json; charset=utf-8
+
+Errores con estructura estándar:
+
+{ "error": { "code": "STRING", "message": "STRING", "details": {...}, "trace_id": "..." } }
+
+req-021: Versionado
+
+Prefijo /api/...
+
+req-022: Identificadores
+
+PK numéricas INT UNSIGNED AUTO_INCREMENT para tablas principales.
+
+Tokens y claves: BINARY(32) o CHAR(64) hex (definir una sola convención).
+
+req-023: Paginación
+
+Listados soportan ?page=1&limit=50 con límites: limit máx 200.
+
+Respuesta incluye meta: { page, limit, total, pages }.
+
+req-024: Filtros y orden
+
+?sort=field:asc,other:desc
+
+?q= (búsqueda simple, si aplica) y filtros explícitos por recurso.
+
+4) Seguridad y autenticación
+
+req-030: Autenticación stateless por Bearer token
+
+Header: Authorization: Bearer <token>
+
+Token generado aleatoriamente (32 bytes) y persistido (sesiones/token store) o JWT (definir 1 opción y mantenerla consistente).
+
+Expiración configurable por .env.
+
+req-031: Roles
+
+Roles mínimos: admin (acceso completo), user (acceso limitado).
+
+Middleware de autorización por rol y por ownership (recursos del usuario).
+
+req-033: Hash de contraseñas
+
+password_hash() con PASSWORD_DEFAULT (verificación con password_verify).
+
+Política de password configurable (mínimo 8, recomendado 10, etc).
+
+req-034: CORS
+
+Configurable por .env (allowed origins, headers, methods).
+
+Preflight OPTIONS respondido correctamente.
+
+req-035: Validación de entrada
+
+Validar tipos/longitudes/formato antes de entrar a Application.
+
+Nunca confiar en datos del cliente para user_id (derivar del token).
+
+5) Configuración y entorno
+
+req-040: .env obligatorio
+Todo valor configurable debe venir de .env (DB, auth, expiraciones, CORS, logs, modo debug, etc.). Prohibido hardcode.
+
+req-041: Conexión DB
+
+PDO con ERRMODE_EXCEPTION (excepciones solo para fallas técnicas).
+
+Charset utf8mb4.
+
+Timezone en DB y app coherente (definir UTC recomendado).
+
+req-042: Logging técnico
+
+Logger con archivos rotativos por día: logs/app-YYYY-MM-DD.log.
+
+trace_id por request (generado si no viene).
+
+6) Modelo de dominio y datos (mínimo viable)
+6.1 Identity Context
+
+req-100: Entidad User
+Campos mínimos:
+
+id, email (único), password_hash, role (admin|user), status (active/disabled), created_at, updated_at.
+
+req-101: Endpoints Identity
+
+POST /api/auth/login (email+password → token + perfil mínimo)
+
+POST /api/auth/logout (revoca token)
+
+GET /api/me (perfil del usuario autenticado)
+
+GET /api/users (admin) listado paginado
+
+POST /api/users (admin) crea usuario
+
+PATCH /api/users/{id} (admin) cambios parciales (role/status/reset password)
+
+DELETE /api/users/{id} (admin) deshabilita (soft delete recomendado)
+
+req-102: Sesiones/Tokens
+Si se usa token persistido:
+
+Tabla sessions: id, user_id, token, expires_at, created_at, revoked_at, ip, user_agent.
+
+6.2 Portfolio Context
+
+req-200: Entidad Portfolio
+
+id, user_id, name, base_currency (default configurable), created_at, updated_at.
+
+req-201: Entidad Holding
+
+id, portfolio_id, instrument_id, quantity, avg_cost, currency, created_at, updated_at.
+
+req-202: Endpoints Portfolio
+
+GET /api/portfolios (propios; admin puede filtrar por user)
+
+POST /api/portfolios
+
+GET /api/portfolios/{id}
+
+PATCH /api/portfolios/{id}
+
+DELETE /api/portfolios/{id}
+
+GET /api/portfolios/{id}/holdings
+
+POST /api/portfolios/{id}/holdings
+
+PATCH /api/holdings/{id}
+
+DELETE /api/holdings/{id}
+
+req-203: Reglas de negocio holdings
+
+No permitir quantity < 0.
+
+instrument_id debe existir en MarketData.
+
+Actualizaciones son parciales (PATCH) e idempotentes cuando aplique.
+
+6.3 MarketData Context
+
+req-300: Catálogo único de instrumentos
+Entidad Instrument:
+
+id, symbol (único), name, type (stock/etf/crypto/forex/etc), exchange, currency, created_at, updated_at.
+
+req-301: Precios históricos
+Entidad Price:
+
+id, instrument_id, as_of (datetime), open, high, low, close, volume, source, created_at.
+
+Índice único: (instrument_id, as_of, source) para deduplicación.
+
+req-302: Endpoints MarketData
+
+GET /api/instruments (filtros por symbol/type/exchange)
+
+POST /api/instruments (admin)
+
+GET /api/instruments/{id}
+
+GET /api/instruments/{id}/prices?from=&to=&source=
+
+POST /api/instruments/{id}/prices (admin o ingestion) inserción batch
+
+GET /api/quotes?symbol= (si existe, devuelve último close/last)
+
+req-303: Idempotencia de precios
+
+Insert batch debe ignorar duplicados por clave única (upsert controlado) y retornar conteo {inserted, skipped, updated}.
+
+6.4 Ingestion Context (ETL / Cron)
+
+req-400: Disparo por cron externo
+
+Endpoint protegido por token de sistema (header X-CRON-TOKEN) leído de .env.
+
+POST /api/ingestion/run ejecuta pipeline incremental.
+
+req-401: Pipeline ETL mínimo (sin sobre-ingeniería)
+Etapas:
+
+Fetch (descarga datos por fuente)
+
+Normalize (mapea al esquema interno)
+
+Deduplicate (garantiza idempotencia)
+
+Persist (upsert en prices)
+
+Report (guarda métricas y status)
+
+req-402: Trazabilidad
+Tabla ingestion_runs:
+
+id, started_at, finished_at, status, source, mode (delta/backfill), metrics_json, error_json.
+
+req-403: Backfill controlado
+
+Endpoint admin: POST /api/ingestion/backfill con instrument_id o symbol + rango from/to.
+
+6.5 Audit Context
+
+req-500: Auditoría de acciones sensibles
+
+Registrar: login success/fail, creación/edición de usuario, cambios de rol, creación/borrado de portfolio/holding, ejecuciones de ingesta.
+
+Tabla audit_log: id, actor_user_id, action, entity, entity_id, data_json, ip, created_at.
+
+7) Persistencia y SQL
+
+req-600: Script de creación de DB y tablas
+
+Entregar sql/001_create_database.sql y sql/002_create_tables.sql (y sucesivos).
+
+Incluir constraints, índices, claves únicas y FK cuando aplique.
+
+req-601: Seed mínimo
+
+Insertar 2 usuarios (según .env o script dedicado), roles admin y user.
+
+Nunca hardcodear credenciales dentro del código runtime.
+
+8) Errores, respuestas y calidad
+
+req-700: Manejo de errores
+
+Errores de validación → 400 con detalles por campo.
+
+No autorizado → 401.
+
+Prohibido → 403.
+
+No encontrado → 404.
+
+Rate limit → 429.
+
+Error técnico → 500 con trace_id.
+
+req-701: Validación de invariantes
+
+Invariantes del Domain se validan en constructores/factories y policies/specs; no solo en controllers.
+
+req-702: Pruebas mínimas
+
+Al menos tests de Application Services críticos (auth, portfolios, upsert prices).
+
+Si no hay framework de tests, proveer “test harness” simple ejecutable por CLI.
+
+9) Routing y estructura de archivos (Codex-friendly)
+
+req-800: Estructura de carpetas mínima
+
+public/index.php (front controller)
+
+src/Domain/...
+
+src/Application/...
+
+src/Infrastructure/...
+
+src/Interfaces/Http/...
+
+config/.env y .env.example
+
+sql/*.sql
+
+logs/
+
+req-801: Router
+
+Router simple por método+path (sin framework) con soporte variables {id} y middlewares.
+
+req-802: Middlewares
+
+AuthMiddleware (Bearer token)
+
+RoleMiddleware (admin/user)
+
+CorsMiddleware
+
+JsonBodyMiddleware (parsea body y maneja errores)
+
+10) Lista de requerimientos enlazables (índice rápido)
+
+req-000..001: Objetivo + stack + restricciones
+
+req-010..013: DDD capas + bounded context enforced + ACL
+
+req-020..024: Convenciones API (JSON, versionado, paginación)
+
+req-030..035: Auth, roles, rate limiting, hashing, CORS, validación
+
+req-040..042: .env, PDO, logging
+
+req-100..102: Identity (User, endpoints, sessions)
+
+req-200..203: Portfolio (Portfolio, Holding, endpoints, reglas)
+
+req-300..303: MarketData (Instrument, Price, endpoints, idempotencia)
+
+req-400..403: Ingestion (cron, ETL, trazabilidad, backfill)
+
+req-500: Audit
+
+req-600..601: SQL scripts + seeds
+
+req-700..702: errores + invariantes + pruebas
+
+req-800..802: estructura + router + middlewares

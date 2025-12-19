@@ -1,0 +1,211 @@
+REQUERIMIENTO MAESTRO — APB DATA LAKE & INGESTION
+
+req-000: OBJETIVO GENERAL
+
+Diseñar e implementar un Data Lake financiero dentro del sistema APB que permita acumular, almacenar y consultar datos históricos de instrumentos financieros de forma consistente, deduplicada y escalable, junto con un sistema de ingesta automática disparado por URLs del sistema para ser ejecutado por un cron externo.
+
+El sistema debe permitir incorporar nuevas fuentes de datos sin romper la arquitectura existente y garantizar la trazabilidad completa del pipeline ETL.
+
+--------------------------------------------------------------------------------
+
+req-001: ALCANCE FUNCIONAL
+
+req-001.1: Data Lake histórico por instrumentos
+
+El sistema deberá:
+
+- Mantener un catálogo único de instrumentos financieros utilizados en los portafolios de los usuarios.
+- Evitar la duplicación de instrumentos aunque estén presentes en múltiples portafolios.
+- Acumular datos históricos de precios por instrumento (series temporales).
+- Permitir backfill histórico y actualizaciones incrementales (delta).
+- Garantizar idempotencia ante ejecuciones repetidas.
+
+req-001.2: Sistema de ingesta
+
+El sistema deberá:
+
+- Obtener datos desde las siguientes fuentes:
+  - Google Finance
+  - TwelveData API
+- Ejecutar procesos de ingesta a través de endpoints HTTP del sistema.
+- Ser compatible con ejecución por cron externo.
+- Integrarse posteriormente con un sistema interno de cron-job.
+
+--------------------------------------------------------------------------------
+
+req-002: MODELO DE DATOS (CONCEPTUAL)
+
+req-002.1: Catálogo de instrumentos
+
+Cada instrumento se identifica de forma única por:
+
+- provider (google_finance, twelvedata, etc.)
+- symbol normalizado
+- market / exchange (si aplica)
+- currency (si aplica)
+
+Regla: un instrumento único corresponde a un único instrument_id interno.
+
+req-002.2: Series históricas
+
+Las series de precios se almacenan por:
+
+- instrument_id
+- timeframe (ej. daily)
+- timestamp o date
+
+Clave única lógica:
+instrument_id + timeframe + timestamp
+
+No se permiten duplicados.
+
+--------------------------------------------------------------------------------
+
+req-003: PIPELINE ETL (OBLIGATORIO)
+
+El Data Lake sigue estrictamente el siguiente pipeline:
+
+External API
+→ RAW / STAGING
+→ FACT
+→ INDICATORS
+→ SIGNALS
+→ SERVING (vistas de consumo)
+
+Descripción por etapa:
+
+- RAW / STAGING:
+  Almacena datos crudos normalizados mínimamente con trazabilidad de fuente.
+
+- FACT:
+  Consolida series temporales limpias por instrumento y timeframe.
+
+- INDICATORS:
+  Calcula indicadores técnicos sobre FACT.
+
+- SIGNALS:
+  Genera señales derivadas de indicadores.
+
+- SERVING:
+  Vistas optimizadas para consumo por Analytics y dashboards.
+
+--------------------------------------------------------------------------------
+
+req-004: BOUNDED CONTEXTS E INTEGRACIÓN
+
+req-004.1: Ingestion
+
+Responsabilidades:
+- Consumir APIs externas.
+- Transformar respuestas en DTOs internos.
+- Persistir datos únicamente en RAW a través de interfaces del DataLake.
+
+Restricciones:
+- No accede directamente a tablas.
+- No contiene lógica de normalización profunda.
+
+req-004.2: DataLake
+
+Responsabilidades:
+- Ser dueño exclusivo del pipeline ETL.
+- Implementar repositorios y servicios para RAW, FACT, INDICATORS, SIGNALS y SERVING.
+- Exponer interfaces para Ingestion y Analytics.
+
+Restricciones:
+- No accede a controladores ni a Auth.
+
+req-004.3: Analytics
+
+Responsabilidades:
+- Leer datos consolidados desde FACT y SERVING.
+- Exponer métricas, señales y vistas.
+
+Restricciones:
+- No escribe datos.
+- No ejecuta ETL.
+
+--------------------------------------------------------------------------------
+
+req-005: ENDPOINTS DE INGESTA (CONTRATO)
+
+Los procesos de ingesta se disparan mediante HTTP.
+
+Endpoints sugeridos:
+
+POST /etl/ingestion/google-finance/run
+POST /etl/ingestion/twelvedata/run
+POST /etl/ingestion/all/run
+
+Parámetros opcionales:
+- mode: delta | backfill
+
+Respuesta estándar JSON:
+
+- job_id
+- source
+- mode
+- status
+- started_at
+- finished_at
+- processed_instruments
+- errors_count
+
+--------------------------------------------------------------------------------
+
+req-006: SEGURIDAD DE EJECUCIÓN
+
+Los endpoints de ingesta deben protegerse mediante una de las siguientes opciones:
+
+Opción A: JWT de servicio
+- Autenticación stateless con JWT Bearer.
+- Scope requerido: etl:run.
+
+Opción B: Token técnico
+- Header X-CRON-TOKEN.
+- Validado por middleware.
+- Uso exclusivo para cron.
+
+--------------------------------------------------------------------------------
+
+req-007: ORQUESTACIÓN Y CONCURRENCIA
+
+- Existirá un runner único de ETL.
+- Se deberá prevenir la ejecución concurrente del mismo job.
+- Cada ejecución deberá registrarse con:
+  - timestamps
+  - estado
+  - errores
+  - métricas básicas
+
+--------------------------------------------------------------------------------
+
+req-008: MODOS DE EJECUCIÓN
+
+- Delta:
+  Actualiza solo ventanas recientes para todos los instrumentos.
+
+- Backfill:
+  Completa históricos faltantes para instrumentos nuevos o con gaps.
+
+--------------------------------------------------------------------------------
+
+req-009: NO-OBJETIVOS
+
+Este requerimiento no incluye:
+
+- Trading en tiempo real.
+- Microservicios.
+- Streaming en tiempo real.
+- Modificación dinámica del esquema de base de datos.
+
+--------------------------------------------------------------------------------
+
+req-010: CRITERIOS DE ACEPTACIÓN
+
+El sistema se considera completo cuando:
+
+- No existen instrumentos duplicados.
+- No existen precios duplicados.
+- El pipeline ETL es reproducible e idempotente.
+- Las ejecuciones por cron son seguras.
+- Analytics puede consumir datos sin acoplarse a ETL.

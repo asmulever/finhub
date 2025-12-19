@@ -1,394 +1,197 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Finhub | Dashboard</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FinHub | Dashboard</title>
+  <link rel="icon" href="/logo/favicon.png" />
+  <script>
+    window.__ENV = window.__ENV ?? {};
+    window.__ENV.API_BASE_URL = '/api';
+  </script>
+  <link rel="preload" href="/logo/full_logoweb.png" as="image" />
+  <style>
+    :root {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: linear-gradient(145deg, #030712, #020f2a 45%, #0f172a);
+      color: #cbd5f5;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(145deg, #030712, #020f2a 45%, #0f172a);
+    }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      padding: 12px 32px;
+      background: rgba(2, 6, 23, 0.95);
+      gap: 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .toolbar-logo img {
+      height: 44px;
+    }
+    .toolbar-menu {
+      display: flex;
+      flex: 1;
+      gap: 16px;
+    }
+    .toolbar-menu button {
+      background: transparent;
+      border: 1px solid transparent;
+      color: inherit;
+      padding: 10px 18px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    .toolbar-menu button.active {
+      border-color: rgba(56, 189, 248, 0.6);
+      background: rgba(14, 165, 233, 0.1);
+    }
+    .toolbar-user {
+      position: relative;
+    }
+    .toolbar-user button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      color: inherit;
+      padding: 10px 16px;
+      border-radius: 999px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .toolbar-user .chevron {
+      font-size: 0.9rem;
+    }
+    .content-shell {
+      padding: 24px 32px;
+    }
+    #app {
+      display: grid;
+      gap: 24px;
+    }
+    .card {
+      background: rgba(15, 23, 42, 0.95);
+      border-radius: 20px;
+      padding: 26px;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      box-shadow: 0 25px 50px rgba(2, 6, 23, 0.7);
+    }
+    .simple-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .simple-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    #app button {
+      margin-top: 16px;
+      background: linear-gradient(120deg, #0ea5e9, #22d3ee);
+      border: none;
+      border-radius: 10px;
+      font-weight: 600;
+      color: #111827;
+      padding: 10px 16px;
+      cursor: pointer;
+      align-self: flex-start;
+    }
+    .card h2 {
+      margin-top: 0;
+      color: #e0f2fe;
+    }
+    .profile {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .user-dropdown {
+      position: fixed;
+      top: 60px;
+      right: 20px;
+      background: rgba(2, 6, 23, 0.95);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 180px;
+      z-index: 20;
+    }
+    .user-dropdown.visible {
+      display: flex;
+    }
+    .user-dropdown button {
+      background: transparent;
+      border: none;
+      color: inherit;
+      text-align: left;
+      padding: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .user-dropdown button:hover {
+      background: rgba(14, 165, 233, 0.15);
+    }
+    @media (max-width: 768px) {
+      .toolbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .toolbar-menu {
+        flex-wrap: wrap;
+      }
+    }
+  </style>
 </head>
-<body class="dashboard-shell">
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-3">
-    <a class="navbar-brand fw-semibold" href="#">Finhub Suite</a>
-    <div class="ms-auto d-flex align-items-center gap-3">
-      <div class="text-light text-end">
-        <div class="text-secondary small" id="sessionCountdown"></div>
-      </div>
-      <div class="dropdown">
-        <button
-          class="btn btn-outline-light dropdown-toggle"
-          type="button"
-          id="userMenuButton"
-          data-bs-toggle="dropdown"
-          aria-expanded="false"
-        >
-          <span id="userMenuEmail">usuario@example.com</span>
-        </button>
-        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="userMenuButton">
-          <li><a class="dropdown-item" href="#" data-user-action="profile">Mi perfil</a></li>
-          <li><a class="dropdown-item" href="#" data-user-action="preferences">Preferencias</a></li>
-          <li>
-            <a
-              class="dropdown-item d-none"
-              href="#"
-              data-user-action="users"
-              id="userMenuUsersLink"
-            >Usuarios</a>
-          </li>
-          <li>
-            <a
-              class="dropdown-item d-none"
-              href="/frontend/logs.html"
-              id="userMenuLogsLink"
-            >Logeos</a>
-          </li>
-          <li><hr class="dropdown-divider"></li>
-          <li><a class="dropdown-item text-danger" href="#" data-user-action="logout">Cerrar sesión</a></li>
-        </ul>
-      </div>
+<body>
+  <header class="toolbar">
+    <div class="toolbar-logo">
+      <img src="/logo/full_logoweb.png" alt="FinHub" />
     </div>
-  </nav>
-  <div class="container-fluid">
-    <div class="row">
-      <aside class="col-md-3 col-lg-2 sidebar p-3">
-        <h6 class="text-uppercase text-white-50 mb-3">Menú principal</h6>
-        <nav class="nav flex-column gap-1" id="mainNav">
-          <a href="#" class="nav-link active" data-section="overview">Resumen</a>
-          <a href="#" class="nav-link" data-section="brokers">Brokers</a>
-          <a href="#" class="nav-link" data-section="portfolio">Portafolio</a>
-          <a href="#" class="nav-link" data-section="tickers">Ticker's</a>
-        </nav>
-      </aside>
-      <main class="col-md-9 col-lg-10 content-area">
-        <section id="section-overview" class="dashboard-section active">
-          <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-              <h3 class="mb-0">Bienvenido al panel</h3>
-              <p class="text-muted mb-0">Extiende esta vista para tus módulos internos.</p>
-            </div>
-            <span class="badge text-bg-light" id="tokenPreview">Token activo</span>
-          </div>
-          <div class="row g-4">
-            <div class="col-md-4">
-              <div class="card shadow-sm border-0 h-100">
-                <div class="card-body">
-                  <h6 class="text-uppercase text-muted">Usuarios</h6>
-                  <p class="display-6 fw-bold mb-0" id="usersMetric">--</p>
-                  <small class="text-muted">Total visibles</small>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-4">
-              <div class="card shadow-sm border-0 h-100">
-                <div class="card-body">
-                  <h6 class="text-uppercase text-muted">Ticker's</h6>
-                  <p class="display-6 fw-bold mb-0" id="foMetric">--</p>
-                  <small class="text-muted">Registros actuales</small>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-4">
-              <div class="card shadow-sm border-0 h-100">
-                <div class="card-body">
-                  <h6 class="text-uppercase text-muted">Estado</h6>
-                  <p class="display-6 fw-bold mb-0 text-success" id="healthStatus">--</p>
-                  <small class="text-muted">Última verificación</small>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="card mt-4 shadow-sm border-0">
-            <div class="card-body">
-              <h5>Módulos futuros</h5>
-              <p class="text-muted mb-0">
-                Agrega nuevas pantallas invocando APIs internas con Bootstrap por CDN.
-                Esta sección sirve como contenedor para tableros, tablas o gráficos.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section id="section-brokers" class="dashboard-section">
-          <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-              <h3 class="mb-0">Brokers / Cuentas</h3>
-              <p class="text-muted mb-0">Administrá tus cuentas operativas personales.</p>
-            </div>
-            <button class="btn btn-outline-secondary btn-sm" id="brokerFormReset">Nueva cuenta</button>
-          </div>
-          <div class="card shadow-sm border-0 mb-4">
-            <div class="card-body">
-              <form id="brokerForm" class="row g-3">
-                <div class="col-md-5">
-                  <label class="form-label">Broker / Cuenta</label>
-                  <input type="text" id="brokerName" class="form-control" required>
-                </div>
-                <div class="col-md-3">
-                  <label class="form-label">Moneda</label>
-                  <input type="text" id="brokerCurrency" class="form-control" value="USD" maxlength="12">
-                </div>
-                <div class="col-md-2 d-flex align-items-end">
-                  <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="brokerPrimary">
-                    <label class="form-check-label" for="brokerPrimary">Principal</label>
-                  </div>
-                </div>
-                <div class="col-md-2 d-flex align-items-end">
-                  <button class="btn btn-primary w-100" type="submit" id="brokerSaveBtn">Guardar</button>
-                </div>
-                <div class="col-12 text-muted" id="brokerFormStatus"></div>
-              </form>
-            </div>
-          </div>
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Broker</th>
-                      <th>Moneda</th>
-                      <th>Principal</th>
-                      <th>Creado</th>
-                      <th class="text-end">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody id="brokersTableBody"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="section-users" class="dashboard-section" data-role="admin">
-          <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-              <h3 class="mb-0">Gestión de usuarios</h3>
-              <p class="text-muted mb-0">CRUD completo disponible solo para administradores.</p>
-            </div>
-            <button class="btn btn-outline-secondary btn-sm" id="userFormReset">Nuevo usuario</button>
-          </div>
-          <div class="card shadow-sm border-0 mb-4">
-            <div class="card-body">
-              <form id="userForm" class="row g-3">
-                <div class="col-md-4">
-                  <label class="form-label">Email</label>
-                  <input type="email" class="form-control" id="userEmail" required>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">Password</label>
-                  <input type="password" class="form-control" id="userPassword" required>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">Rol</label>
-                  <select id="userRole" class="form-select">
-                    <option value="admin">admin</option>
-                    <option value="user">user</option>
-                  </select>
-                </div>
-                <div class="col-12 d-flex gap-2">
-                  <button class="btn btn-primary" type="submit" id="userSaveBtn">Guardar usuario</button>
-                  <div class="text-muted" id="userFormStatus"></div>
-                </div>
-              </form>
-            </div>
-          </div>
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Email</th>
-                      <th>Rol</th>
-                      <th class="text-end">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody id="usersTableBody"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="section-profile" class="dashboard-section">
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <h3 class="mb-3">Mi perfil</h3>
-              <p class="text-muted">Vista preliminar para los datos personales del usuario autenticado.</p>
-              <dl class="row">
-                <dt class="col-sm-3">Correo</dt>
-                <dd class="col-sm-9" id="profileEmail">--</dd>
-                <dt class="col-sm-3">Rol</dt>
-                <dd class="col-sm-9" id="profileRole">--</dd>
-                <dt class="col-sm-3">Último acceso</dt>
-                <dd class="col-sm-9" id="profileLastLogin">Se completará en futuras versiones.</dd>
-              </dl>
-            </div>
-          </div>
-        </section>
-
-        <section id="section-preferences" class="dashboard-section">
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <h3 class="mb-3">Preferencias del entorno</h3>
-              <p class="text-muted">
-                Configura opciones como tema, idioma y parámetros específicos de FinHub. Esta vista está
-                preparada para ampliarse con la lógica necesaria.
-              </p>
-              <form class="row g-3" id="preferencesForm">
-                <div class="col-md-4">
-                  <label class="form-label">Tema visual</label>
-                  <select class="form-select" disabled>
-                    <option value="dark">Oscuro (predeterminado)</option>
-                  </select>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">Idioma</label>
-                  <select class="form-select" disabled>
-                    <option value="es">Español</option>
-                  </select>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">Notificaciones de mercado</label>
-                  <select class="form-select" disabled>
-                    <option value="realtime">Inmediatas</option>
-                  </select>
-                </div>
-                <div class="col-12">
-                  <small class="text-muted">
-                    Próximamente podrás editar estas opciones directamente desde esta pantalla.
-                  </small>
-                </div>
-              </form>
-            </div>
-          </div>
-        </section>
-
-        <section id="section-tickers" class="dashboard-section">
-          <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-              <h3 class="mb-0">Ticker's</h3>
-              <p class="text-muted mb-0">Administra tus instrumentos financieros.</p>
-            </div>
-            <button class="btn btn-outline-secondary btn-sm" id="tickerFormReset">Nuevo ticker</button>
-          </div>
-          <div class="card shadow-sm border-0 mb-4">
-            <div class="card-body">
-              <form id="tickerForm" class="row g-3">
-                <div class="col-md-4">
-                  <label class="form-label">Nombre</label>
-                  <input type="text" class="form-control" id="tickerName" required>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">Símbolo</label>
-                  <input type="text" class="form-control" id="tickerSymbol" required>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">Tipo</label>
-                  <input type="text" class="form-control" id="tickerType" placeholder="stock / etf / crypto" required>
-                </div>
-                <div class="col-12 d-flex gap-2">
-                  <button class="btn btn-primary" type="submit" id="tickerSaveBtn">Guardar ticker</button>
-                  <div class="text-muted" id="tickerFormStatus"></div>
-                </div>
-              </form>
-            </div>
-          </div>
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Nombre</th>
-                      <th>Símbolo</th>
-                      <th>Tipo</th>
-                      <th class="text-end">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody id="tickersTableBody"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="section-portfolio" class="dashboard-section">
-          <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-              <h3 class="mb-0">Portafolio personal</h3>
-              <p class="text-muted mb-0">Gestiona tus posiciones vinculadas a tus brokers.</p>
-            </div>
-          </div>
-          <div class="row g-4">
-            <div class="col-lg-4">
-              <div class="card shadow-sm border-0 h-100">
-                <div class="card-body">
-                  <h5 class="mb-3">Selecciona broker</h5>
-                  <select id="portfolioBrokerSelect" class="form-select"></select>
-                  <div class="alert alert-info mt-3 d-none" id="portfolioNoBrokers">
-                    Primero crea un broker en la pestaña anterior para habilitar tu portafolio.
-                  </div>
-                  <small class="text-muted" id="portfolioBrokerHint">
-                    Todos los tickers se guardan para el usuario autenticado.
-                  </small>
-                </div>
-              </div>
-            </div>
-            <div class="col-lg-8">
-              <div class="card shadow-sm border-0">
-                <div class="card-body">
-                  <form id="portfolioTickerForm" class="row g-3 align-items-end">
-                    <div class="col-md-4">
-                      <label class="form-label">Ticker (catálogo)</label>
-                      <select id="portfolioTickerSelect" class="form-select"></select>
-                    </div>
-                    <div class="col-md-3">
-                      <label class="form-label">Cantidad</label>
-                      <input type="number" step="0.0001" min="0" id="portfolioQty" class="form-control" required>
-                    </div>
-                    <div class="col-md-3">
-                      <label class="form-label">Precio promedio</label>
-                      <input type="number" step="0.0001" min="0" id="portfolioAvgPrice" class="form-control" required>
-                    </div>
-                    <div class="col-md-2">
-                      <button class="btn btn-primary w-100" type="submit">Agregar</button>
-                    </div>
-                  </form>
-                  <div class="text-muted mt-2" id="portfolioTickerStatus"></div>
-                  <div class="table-responsive mt-4">
-                    <table class="table table-hover align-middle">
-                      <thead>
-                        <tr>
-                          <th>Símbolo</th>
-                          <th>Nombre</th>
-                          <th>Cantidad</th>
-                          <th>Precio prom.</th>
-                          <th>Tipo</th>
-                          <th class="text-end">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody id="portfolioTickersBody"></tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
+    <nav class="toolbar-menu">
+      <button type="button" class="active" data-menu="overview">Resumen</button>
+      <button type="button" data-menu="portfolios">Portafolios</button>
+      <button type="button" data-menu="prices">Precios</button>
+    </nav>
+    <div class="toolbar-user">
+      <button id="user-menu-button" type="button">
+        <span id="user-name">Usuario</span>
+        <span class="chevron">▾</span>
+      </button>
     </div>
+  </header>
+  <div class="content-shell">
+    <main id="app">
+      <section class="card">
+        <h2>Cargando perfil...</h2>
+      </section>
+    </main>
   </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js"></script>
-  <script src="js/logger.js?v=1"></script>
-  <script src="js/api-client.js?v=1"></script>
-  <script src="js/session.js?v=4"></script>
-  <script src="js/dashboard.js?v=5"></script>
+  <div class="user-dropdown" id="user-dropdown">
+    <button id="abm-clientes-action" type="button">ABM de clientes</button>
+    <button id="logout-action" type="button">Cerrar sesión</button>
+  </div>
+  <script type="module" src="/Frontend/pages/Dashboard.js"></script>
 </body>
 </html>

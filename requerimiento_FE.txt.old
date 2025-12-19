@@ -1,0 +1,180 @@
+REQUERIMIENTO FRONTEND — APB DATA LAKE & INGESTION (UI OPERATIVA)
+
+frt-req-000: OBJETIVO DEL FRONTEND (correlación: req-000)
+Diseñar e implementar una interfaz web operativa para ejecutar, monitorear y auditar los flujos del Data Lake (ingesta + ETL + consumo), con foco en trazabilidad, idempotencia percibida (evitar “doble ejecución” desde UI) y diagnósticos rápidos.
+
+frt-req-001: NAVEGACIÓN PRINCIPAL (MENÚ) (correlación: req-004, req-003, req-005)
+El sistema deberá proveer un menú lateral (o superior) con secciones:
+
+Dashboard
+
+Ingesta (Google Finance, TwelveData, All)
+
+Jobs & Ejecuciones
+
+Catálogo de Instrumentos
+
+Series Históricas (FACT)
+
+Indicadores
+
+Señales
+
+Serving (vistas de consumo)
+
+Configuración / Seguridad (solo lectura del modo activo)
+
+Cada ítem debe llevar a una vista con filtros, tabla de resultados y acciones contextuales.
+
+frt-req-002: DASHBOARD OPERATIVO (correlación: req-003, req-008, req-011)
+El dashboard deberá mostrar, como mínimo:
+
+Estado “salud” por etapa del pipeline: RAW, FACT, INDICATORS, SIGNALS, SERVING (req-003).
+
+Últimas N ejecuciones (job_id, source, mode, status, started_at, finished_at, processed_instruments, errors_count) (req-005, req-008).
+
+Métricas rápidas: instrumentos totales, instrumentos con precios recientes, gaps detectados, errores últimas 24h (req-008, req-011).
+
+Acciones rápidas: “Run Delta All”, “Run Backfill All” con confirmación (req-005, req-008, req-007).
+
+frt-req-003: VISTA “INGESTA” POR FUENTE + EJECUCIÓN (correlación: req-002, req-005, req-006, req-008, req-007)
+Para cada fuente (Google Finance / TwelveData) la UI deberá permitir:
+
+Selección de modo: delta | backfill (req-008).
+
+Disparo de ejecución vía endpoints (req-005).
+
+Mostrar el JSON de respuesta normalizado en UI (job_id, status, etc.) (req-005).
+
+Prevenir doble click / doble envío (bloqueo de botón + indicador “en curso”) (req-007).
+
+Mensaje claro de seguridad: “ejecución requiere JWT etl:run o X-CRON-TOKEN” (req-006).
+
+Acción primaria: POST /etl/ingestion/{source}/run con mode opcional.
+
+frt-req-004: VISTA “INGESTA ALL” (correlación: req-005, req-008, req-007)
+La UI deberá exponer una pantalla para ejecutar “All” con:
+
+Modo delta/backfill.
+
+Confirmación (modal) con resumen: “Se ejecutará pipeline completo para todas las fuentes”.
+
+Visualización de progreso por job (si el backend devuelve un único job_id, mostrarlo como “job master”).
+
+Acción primaria: POST /etl/ingestion/all/run con mode opcional.
+
+frt-req-005: JOBS & EJECUCIONES — LISTADO + DETALLE (correlación: req-007, req-005, req-011)
+La UI deberá contar con:
+
+Listado paginado y filtrable por: source, mode, status, rango de fechas, errors_count>0.
+
+Detalle de job con: timestamps, estado, errores, métricas básicas (req-007).
+
+Vista de “errores” con capacidad de copiar/descargar (texto plano) para debugging.
+
+Señalización de idempotencia: si se detectan ejecuciones repetidas, marcar como “re-run” (sin inventar lógica; solo si el backend lo expone).
+
+frt-req-006: CATÁLOGO DE INSTRUMENTOS — LISTADO, DETALLE, DUPLICADOS (correlación: req-002.1, req-011)
+La UI deberá permitir:
+
+Listar instrumentos por provider, symbol, market/exchange, currency (req-002.1).
+
+Búsqueda por symbol y filtros por provider/market/currency.
+
+Detalle de instrumento con su instrument_id y “estado de cobertura” (tiene FACT, tiene indicadores, etc.).
+
+Panel de “posibles duplicados” basado en coincidencias (por ejemplo symbol+market) SOLO si el backend expone ese reporte; si no, ocultar sección.
+Objetivo visual: evidenciar cumplimiento “no existen instrumentos duplicados” (req-011).
+
+frt-req-007: SERIES HISTÓRICAS (FACT) — EXPLORACIÓN Y GAP CHECK (correlación: req-002.2, req-003, req-008, req-011)
+La UI deberá permitir:
+
+Seleccionar instrument_id + timeframe (daily, etc.).
+
+Mostrar tabla con timestamp/date y campos relevantes.
+
+Resumen: rango disponible (min/max), cantidad de puntos, últimos N días.
+
+Detección visual de gaps (por ejemplo, días faltantes) si el backend expone “missing dates” o si la UI puede inferir gaps de manera simple para daily (marcar como “estimación UI”).
+
+Garantía de no duplicados a nivel visual: si aparecen timestamps repetidos, mostrar alerta (req-011).
+
+frt-req-008: INDICADORES — VISUALIZACIÓN Y TRAZABILIDAD (correlación: req-003 INDICATORS)
+La UI deberá permitir:
+
+Seleccionar instrumento + timeframe + indicador (ej. RSI, SMA, etc. si existen).
+
+Mostrar serie del indicador con timestamp.
+
+Mostrar “origen”: derivado de FACT (referenciar instrument/timeframe/rango).
+Nota: si el backend aún no expone endpoints de indicadores, esta vista queda en “readiness mode” (UI visible pero con estado “No disponible”).
+
+frt-req-009: SEÑALES — LISTADO Y DETALLE (correlación: req-003 SIGNALS, req-004.3)
+La UI deberá permitir:
+
+Listar señales por instrumento, tipo, fecha, severidad/score (si existe).
+
+Ver detalle de señal: qué indicadores la dispararon (trazabilidad).
+
+Filtros: “últimos 7/30/90 días”, “solo activas” (si aplica).
+Restricción: la UI no debe ejecutar ETL desde esta vista (cumplir separación de responsabilidades) (req-004.3).
+
+frt-req-010: SERVING — VISTAS PARA CONSUMO (correlación: req-003 SERVING, req-004.3, req-011)
+La UI deberá ofrecer:
+
+Selección de “vista de consumo” (por ejemplo: precios consolidados, indicadores consolidados, señales consolidadas).
+
+Export simple (CSV/JSON) si el backend lo permite.
+
+Indicadores de performance percibida (tiempo de respuesta, tamaño del payload) para validar que SERVING está optimizado (req-003).
+
+frt-req-011: AUTENTICACIÓN Y AUTORIZACIÓN DE UI (correlación: req-006)
+La UI deberá soportar 2 modos de ejecución de seguridad:
+
+JWT Bearer con scope etl:run (req-006 opción A): almacenar token en memoria/secure storage del cliente (según tu estándar) y adjuntarlo en Authorization.
+
+Token técnico X-CRON-TOKEN (req-006 opción B): NO debe pedirse ni almacenarse en UI de usuario final; solo permitir en pantallas de administración restringida si aplica.
+La UI debe mostrar errores 401/403 con mensajes accionables (scope faltante, token inválido).
+
+frt-req-012: MANEJO DE ESTADOS, ERRORES Y CONSISTENCIA (correlación: req-007, req-011)
+La UI deberá:
+
+Mostrar estados: idle / running / success / failed.
+
+Registrar “última acción del usuario” en el cliente (para soporte): fuente, modo, timestamp.
+
+Presentar errores del backend sin truncar (con botón “copiar”).
+
+Validación de idempotencia operativa: si un job está “running”, deshabilitar nuevas ejecuciones del mismo tipo desde UI (req-007).
+
+frt-req-013: CONTRATOS API NECESARIOS PARA SOPORTAR LA UI (correlación: req-005 + extensiones de lectura por req-003/004/011)
+Además de los endpoints de ejecución (req-005), el frontend requiere endpoints de lectura (si no existen aún, se consideran requeridos para operar):
+
+GET /etl/jobs?filters... (listado) (req-007)
+
+GET /etl/jobs/{job_id} (detalle) (req-007)
+
+GET /datalake/instruments?filters... (catálogo) (req-002.1)
+
+GET /datalake/instruments/{instrument_id} (detalle) (req-002.1)
+
+GET /datalake/fact/prices?instrument_id=&timeframe=&from=&to= (req-002.2, req-003 FACT)
+
+GET /datalake/indicators?... (req-003 INDICATORS)
+
+GET /datalake/signals?... (req-003 SIGNALS)
+
+GET /datalake/serving/{view}?params... (req-003 SERVING)
+
+Nota: estos endpoints no contradicen req-005; son necesarios para “Analytics puede consumir datos sin acoplarse a ETL” y para que la UI opere (req-011).
+
+frt-req-014: CRITERIOS DE ACEPTACIÓN FRONTEND (correlación: req-011)
+El frontend se considera completo cuando:
+
+Se puede ejecutar delta y backfill por fuente y “all” con feedback de job_id y estado (req-005, req-008).
+
+Se pueden auditar ejecuciones, ver errores y métricas (req-007).
+
+Se puede navegar y validar no duplicados a nivel catálogo y series (req-011).
+
+El usuario puede consumir vistas SERVING sin fricción (req-003 SERVING, req-011).
