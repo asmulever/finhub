@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>FinHub | Dashboard</title>
+  <title>FinHub | Precios</title>
   <link rel="icon" href="/logo/favicon.png" />
   <script>
     window.__ENV = window.__ENV ?? {};
@@ -85,19 +85,6 @@
       border: 1px solid rgba(148, 163, 184, 0.3);
       box-shadow: 0 25px 50px rgba(2, 6, 23, 0.7);
     }
-    .simple-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .simple-list li {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-    }
     #app button {
       margin-top: 16px;
       background: linear-gradient(120deg, #0ea5e9, #22d3ee);
@@ -109,19 +96,43 @@
       cursor: pointer;
       align-self: flex-start;
     }
-    .card h2 {
-      margin-top: 0;
-      color: #e0f2fe;
+    .price-grid {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
     }
-    .profile {
+    .price-tile {
+      background: rgba(2, 6, 23, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 16px;
+      padding: 16px;
       display: flex;
       flex-direction: column;
       gap: 6px;
     }
-    .controls {
+    .price-tile strong {
+      font-size: 1.1rem;
+      color: #e2e8f0;
+    }
+    .price-meta {
       display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      color: #94a3b8;
+    }
+    .price-badge {
+      font-size: 0.8rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #38bdf8;
+    }
+    .price-error {
+      color: #f87171;
+    }
+    .muted {
+      color: #94a3b8;
+      font-size: 0.95rem;
     }
     .user-dropdown {
       position: fixed;
@@ -170,9 +181,9 @@
       <img src="/logo/full_logoweb.png" alt="FinHub" />
     </div>
     <nav class="toolbar-menu">
-      <button type="button" class="active" data-menu="overview" data-link="/Frontend/Dashboard.html">Resumen</button>
-      <button type="button" data-menu="portfolios" data-link="/Frontend/Dashboard.html">Portafolios</button>
-      <button type="button" data-menu="prices" data-link="/Frontend/precios.html">Precios</button>
+      <button type="button" data-link="/Frontend/Dashboard.html">Resumen</button>
+      <button type="button" data-link="/Frontend/Dashboard.html">Portafolios</button>
+      <button type="button" class="active" data-link="/Frontend/precios.html">Precios</button>
     </nav>
     <div class="toolbar-user">
       <button id="user-menu-button" type="button">
@@ -184,7 +195,11 @@
   <div class="content-shell">
     <main id="app">
       <section class="card">
-        <h2>Cargando perfil...</h2>
+        <h2>Precios en vivo</h2>
+        <div id="prices-content" class="price-grid">
+          <p class="muted">Cargando cotizaciones...</p>
+        </div>
+        <button id="refresh-prices" type="button">Actualizar precios</button>
       </section>
     </main>
   </div>
@@ -192,6 +207,6 @@
     <button id="abm-clientes-action" type="button">ABM de clientes</button>
     <button id="logout-action" type="button">Cerrar sesión</button>
   </div>
-  <script type="module" src="/Frontend/pages/Dashboard.js"></script>
+  <script type="module" src="/Frontend/paginas/precios.js"></script>
 </body>
 </html>

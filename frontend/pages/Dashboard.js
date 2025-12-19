@@ -145,7 +145,7 @@ const setupToolbar = () => {
         return;
       }
       if (target === 'prices') {
-        renderPricesView();
+        window.location.href = '/Frontend/precios.html';
         return;
       }
       renderOverview();
