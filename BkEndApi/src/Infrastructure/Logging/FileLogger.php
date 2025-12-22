@@ -5,14 +5,19 @@ final class FileLogger implements LoggerInterface
 {
     private string $logDirectory;
     private string $level;
+    private bool $canWrite;
 
     public function __construct(string $logDirectory, string $level = 'info')
     {
         $this->logDirectory = rtrim($logDirectory, '/');
         $this->level = $level;
+        $this->canWrite = true;
+
         if (!is_dir($this->logDirectory)) {
-            mkdir($this->logDirectory, 0775, true);
+            $this->canWrite = mkdir($this->logDirectory, 0775, true);
         }
+
+        $this->canWrite = $this->canWrite && is_writable($this->logDirectory);
     }
 
     public function log(string $level, string $message, array $context = []): void
@@ -20,7 +25,14 @@ final class FileLogger implements LoggerInterface
         $timestamp = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
         $context = $this->normalizeContext($context);
         $line = sprintf("[%s] %s: %s %s", $timestamp, strtoupper($level), $message, $context);
-        error_log($line . PHP_EOL, 3, $this->buildPath());
+
+        if ($this->canWrite) {
+            error_log($line . PHP_EOL, 3, $this->buildPath());
+            return;
+        }
+
+        // Fallback: evita warnings de escritura en disco y delega en el log del SAPI.
+        error_log($line);
     }
 
     public function info(string $message, array $context = []): void

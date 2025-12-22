@@ -176,22 +176,7 @@
   </style>
 </head>
 <body>
-  <header class="toolbar">
-    <div class="toolbar-logo">
-      <img src="/logo/full_logoweb.png" alt="FinHub" />
-    </div>
-    <nav class="toolbar-menu">
-      <button type="button" data-link="/Frontend/Dashboard.html">Resumen</button>
-      <button type="button" data-link="/Frontend/Dashboard.html">Portafolios</button>
-      <button type="button" class="active" data-link="/Frontend/precios.html">Precios</button>
-    </nav>
-    <div class="toolbar-user">
-      <button id="user-menu-button" type="button">
-        <span id="user-name">Usuario</span>
-        <span class="chevron">▾</span>
-      </button>
-    </div>
-  </header>
+  <div id="toolbar-root"></div>
   <div class="content-shell">
     <main id="app">
       <section class="card">
@@ -202,10 +187,6 @@
         <button id="refresh-prices" type="button">Actualizar precios</button>
       </section>
     </main>
-  </div>
-  <div class="user-dropdown" id="user-dropdown">
-    <button id="abm-clientes-action" type="button">ABM de clientes</button>
-    <button id="logout-action" type="button">Cerrar sesión</button>
   </div>
   <script type="module" src="/Frontend/paginas/precios.js"></script>
 </body>

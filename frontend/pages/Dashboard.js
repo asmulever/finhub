@@ -1,5 +1,6 @@
 import { getJson, postJson } from '../apicliente.js';
 import { authStore } from '../auth/authStore.js';
+import { bindToolbarNavigation, bindUserMenu, highlightToolbar, renderToolbar, setToolbarUserName } from '../components/toolbar.js';
 
 const state = {
   profile: null,
@@ -106,53 +107,6 @@ const handleLogout = async () => {
   }
 };
 
-const updateUserMenu = () => {
-  const nameField = document.getElementById('user-name');
-  if (nameField && state.profile) {
-    nameField.textContent = `${state.profile.email}`;
-  }
-};
-
-const setupUserMenu = () => {
-  const button = document.getElementById('user-menu-button');
-  const dropdown = document.getElementById('user-dropdown');
-  button?.addEventListener('click', () => {
-    dropdown?.classList.toggle('visible');
-  });
-  document.addEventListener('click', (event) => {
-    if (!button?.contains(event.target) && !dropdown?.contains(event.target)) {
-      dropdown?.classList.remove('visible');
-    }
-  });
-  document.getElementById('logout-action')?.addEventListener('click', () => {
-    dropdown?.classList.remove('visible');
-    handleLogout();
-  });
-  document.getElementById('abm-clientes-action')?.addEventListener('click', () => {
-    dropdown?.classList.remove('visible');
-    renderAbmClientes();
-  });
-};
-
-const setupToolbar = () => {
-  document.querySelectorAll('.toolbar-menu button').forEach((button) => {
-    button.addEventListener('click', () => {
-      document.querySelectorAll('.toolbar-menu button').forEach((btn) => btn.classList.remove('active'));
-      button.classList.add('active');
-      const target = button.getAttribute('data-menu');
-      if (target === 'portfolios') {
-        renderPortfoliosView();
-        return;
-      }
-      if (target === 'prices') {
-        window.location.href = '/Frontend/precios.html';
-        return;
-      }
-      renderOverview();
-    });
-  });
-};
-
 const render = async () => {
   const app = document.getElementById('app');
   if (!app) {
@@ -162,6 +116,7 @@ const render = async () => {
   try {
     state.profile = await getJson('/me');
   } catch (error) {
+    setToolbarUserName('');
     return;
   }
   try {
@@ -174,12 +129,25 @@ const render = async () => {
   } catch (error) {
     state.quote = null;
   }
-  updateUserMenu();
+  syncUserName();
   renderOverview();
 };
 
+const syncUserName = () => {
+  setToolbarUserName(state.profile?.email ?? '');
+};
+
 document.addEventListener('DOMContentLoaded', () => {
-  setupUserMenu();
-  setupToolbar();
+  renderToolbar();
+  setToolbarUserName('');
+  bindUserMenu({
+    onLogout: handleLogout,
+    onAbm: () => {
+      document.querySelectorAll('.toolbar-menu button').forEach((btn) => btn.classList.remove('active'));
+      renderAbmClientes();
+    },
+  });
+  bindToolbarNavigation();
+  highlightToolbar();
   render();
 });

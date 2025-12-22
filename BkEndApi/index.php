@@ -37,5 +37,5 @@ function generateTraceId(): string
 function handleFatalError(LoggerInterface $logger, string $traceId, string $message, string $file, int $line): bool
 {
     $logger->error('php.error', ['trace_id' => $traceId, 'message' => $message, 'file' => $file, 'line' => $line]);
-    return false;
+    return true; // evitar que PHP vuelque el warning en la salida y rompa headers
 }

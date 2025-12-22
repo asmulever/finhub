@@ -1,5 +1,6 @@
 import { getJson, postJson } from '../apicliente.js';
 import { authStore } from '../auth/authStore.js';
+import { bindToolbarNavigation, bindUserMenu, highlightToolbar, renderToolbar, setToolbarUserName } from '../components/toolbar.js';
 
 const symbols = ['AAPL', 'MSFT', 'GOOGL', 'TSLA', 'AMZN'];
 const state = {
@@ -83,13 +84,6 @@ const refreshPrices = async () => {
   renderQuotes();
 };
 
-const updateUserMenu = () => {
-  const nameField = document.getElementById('user-name');
-  if (nameField && state.profile) {
-    nameField.textContent = `${state.profile.email}`;
-  }
-};
-
 const handleLogout = async () => {
   try {
     await postJson('/auth/logout');
@@ -98,61 +92,26 @@ const handleLogout = async () => {
     window.location.href = '/';
   }
 };
-
-const setupUserMenu = () => {
-  const button = document.getElementById('user-menu-button');
-  const dropdown = document.getElementById('user-dropdown');
-  button?.addEventListener('click', () => {
-    dropdown?.classList.toggle('visible');
-  });
-  document.addEventListener('click', (event) => {
-    if (!button?.contains(event.target) && !dropdown?.contains(event.target)) {
-      dropdown?.classList.remove('visible');
-    }
-  });
-  document.getElementById('logout-action')?.addEventListener('click', () => {
-    dropdown?.classList.remove('visible');
-    handleLogout();
-  });
-  document.getElementById('abm-clientes-action')?.addEventListener('click', () => {
-    dropdown?.classList.remove('visible');
-    window.location.href = '/Frontend/Dashboard.html';
-  });
-};
-
-const highlightToolbar = () => {
-  const path = window.location.pathname;
-  document.querySelectorAll('.toolbar-menu button').forEach((button) => {
-    button.classList.toggle('active', button.getAttribute('data-link') === path);
-  });
-};
-
-const setupToolbarNavigation = () => {
-  document.querySelectorAll('.toolbar-menu button').forEach((button) => {
-    button.addEventListener('click', () => {
-      const link = button.getAttribute('data-link');
-      if (!link) return;
-      if (link === window.location.pathname) {
-        highlightToolbar();
-        return;
-      }
-      window.location.href = link;
-    });
-  });
-};
-
 const loadProfile = async () => {
   try {
     state.profile = await getJson('/me');
-    updateUserMenu();
+    setToolbarUserName(state.profile?.email ?? '');
   } catch (error) {
     state.profile = null;
+    setToolbarUserName('');
   }
 };
 
 const init = () => {
-  setupUserMenu();
-  setupToolbarNavigation();
+  renderToolbar();
+  setToolbarUserName('');
+  bindUserMenu({
+    onLogout: handleLogout,
+    onAbm: () => {
+      window.location.href = '/Frontend/Dashboard.html';
+    },
+  });
+  bindToolbarNavigation();
   highlightToolbar();
   refreshPrices();
   loadProfile();
