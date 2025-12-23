@@ -1,4 +1,6 @@
 DirectoryIndex index.php
+# Asegura que el header Authorization llegue a PHP (algunos hosts lo filtran).
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
 
 <IfModule mod_rewrite.c>
     RewriteEngine On

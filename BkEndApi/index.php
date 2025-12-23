@@ -27,7 +27,15 @@ set_error_handler(fn ($severity, $message, $file, $line) => handleFatalError($lo
 
 $userRepository = new PdoUserRepository($pdo);
 $authService = new AuthService($userRepository, $passwordHasher, $jwt, $config);
-$dispatcher = new ApiDispatcher($config, $logger, $authService, $priceService);
+$dispatcher = new ApiDispatcher(
+    $config,
+    $logger,
+    $authService,
+    $priceService,
+    $userRepository,
+    $jwt,
+    $passwordHasher
+);
 $dispatcher->dispatch($traceId);
 
 function generateTraceId(): string

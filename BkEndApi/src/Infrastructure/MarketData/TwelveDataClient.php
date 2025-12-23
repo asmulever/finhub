@@ -44,20 +44,7 @@ final class TwelveDataClient
         if (!is_array($data)) {
             throw new \RuntimeException('Respuesta inválida desde Twelve Data (stocks)', 502);
         }
-        $filtered = [];
-        foreach ($data as $row) {
-            if (($row['type'] ?? null) !== 'Common Stock') {
-                continue;
-            }
-            $filtered[] = [
-                'symbol' => $row['symbol'] ?? null,
-                'name' => $row['name'] ?? null,
-                'currency' => $row['currency'] ?? null,
-                'exchange' => $row['exchange'] ?? null,
-                'mic_code' => $row['mic_code'] ?? null,
-            ];
-        }
-        return $filtered;
+        return $data;
     }
 
     /**

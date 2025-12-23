@@ -6,8 +6,11 @@ namespace FinHub\Infrastructure;
 use FinHub\Application\Auth\AuthService;
 use FinHub\Application\MarketData\Dto\PriceRequest;
 use FinHub\Application\MarketData\PriceService;
+use FinHub\Domain\User\UserRepositoryInterface;
 use FinHub\Infrastructure\Config\Config;
 use FinHub\Infrastructure\Logging\LoggerInterface;
+use FinHub\Infrastructure\Security\JwtTokenProvider;
+use FinHub\Infrastructure\Security\PasswordHasher;
 
 final class ApiDispatcher
 {
@@ -15,16 +18,30 @@ final class ApiDispatcher
     private LoggerInterface $logger;
     private AuthService $authService;
     private PriceService $priceService;
+    private UserRepositoryInterface $userRepository;
+    private JwtTokenProvider $jwt;
+    private PasswordHasher $passwordHasher;
     /** Rutas base deben terminar sin barra final. */
     private string $apiBase;
 
-    public function __construct(Config $config, LoggerInterface $logger, AuthService $authService, PriceService $priceService)
+    public function __construct(
+        Config $config,
+        LoggerInterface $logger,
+        AuthService $authService,
+        PriceService $priceService,
+        UserRepositoryInterface $userRepository,
+        JwtTokenProvider $jwt,
+        PasswordHasher $passwordHasher
+    )
     {
         $this->config = $config;
         $this->logger = $logger;
         $this->apiBase = rtrim($config->get('API_BASE_PATH', '/api'), '/');
         $this->authService = $authService;
         $this->priceService = $priceService;
+        $this->userRepository = $userRepository;
+        $this->jwt = $jwt;
+        $this->passwordHasher = $passwordHasher;
     }
 
     /**
@@ -70,11 +87,41 @@ final class ApiDispatcher
             $this->sendJson(['data' => $stocks]);
             return;
         }
+        if ($method === 'GET' && $path === '/me') {
+            $user = $this->requireUser();
+            $this->sendJson($user->toResponse());
+            return;
+        }
         if ($method === 'GET' && ($path === '/prices' || $path === '/quotes')) {
             $request = PriceRequest::fromArray($_GET ?? []);
             $quote = $this->priceService->getPrice($request);
             $this->sendJson($quote);
             return;
+        }
+        if ($method === 'GET' && $path === '/users') {
+            $this->requireAdmin();
+            $users = $this->userRepository->listAll();
+            $payload = array_map(static fn ($user) => $user->toResponse(), $users);
+            $this->sendJson(['data' => $payload]);
+            return;
+        }
+        if ($method === 'POST' && $path === '/users') {
+            $this->requireAdmin();
+            $this->handleCreateUser();
+            return;
+        }
+        if (str_starts_with($path, '/users/') && preg_match('#^/users/(\\d+)$#', $path, $matches)) {
+            $userId = (int) $matches[1];
+            if ($method === 'PATCH') {
+                $this->requireAdmin();
+                $this->handleUpdateUser($userId);
+                return;
+            }
+            if ($method === 'DELETE') {
+                $this->requireAdmin();
+                $this->handleDeleteUser($userId);
+                return;
+            }
         }
         if ($method === 'POST' && $path === '/auth/login') {
             $this->handleLogin();
@@ -121,6 +168,64 @@ final class ApiDispatcher
         $this->sendJson($payload);
     }
 
+    private function handleCreateUser(): void
+    {
+        $data = $this->parseJsonBody();
+        $email = trim((string) ($data['email'] ?? ''));
+        $password = (string) ($data['password'] ?? '');
+        $role = trim((string) ($data['role'] ?? ''));
+        $status = trim((string) ($data['status'] ?? 'active'));
+
+        if ($email === '' || $password === '' || $role === '') {
+            throw new \RuntimeException('Email, contraseña y rol requeridos', 422);
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new \RuntimeException('Email inválido', 422);
+        }
+
+        $existing = $this->userRepository->findByEmail($email);
+        if ($existing !== null) {
+            throw new \RuntimeException('Email ya registrado', 409);
+        }
+
+        $hash = $this->passwordHasher->hash($password);
+        $user = $this->userRepository->create($email, $role, $status !== '' ? $status : 'active', $hash);
+        $this->sendJson($user->toResponse(), 201);
+    }
+
+    private function handleUpdateUser(int $userId): void
+    {
+        $data = $this->parseJsonBody();
+        $fields = [];
+        if (array_key_exists('role', $data)) {
+            $fields['role'] = trim((string) $data['role']);
+        }
+        if (array_key_exists('status', $data)) {
+            $fields['status'] = trim((string) $data['status']);
+        }
+        if (array_key_exists('password', $data) && (string) $data['password'] !== '') {
+            $fields['password_hash'] = $this->passwordHasher->hash((string) $data['password']);
+        }
+        if (empty($fields)) {
+            throw new \RuntimeException('Sin cambios para actualizar', 422);
+        }
+        $user = $this->userRepository->update($userId, $fields);
+        if ($user === null) {
+            throw new \RuntimeException('Usuario no encontrado', 404);
+        }
+        $this->sendJson($user->toResponse());
+    }
+
+    private function handleDeleteUser(int $userId): void
+    {
+        $deleted = $this->userRepository->delete($userId);
+        if (!$deleted) {
+            throw new \RuntimeException('Usuario no encontrado', 404);
+        }
+        $this->sendJson(['deleted' => true]);
+    }
+
     private function parseJsonBody(): array
     {
         $raw = file_get_contents('php://input');
@@ -139,6 +244,71 @@ final class ApiDispatcher
         }
 
         return $decoded;
+    }
+
+    private function requireUser(): \FinHub\Domain\User\User
+    {
+        $payload = $this->requireAuthPayload();
+        $email = (string) ($payload['email'] ?? '');
+        $user = null;
+        if ($email !== '') {
+            $user = $this->userRepository->findByEmail($email);
+        }
+        if ($user === null && isset($payload['sub'])) {
+            $user = $this->userRepository->findById((int) $payload['sub']);
+        }
+        if ($user === null) {
+            throw new \RuntimeException('Token inválido', 401);
+        }
+        if (!$user->isActive()) {
+            throw new \RuntimeException('Usuario deshabilitado', 403);
+        }
+        return $user;
+    }
+
+    private function requireAdmin(): \FinHub\Domain\User\User
+    {
+        $user = $this->requireUser();
+        if (strtolower($user->getRole()) !== 'admin') {
+            throw new \RuntimeException('Acceso restringido', 403);
+        }
+        return $user;
+    }
+
+    private function requireAuthPayload(): array
+    {
+        $token = $this->getBearerToken();
+        try {
+            return $this->jwt->decode($token);
+        } catch (\InvalidArgumentException $exception) {
+            throw new \RuntimeException('Token inválido', 401);
+        }
+    }
+
+    private function getBearerToken(): string
+    {
+        $header = $_SERVER['HTTP_AUTHORIZATION']
+            ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+            ?? $_SERVER['Authorization']
+            ?? $_SERVER['REDIRECT_Authorization']
+            ?? '';
+        if ($header === '' && function_exists('getallheaders')) {
+            $headers = getallheaders();
+            foreach ($headers as $name => $value) {
+                if (strcasecmp((string) $name, 'Authorization') === 0) {
+                    $header = $value;
+                    break;
+                }
+            }
+        }
+        if ($header === '' && function_exists('apache_request_headers')) {
+            $headers = apache_request_headers();
+            $header = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+        }
+        if (!is_string($header) || $header === '' || stripos($header, 'Bearer ') !== 0) {
+            throw new \RuntimeException('Token requerido', 401);
+        }
+        return trim(substr($header, 7));
     }
 
     /**

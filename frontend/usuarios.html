@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>FinHub | Portafolios</title>
+  <title>FinHub | Usuarios</title>
   <link rel="icon" href="/logo/favicon.png" />
   <script>
     window.__ENV = window.__ENV ?? {};
@@ -96,39 +96,15 @@
       cursor: pointer;
       align-self: flex-start;
     }
-    .price-grid {
-      margin-top: 12px;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 12px;
-    }
-    .price-tile {
-      background: rgba(2, 6, 23, 0.85);
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      border-radius: 16px;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .price-tile strong {
-      font-size: 1.1rem;
+    #app button.ghost {
+      background: rgba(15, 23, 42, 0.6);
       color: #e2e8f0;
+      border: 1px solid rgba(148, 163, 184, 0.4);
     }
-    .price-meta {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.9rem;
-      color: #94a3b8;
-    }
-    .price-badge {
-      font-size: 0.8rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: #38bdf8;
-    }
-    .price-error {
-      color: #f87171;
+    #app button.danger {
+      background: rgba(248, 113, 113, 0.2);
+      color: #fecaca;
+      border: 1px solid rgba(248, 113, 113, 0.45);
     }
     .card-header {
       display: flex;
@@ -141,74 +117,103 @@
       color: #94a3b8;
       font-size: 0.95rem;
     }
-    .stocks-grid {
+    .user-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin: 16px 0 12px;
+    }
+    .user-form .form-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .user-form .form-field {
+      flex: 1;
+      min-width: 220px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .user-form label {
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+    .user-form input,
+    .user-form select {
+      background: rgba(2, 6, 23, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      color: #e2e8f0;
+      padding: 10px 12px;
+      border-radius: 10px;
+      outline: none;
+    }
+    .user-form input:focus,
+    .user-form select:focus {
+      border-color: rgba(14, 165, 233, 0.8);
+      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+    }
+    .users-grid {
       margin-top: 16px;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
       gap: 12px;
     }
-    .stock-tile {
+    .user-row {
       background: rgba(2, 6, 23, 0.85);
       border: 1px solid rgba(56, 189, 248, 0.35);
       border-radius: 16px;
       padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 12px;
     }
-    .stock-symbol {
+    .user-main {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
     }
-    .stock-symbol strong {
+    .user-main strong {
       font-size: 1.05rem;
       color: #e2e8f0;
     }
-    .stock-tag {
-      font-size: 0.78rem;
-      color: #38bdf8;
-      background: rgba(14, 165, 233, 0.12);
-      border-radius: 999px;
-      padding: 4px 10px;
-      border: 1px solid rgba(56, 189, 248, 0.35);
-    }
-    .stock-meta {
-      font-size: 0.9rem;
+    .user-meta {
+      font-size: 0.85rem;
       color: #a5b4fc;
     }
-    .filter-row {
+    .user-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    .user-controls label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 160px;
+      font-size: 0.85rem;
+    }
+    .user-controls select {
+      background: rgba(2, 6, 23, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      color: #e2e8f0;
+      padding: 8px 10px;
+      border-radius: 10px;
+      outline: none;
+    }
+    .user-controls select:focus {
+      border-color: rgba(14, 165, 233, 0.8);
+      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+    }
+    .user-actions {
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
-      margin-top: 12px;
     }
-    .filter-row input {
-      flex: 1;
-      min-width: 220px;
-      background: rgba(2, 6, 23, 0.7);
-      border: 1px solid rgba(148, 163, 184, 0.5);
-      color: #e2e8f0;
-      padding: 10px 12px;
-      border-radius: 10px;
-      outline: none;
-    }
-    .filter-row select {
-      min-width: 220px;
-      background: rgba(2, 6, 23, 0.7);
-      border: 1px solid rgba(148, 163, 184, 0.5);
-      color: #e2e8f0;
-      padding: 10px 12px;
-      border-radius: 10px;
-      outline: none;
-    }
-    .filter-row input:focus {
-      border-color: rgba(14, 165, 233, 0.8);
-      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
-    }
-    .filter-row select:focus {
-      border-color: rgba(14, 165, 233, 0.8);
-      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+    .price-error {
+      color: #f87171;
     }
     .user-dropdown {
       position: fixed;
@@ -248,8 +253,12 @@
       .toolbar-menu {
         flex-wrap: wrap;
       }
-      .content-shell {
-        padding: 16px;
+      .user-controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .user-actions {
+        width: 100%;
       }
     }
   </style>
@@ -260,25 +269,46 @@
     <main id="app">
       <section class="card">
         <div class="card-header">
-          <h2>Portafolios</h2>
-          <p class="muted">Tickers disponibles en Twelve Data</p>
+          <h2>Administrar usuarios</h2>
+          <p class="muted">Alta, edición y baja de usuarios</p>
         </div>
-        <div class="filter-row">
-          <select id="category-filter" aria-label="Filtrar por categoría">
-            <option value="all">Todas las categorías</option>
-            <option value="on">Acción local (ON)</option>
-            <option value="cedear">CEDEAR</option>
-            <option value="bond">Bono</option>
-            <option value="etf">ETF / Trust</option>
-          </select>
-          <input id="filter-input" placeholder="Filtrar por símbolo, nombre o país..." autocomplete="off" />
-        </div>
-        <div id="stocks-container" class="stocks-grid">
-          <p class="muted">Cargando tickers...</p>
+        <form id="user-form" class="user-form">
+          <div class="form-row">
+            <div class="form-field">
+              <label for="user-email">Email</label>
+              <input id="user-email" name="email" type="email" autocomplete="off" required />
+            </div>
+            <div class="form-field">
+              <label for="user-password">Contraseña</label>
+              <input id="user-password" name="password" type="password" autocomplete="new-password" required />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="user-role">Rol</label>
+              <select id="user-role" name="role" required>
+                <option value="admin">Admin</option>
+                <option value="user">User</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="user-status">Estado</label>
+              <select id="user-status" name="status">
+                <option value="active">active</option>
+                <option value="inactive">inactive</option>
+                <option value="disabled">disabled</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit">Crear usuario</button>
+          <small id="user-form-message" class="muted"></small>
+        </form>
+        <div id="users-container" class="users-grid">
+          <p class="muted">Cargando usuarios...</p>
         </div>
       </section>
     </main>
   </div>
-  <script type="module" src="/Frontend/paginas/portafolios.js"></script>
+  <script type="module" src="/Frontend/paginas/usuarios.js"></script>
 </body>
 </html>

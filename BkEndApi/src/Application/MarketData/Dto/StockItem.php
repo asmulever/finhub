@@ -11,6 +11,7 @@ final class StockItem
     public ?string $exchange;
     public ?string $country;
     public ?string $micCode;
+    public ?string $type;
 
     public function __construct(
         string $symbol,
@@ -18,7 +19,8 @@ final class StockItem
         ?string $currency,
         ?string $exchange,
         ?string $country,
-        ?string $micCode
+        ?string $micCode,
+        ?string $type
     ) {
         $this->symbol = $symbol;
         $this->name = $name;
@@ -26,6 +28,7 @@ final class StockItem
         $this->exchange = $exchange;
         $this->country = $country;
         $this->micCode = $micCode;
+        $this->type = $type;
     }
 
     public static function fromArray(array $data): self
@@ -36,7 +39,8 @@ final class StockItem
             $data['currency'] ?? null,
             $data['exchange'] ?? null,
             $data['country'] ?? null,
-            $data['mic_code'] ?? null
+            $data['mic_code'] ?? null,
+            $data['type'] ?? null
         );
     }
 
@@ -49,6 +53,7 @@ final class StockItem
             'exchange' => $this->exchange,
             'country' => $this->country,
             'mic_code' => $this->micCode,
+            'type' => $this->type,
         ];
     }
 }

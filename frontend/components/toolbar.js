@@ -1,3 +1,5 @@
+import { authStore } from '../auth/authStore.js';
+
 const toolbarTemplate = `
   <header class="toolbar">
     <div class="toolbar-logo">
@@ -16,12 +18,20 @@ const toolbarTemplate = `
     </div>
   </header>
   <div class="user-dropdown" id="user-dropdown">
-    <button id="abm-clientes-action" type="button">ABM de clientes</button>
+    <button id="admin-users-action" type="button">Admin Usuarios</button>
     <button id="logout-action" type="button">Cerrar sesión</button>
   </div>
 `;
 
 let toolbarMounted = false;
+const isAdminProfile = (profile) => String(profile?.role ?? '').toLowerCase() === 'admin';
+
+export const setAdminMenuVisibility = (profile) => {
+  const adminButton = document.getElementById('admin-users-action');
+  if (!adminButton) return;
+  const isAdmin = isAdminProfile(profile);
+  adminButton.hidden = !isAdmin;
+};
 
 export const renderToolbar = () => {
   const container = document.getElementById('toolbar-root');
@@ -30,6 +40,8 @@ export const renderToolbar = () => {
   }
   container.innerHTML = toolbarTemplate;
   toolbarMounted = true;
+  const cachedProfile = authStore.getProfile();
+  setAdminMenuVisibility(cachedProfile);
 };
 
 export const highlightToolbar = () => {
@@ -61,10 +73,11 @@ export const setToolbarUserName = (name) => {
   label.textContent = name && name.length ? name : 'Usuario';
 };
 
-export const bindUserMenu = ({ onLogout, onAbm } = {}) => {
+export const bindUserMenu = ({ onLogout, onAdmin, profile } = {}) => {
   const menuButton = document.getElementById('user-menu-button');
   const dropdown = document.getElementById('user-dropdown');
   if (!menuButton || !dropdown) return;
+  setAdminMenuVisibility(profile ?? authStore.getProfile());
 
   menuButton.addEventListener('click', () => {
     dropdown.classList.toggle('visible');
@@ -76,13 +89,13 @@ export const bindUserMenu = ({ onLogout, onAbm } = {}) => {
     }
   });
 
-  const abmButton = document.getElementById('abm-clientes-action');
+  const adminButton = document.getElementById('admin-users-action');
   const logoutButton = document.getElementById('logout-action');
-  abmButton?.addEventListener('click', (event) => {
+  adminButton?.addEventListener('click', (event) => {
     event.preventDefault();
     dropdown.classList.remove('visible');
-    if (typeof onAbm === 'function') {
-      onAbm();
+    if (typeof onAdmin === 'function') {
+      onAdmin();
     }
   });
   logoutButton?.addEventListener('click', (event) => {

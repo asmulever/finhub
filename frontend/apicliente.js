@@ -42,7 +42,10 @@ const parsePayload = async (response) => response.json().catch(() => null);
 export const apiClient = async (path, options = {}) => {
   const { method = 'GET', body, headers = {}, ...rest } = options;
   const composedHeaders = buildHeaders(headers);
-  const token = authStore.getToken();
+  const token = authStore.getToken() ?? localStorage.getItem("jwt");
+  
+  console.info(token);
+
   if (token) {
     composedHeaders.Authorization = `Bearer ${token}`;
   }
@@ -54,7 +57,7 @@ export const apiClient = async (path, options = {}) => {
     body: body === undefined ? undefined : JSON.stringify(body),
     ...rest,
   });
-  console.log(response);
+  console.info(response);
 
   const payload = await parsePayload(response);
   if (!response.ok) {

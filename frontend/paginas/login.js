@@ -72,8 +72,8 @@ const render = () => {
     const payload = {
       email: formData.get('email'),
       password: formData.get('password'),
-    };
-    console.log(payload);
+    };    
+
     try {
       errorMessage.textContent = '';
       const response = await postJson('/auth/login', payload);
