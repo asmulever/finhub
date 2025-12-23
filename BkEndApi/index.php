@@ -34,7 +34,8 @@ $dispatcher = new ApiDispatcher(
     $priceService,
     $userRepository,
     $jwt,
-    $passwordHasher
+    $passwordHasher,
+    $pdo
 );
 $dispatcher->dispatch($traceId);
 

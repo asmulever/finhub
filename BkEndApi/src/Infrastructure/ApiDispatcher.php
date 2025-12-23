@@ -21,6 +21,7 @@ final class ApiDispatcher
     private UserRepositoryInterface $userRepository;
     private JwtTokenProvider $jwt;
     private PasswordHasher $passwordHasher;
+    private \PDO $pdo;
     /** Rutas base deben terminar sin barra final. */
     private string $apiBase;
 
@@ -31,7 +32,8 @@ final class ApiDispatcher
         PriceService $priceService,
         UserRepositoryInterface $userRepository,
         JwtTokenProvider $jwt,
-        PasswordHasher $passwordHasher
+        PasswordHasher $passwordHasher,
+        \PDO $pdo
     )
     {
         $this->config = $config;
@@ -42,6 +44,7 @@ final class ApiDispatcher
         $this->userRepository = $userRepository;
         $this->jwt = $jwt;
         $this->passwordHasher = $passwordHasher;
+        $this->pdo = $pdo;
     }
 
     /**
@@ -96,6 +99,17 @@ final class ApiDispatcher
             $request = PriceRequest::fromArray($_GET ?? []);
             $quote = $this->priceService->getPrice($request);
             $this->sendJson($quote);
+            return;
+        }
+        if ($method === 'GET' && $path === '/portfolio/instruments') {
+            $user = $this->requireUser();
+            $items = $this->listPortfolioInstruments($user->getId());
+            $this->sendJson(['data' => $items]);
+            return;
+        }
+        if ($method === 'POST' && $path === '/portfolio/instruments') {
+            $user = $this->requireUser();
+            $this->handleAddInstrument($user);
             return;
         }
         if ($method === 'GET' && $path === '/users') {
@@ -224,6 +238,106 @@ final class ApiDispatcher
             throw new \RuntimeException('Usuario no encontrado', 404);
         }
         $this->sendJson(['deleted' => true]);
+    }
+
+    /**
+     * Devuelve todos los instrumentos del portafolio del usuario autenticado.
+     */
+    private function listPortfolioInstruments(int $userId): array
+    {
+        $portfolioId = $this->ensureUserPortfolio($userId);
+        $query = <<<'SQL'
+SELECT id, symbol, name, exchange, currency, country, type, mic_code
+FROM portfolio_instruments
+WHERE portfolio_id = :portfolio_id
+ORDER BY symbol ASC
+SQL;
+        $statement = $this->pdo->prepare($query);
+        $statement->execute(['portfolio_id' => $portfolioId]);
+        $rows = $statement->fetchAll(\PDO::FETCH_ASSOC);
+        return array_map(static function (array $row): array {
+            return [
+                'id' => (int) $row['id'],
+                'symbol' => (string) ($row['symbol'] ?? ''),
+                'name' => (string) ($row['name'] ?? ''),
+                'exchange' => (string) ($row['exchange'] ?? ''),
+                'currency' => (string) ($row['currency'] ?? ''),
+                'country' => (string) ($row['country'] ?? ''),
+                'type' => (string) ($row['type'] ?? ''),
+                'mic_code' => (string) ($row['mic_code'] ?? ''),
+            ];
+        }, $rows ?: []);
+    }
+
+    /**
+     * Inserta un instrumento en el portafolio del usuario, evitando duplicados.
+     */
+    private function handleAddInstrument(\FinHub\Domain\User\User $user): void
+    {
+        $data = $this->parseJsonBody();
+        $symbol = trim((string) ($data['symbol'] ?? ''));
+        if ($symbol === '') {
+            throw new \RuntimeException('Símbolo requerido', 422);
+        }
+
+        $portfolioId = $this->ensureUserPortfolio($user->getId());
+        $payload = [
+            'portfolio_id' => $portfolioId,
+            'symbol' => $symbol,
+            'name' => substr(trim((string) ($data['name'] ?? '')), 0, 191),
+            'exchange' => substr(trim((string) ($data['exchange'] ?? '')), 0, 64),
+            'currency' => substr(trim((string) ($data['currency'] ?? '')), 0, 16),
+            'country' => substr(trim((string) ($data['country'] ?? '')), 0, 64),
+            'type' => substr(trim((string) ($data['type'] ?? '')), 0, 64),
+            'mic_code' => substr(trim((string) ($data['mic_code'] ?? '')), 0, 16),
+        ];
+
+        $insert = <<<'SQL'
+INSERT INTO portfolio_instruments (portfolio_id, symbol, name, exchange, currency, country, type, mic_code)
+VALUES (:portfolio_id, :symbol, :name, :exchange, :currency, :country, :type, :mic_code)
+ON DUPLICATE KEY UPDATE
+    name = VALUES(name),
+    exchange = VALUES(exchange),
+    currency = VALUES(currency),
+    country = VALUES(country),
+    type = VALUES(type),
+    mic_code = VALUES(mic_code)
+SQL;
+        $statement = $this->pdo->prepare($insert);
+        $statement->execute($payload);
+
+        $select = $this->pdo->prepare('SELECT id, symbol, name, exchange, currency, country, type, mic_code FROM portfolio_instruments WHERE portfolio_id = :portfolio_id AND symbol = :symbol LIMIT 1');
+        $select->execute(['portfolio_id' => $portfolioId, 'symbol' => $symbol]);
+        $row = $select->fetch(\PDO::FETCH_ASSOC);
+        $item = $row ? [
+            'id' => (int) $row['id'],
+            'symbol' => (string) $row['symbol'],
+            'name' => (string) ($row['name'] ?? ''),
+            'exchange' => (string) ($row['exchange'] ?? ''),
+            'currency' => (string) ($row['currency'] ?? ''),
+            'country' => (string) ($row['country'] ?? ''),
+            'type' => (string) ($row['type'] ?? ''),
+            'mic_code' => (string) ($row['mic_code'] ?? ''),
+        ] : [];
+
+        $this->sendJson($item, 201);
+    }
+
+    /**
+     * Garantiza la existencia de un portafolio por usuario y devuelve su ID.
+     */
+    private function ensureUserPortfolio(int $userId): int
+    {
+        $select = $this->pdo->prepare('SELECT id FROM portfolios WHERE user_id = :user_id LIMIT 1');
+        $select->execute(['user_id' => $userId]);
+        $row = $select->fetch(\PDO::FETCH_ASSOC);
+        if ($row !== false) {
+            return (int) $row['id'];
+        }
+
+        $insert = $this->pdo->prepare('INSERT INTO portfolios (user_id, name) VALUES (:user_id, :name)');
+        $insert->execute(['user_id' => $userId, 'name' => 'default']);
+        return (int) $this->pdo->lastInsertId();
     }
 
     private function parseJsonBody(): array
