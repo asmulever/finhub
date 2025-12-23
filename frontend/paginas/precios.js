@@ -2,10 +2,11 @@ import { getJson, postJson } from '../apicliente.js';
 import { authStore } from '../auth/authStore.js';
 import { bindToolbarNavigation, bindUserMenu, highlightToolbar, renderToolbar, setToolbarUserName } from '../components/toolbar.js';
 
-const symbols = ['AAPL', 'MSFT', 'GOOGL', 'TSLA', 'AMZN'];
 const state = {
   profile: null,
-  quotes: [],
+  quote: null,
+  loading: false,
+  error: '',
 };
 
 const formatCurrency = (value) => {
@@ -25,63 +26,43 @@ const buildTile = (quote) => {
       </article>
     `;
   }
+  const asOf = quote.asOf ? new Date(quote.asOf).toLocaleString() : 'Fecha no disponible';
   return `
     <article class="price-tile">
       <div class="price-badge">${quote.source ?? 'Mercado'}</div>
-      <strong>${quote.symbol}</strong>
+      <strong>${quote.symbol}${quote.name ? ` • ${quote.name}` : ''}</strong>
       <div class="price-meta">
         <span>${formatCurrency(quote.close)}</span>
-        <small>${new Date(quote.asOf).toLocaleString()}</small>
+        <small>${asOf}</small>
       </div>
       <div class="price-meta">
         <span>Máx ${formatCurrency(quote.high ?? quote.close)}</span>
         <span>Mín ${formatCurrency(quote.low ?? quote.close)}</span>
       </div>
+      <div class="price-meta">
+        <span>Apertura ${formatCurrency(quote.open ?? quote.close)}</span>
+        <span>Prev ${formatCurrency(quote.previous_close ?? quote.close)}</span>
+      </div>
     </article>
   `;
 };
 
-const renderQuotes = () => {
+const renderQuote = () => {
   const container = document.getElementById('prices-content');
   if (!container) return;
-  if (state.quotes.length === 0) {
-    container.innerHTML = '<p class="muted">Aún no hay cotizaciones disponibles</p>';
+  if (state.loading) {
+    container.innerHTML = '<p class="muted">Consultando precio...</p>';
     return;
   }
-  container.innerHTML = state.quotes.map(buildTile).join('');
-};
-
-const fetchQuotes = async () => {
-  const results = await Promise.allSettled(
-    symbols.map((symbol) => getJson(`/quotes?symbol=${symbol}`))
-  );
-  state.quotes = results.map((result, index) => {
-    if (result.status === 'fulfilled') {
-      return result.value;
-    }
-    return {
-      symbol: symbols[index],
-      error: {
-        message: result.reason?.error?.message ?? 'No disponible',
-      },
-    };
-  });
-};
-
-const refreshPrices = async () => {
-  const container = document.getElementById('prices-content');
-  if (container) {
-    container.innerHTML = '<p class="muted">Actualizando cotizaciones...</p>';
+  if (state.error) {
+    container.innerHTML = `<p class="price-error">${state.error}</p>`;
+    return;
   }
-  try {
-    await fetchQuotes();
-  } catch (error) {
-    state.quotes = symbols.map((symbol) => ({
-      symbol,
-      error: { message: 'No se pudo obtener el precio' },
-    }));
+  if (!state.quote) {
+    container.innerHTML = '<p class="muted">Ingresa un ticker y presiona "Consultar".</p>';
+    return;
   }
-  renderQuotes();
+  container.innerHTML = buildTile(state.quote);
 };
 
 const handleLogout = async () => {
@@ -102,6 +83,36 @@ const loadProfile = async () => {
   }
 };
 
+const fetchPrice = async (symbol) => {
+  state.loading = true;
+  state.error = '';
+  renderQuote();
+  try {
+    const quote = await getJson(`/prices?symbol=${encodeURIComponent(symbol)}`);
+    state.quote = quote;
+    state.error = '';
+  } catch (error) {
+    state.quote = null;
+    state.error = error?.error?.message ?? 'No se pudo obtener el precio';
+  } finally {
+    state.loading = false;
+    renderQuote();
+  }
+};
+
+const onSubmit = (event) => {
+  event.preventDefault();
+  const input = document.getElementById('ticker-input');
+  const symbol = input?.value.trim().toUpperCase();
+  if (!symbol) {
+    state.error = 'Ingresa un ticker';
+    state.quote = null;
+    renderQuote();
+    return;
+  }
+  fetchPrice(symbol);
+};
+
 const init = () => {
   renderToolbar();
   setToolbarUserName('');
@@ -113,9 +124,14 @@ const init = () => {
   });
   bindToolbarNavigation();
   highlightToolbar();
-  refreshPrices();
+  renderQuote();
   loadProfile();
-  document.getElementById('refresh-prices')?.addEventListener('click', refreshPrices);
+  document.getElementById('price-form')?.addEventListener('submit', onSubmit);
+  const tickerInput = document.getElementById('ticker-input');
+  if (tickerInput) {
+    tickerInput.value = 'AAPL';
+    fetchPrice('AAPL');
+  }
 };
 
 document.addEventListener('DOMContentLoaded', init);

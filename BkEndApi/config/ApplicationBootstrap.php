@@ -6,6 +6,8 @@ namespace FinHub\Infrastructure\Config;
 use FinHub\Infrastructure\Config\Config;
 use FinHub\Infrastructure\Config\Container;
 use FinHub\Infrastructure\Logging\FileLogger;
+use FinHub\Application\MarketData\PriceService;
+use FinHub\Infrastructure\MarketData\TwelveDataClient;
 use FinHub\Infrastructure\Security\JwtTokenProvider;
 use FinHub\Infrastructure\Security\PasswordHasher;
 
@@ -53,6 +55,16 @@ final class ApplicationBootstrap
         $logger = new FileLogger($logPath, $config->get('LOG_LEVEL', 'info'));
         $jwt = new JwtTokenProvider($config->require('JWT_SECRET'));
         $passwordHasher = new PasswordHasher();
+        $apiKey = trim((string) $config->get('TWELVE_DATA_API_KEY', ''));
+        $twelveDataClient = null;
+        if ($apiKey !== '') {
+            $twelveDataClient = new TwelveDataClient(
+                $apiKey,
+                $config->get('TWELVE_DATA_BASE_URL', 'https://api.twelvedata.com'),
+                (int) $config->get('TWELVE_DATA_TIMEOUT_SECONDS', 5)
+            );
+        }
+        $priceService = new PriceService($twelveDataClient);
 
         return new Container([
             'config' => $config,
@@ -60,6 +72,7 @@ final class ApplicationBootstrap
             'logger' => $logger,
             'jwt' => $jwt,
             'password_hasher' => $passwordHasher,
+            'price_service' => $priceService,
         ]);
     }
 

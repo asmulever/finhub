@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace FinHub\Infrastructure;
 
 use FinHub\Application\Auth\AuthService;
+use FinHub\Application\MarketData\Dto\PriceRequest;
+use FinHub\Application\MarketData\PriceService;
 use FinHub\Infrastructure\Config\Config;
 use FinHub\Infrastructure\Logging\LoggerInterface;
 
@@ -12,15 +14,17 @@ final class ApiDispatcher
     private Config $config;
     private LoggerInterface $logger;
     private AuthService $authService;
+    private PriceService $priceService;
     /** Rutas base deben terminar sin barra final. */
     private string $apiBase;
 
-    public function __construct(Config $config, LoggerInterface $logger, AuthService $authService)
+    public function __construct(Config $config, LoggerInterface $logger, AuthService $authService, PriceService $priceService)
     {
         $this->config = $config;
         $this->logger = $logger;
         $this->apiBase = rtrim($config->get('API_BASE_PATH', '/api'), '/');
         $this->authService = $authService;
+        $this->priceService = $priceService;
     }
 
     /**
@@ -59,6 +63,17 @@ final class ApiDispatcher
                 'env' => $this->config->get('APP_ENV', 'production'),
                 'trace_id' => $traceId,
             ]);
+            return;
+        }
+        if ($method === 'GET' && $path === '/stocks') {
+            $stocks = $this->priceService->listStocks();
+            $this->sendJson(['data' => $stocks]);
+            return;
+        }
+        if ($method === 'GET' && ($path === '/prices' || $path === '/quotes')) {
+            $request = PriceRequest::fromArray($_GET ?? []);
+            $quote = $this->priceService->getPrice($request);
+            $this->sendJson($quote);
             return;
         }
         if ($method === 'POST' && $path === '/auth/login') {
