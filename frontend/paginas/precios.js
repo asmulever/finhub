@@ -1,6 +1,6 @@
 import { getJson, postJson } from '../apicliente.js';
 import { authStore } from '../auth/authStore.js';
-import { bindToolbarNavigation, bindUserMenu, highlightToolbar, renderToolbar, setToolbarUserName } from '../components/toolbar.js';
+import { bindToolbarNavigation, bindUserMenu, highlightToolbar, renderToolbar, setAdminMenuVisibility, setToolbarUserName } from '../components/toolbar.js';
 
 const state = {
   profile: null,
@@ -77,9 +77,12 @@ const loadProfile = async () => {
   try {
     state.profile = await getJson('/me');
     setToolbarUserName(state.profile?.email ?? '');
+    setAdminMenuVisibility(state.profile);
   } catch (error) {
     state.profile = null;
-    setToolbarUserName('');
+    const cachedProfile = authStore.getProfile();
+    setToolbarUserName(cachedProfile?.email ?? '');
+    setAdminMenuVisibility(cachedProfile);
   }
 };
 
@@ -118,8 +121,8 @@ const init = () => {
   setToolbarUserName('');
   bindUserMenu({
     onLogout: handleLogout,
-    onAbm: () => {
-      window.location.href = '/Frontend/Dashboard.html';
+    onAdmin: () => {
+      window.location.href = '/Frontend/usuarios.html';
     },
   });
   bindToolbarNavigation();

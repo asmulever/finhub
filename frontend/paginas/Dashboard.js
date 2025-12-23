@@ -1,6 +1,6 @@
 import { getJson, postJson } from '../apicliente.js';
 import { authStore } from '../auth/authStore.js';
-import { bindToolbarNavigation, bindUserMenu, highlightToolbar, renderToolbar, setToolbarUserName } from '../components/toolbar.js';
+import { bindToolbarNavigation, bindUserMenu, highlightToolbar, renderToolbar, setAdminMenuVisibility, setToolbarUserName } from '../components/toolbar.js';
 
 const state = {
   profile: null,
@@ -77,27 +77,6 @@ const renderPricesView = () => {
   `);
 };
 
-const renderAbmClientes = () => {
-  const app = document.getElementById('app');
-  if (!app) return;
-  app.innerHTML = createCard('ABM de clientes', `
-    <p>Administra clientes, roles y ownership con controles de acceso y trazabilidad auditada.</p>
-    <ul class="simple-list">
-      <li>Crear / actualizar perfiles</li>
-      <li>Gestionar portfolios y holdings</li>
-      <li>Revisar logs de auditoría</li>
-    </ul>
-    <button id="back-to-overview" type="button">Volver al Dashboard</button>
-  `);
-  const backButton = document.getElementById('back-to-overview');
-  backButton?.addEventListener('click', () => {
-    document.querySelectorAll('.toolbar-menu button').forEach((btn) => btn.classList.remove('active'));
-    const overviewBtn = document.querySelector('.toolbar-menu button[data-menu="overview"]');
-    overviewBtn?.classList.add('active');
-    renderOverview();
-  });
-};
-
 const handleLogout = async () => {
   try {
     await postJson('/auth/logout');
@@ -116,7 +95,9 @@ const render = async () => {
   try {
     state.profile = await getJson('/me');
   } catch (error) {
-    setToolbarUserName('');
+    const cachedProfile = authStore.getProfile();
+    setToolbarUserName(cachedProfile?.email ?? '');
+    setAdminMenuVisibility(cachedProfile);
     return;
   }
   try {
@@ -135,6 +116,7 @@ const render = async () => {
 
 const syncUserName = () => {
   setToolbarUserName(state.profile?.email ?? '');
+  setAdminMenuVisibility(state.profile);
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -142,9 +124,8 @@ document.addEventListener('DOMContentLoaded', () => {
   setToolbarUserName('');
   bindUserMenu({
     onLogout: handleLogout,
-    onAbm: () => {
-      document.querySelectorAll('.toolbar-menu button').forEach((btn) => btn.classList.remove('active'));
-      renderAbmClientes();
+    onAdmin: () => {
+      window.location.href = '/Frontend/usuarios.html';
     },
   });
   bindToolbarNavigation();
