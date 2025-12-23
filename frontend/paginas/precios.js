@@ -4,9 +4,13 @@ import { bindToolbarNavigation, bindUserMenu, highlightToolbar, renderToolbar, s
 
 const state = {
   profile: null,
-  quote: null,
-  loading: false,
-  error: '',
+  selectedSymbols: [],
+  selectedQuotes: [],
+  tempQuote: null,
+  loadingSelected: false,
+  loadingTemp: false,
+  errorSelected: '',
+  errorTemp: '',
 };
 
 const formatCurrency = (value) => {
@@ -16,11 +20,12 @@ const formatCurrency = (value) => {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value);
 };
 
-const buildTile = (quote) => {
+const buildTile = (quote, label = '') => {
+  const badge = label || quote.source || 'Mercado';
   if (quote.error) {
     return `
       <article class="price-tile">
-        <div class="price-badge">${quote.symbol}</div>
+        <div class="price-badge">${badge}</div>
         <strong>${quote.symbol}</strong>
         <span class="price-error">${quote.error.message ?? 'No disponible'}</span>
       </article>
@@ -29,7 +34,7 @@ const buildTile = (quote) => {
   const asOf = quote.asOf ? new Date(quote.asOf).toLocaleString() : 'Fecha no disponible';
   return `
     <article class="price-tile">
-      <div class="price-badge">${quote.source ?? 'Mercado'}</div>
+      <div class="price-badge">${badge}</div>
       <strong>${quote.symbol}${quote.name ? ` • ${quote.name}` : ''}</strong>
       <div class="price-meta">
         <span>${formatCurrency(quote.close)}</span>
@@ -47,22 +52,40 @@ const buildTile = (quote) => {
   `;
 };
 
-const renderQuote = () => {
+const renderPrices = () => {
   const container = document.getElementById('prices-content');
   if (!container) return;
-  if (state.loading) {
-    container.innerHTML = '<p class="muted">Consultando precio...</p>';
+
+  if (state.loadingSelected && state.selectedQuotes.length === 0) {
+    container.innerHTML = '<p class="muted">Cargando precios del portafolio...</p>';
     return;
   }
-  if (state.error) {
-    container.innerHTML = `<p class="price-error">${state.error}</p>`;
+
+  const tiles = [];
+
+  if (state.errorSelected) {
+    tiles.push(`<p class="price-error">${state.errorSelected}</p>`);
+  }
+  if (state.errorTemp && !state.tempQuote) {
+    tiles.push(`<p class="price-error">${state.errorTemp}</p>`);
+  }
+
+  state.selectedQuotes.forEach((quote) => {
+    tiles.push(buildTile(quote, 'Portafolio'));
+  });
+
+  if (state.loadingTemp) {
+    tiles.push('<p class="muted">Consultando precio...</p>');
+  } else if (state.tempQuote) {
+    tiles.push(buildTile(state.tempQuote, 'Consulta'));
+  }
+
+  if (tiles.length === 0) {
+    container.innerHTML = '<p class="muted">No hay precios cargados. Agrega tickers a tu portafolio o consulta uno.</p>';
     return;
   }
-  if (!state.quote) {
-    container.innerHTML = '<p class="muted">Ingresa un ticker y presiona "Consultar".</p>';
-    return;
-  }
-  container.innerHTML = buildTile(state.quote);
+
+  container.innerHTML = tiles.join('');
 };
 
 const handleLogout = async () => {
@@ -86,21 +109,58 @@ const loadProfile = async () => {
   }
 };
 
-const fetchPrice = async (symbol) => {
-  state.loading = true;
-  state.error = '';
-  renderQuote();
+const fetchQuote = async (symbol) => {
   try {
     const quote = await getJson(`/prices?symbol=${encodeURIComponent(symbol)}`);
-    state.quote = quote;
-    state.error = '';
+    return quote;
   } catch (error) {
-    state.quote = null;
-    state.error = error?.error?.message ?? 'No se pudo obtener el precio';
-  } finally {
-    state.loading = false;
-    renderQuote();
+    return { symbol, error: { message: error?.error?.message ?? 'No se pudo obtener el precio' } };
   }
+};
+
+const fetchSelectedSymbols = async () => {
+  state.loadingSelected = true;
+  state.errorSelected = '';
+  renderPrices();
+  try {
+    const response = await getJson('/portfolio/instruments');
+    const items = Array.isArray(response?.data) ? response.data : [];
+    state.selectedSymbols = items.map((i) => String(i.symbol)).filter(Boolean);
+  } catch (error) {
+    state.selectedSymbols = [];
+    state.errorSelected = error?.error?.message ?? 'No se pudieron cargar tus instrumentos';
+  }
+};
+
+const fetchSelectedQuotes = async () => {
+  if (!state.selectedSymbols.length) {
+    state.selectedQuotes = [];
+    state.loadingSelected = false;
+    renderPrices();
+    return;
+  }
+  const symbols = Array.from(new Set(state.selectedSymbols));
+  const quotes = [];
+  for (const symbol of symbols) {
+    // sequential to avoid flooding if la lista es corta; se puede paralelizar si hace falta
+    // eslint-disable-next-line no-await-in-loop
+    const q = await fetchQuote(symbol);
+    quotes.push(q);
+  }
+  state.selectedQuotes = quotes;
+  state.loadingSelected = false;
+  renderPrices();
+};
+
+const fetchTempQuote = async (symbol) => {
+  state.loadingTemp = true;
+  state.tempQuote = null;
+  state.errorTemp = '';
+  renderPrices();
+  const quote = await fetchQuote(symbol);
+  state.tempQuote = quote;
+  state.loadingTemp = false;
+  renderPrices();
 };
 
 const onSubmit = (event) => {
@@ -108,12 +168,12 @@ const onSubmit = (event) => {
   const input = document.getElementById('ticker-input');
   const symbol = input?.value.trim().toUpperCase();
   if (!symbol) {
-    state.error = 'Ingresa un ticker';
-    state.quote = null;
-    renderQuote();
+    state.errorTemp = 'Ingresa un ticker';
+    state.tempQuote = null;
+    renderPrices();
     return;
   }
-  fetchPrice(symbol);
+  fetchTempQuote(symbol);
 };
 
 const init = () => {
@@ -127,14 +187,15 @@ const init = () => {
   });
   bindToolbarNavigation();
   highlightToolbar();
-  renderQuote();
+  renderPrices();
   loadProfile();
+  fetchSelectedSymbols()
+    .then(fetchSelectedQuotes)
+    .catch(() => {
+      state.loadingSelected = false;
+      renderPrices();
+    });
   document.getElementById('price-form')?.addEventListener('submit', onSubmit);
-  const tickerInput = document.getElementById('ticker-input');
-  if (tickerInput) {
-    tickerInput.value = 'AAPL';
-    fetchPrice('AAPL');
-  }
 };
 
 document.addEventListener('DOMContentLoaded', init);

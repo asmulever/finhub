@@ -10,7 +10,10 @@ const state = {
   profile: null,
   category: 'all',
   searchTerm: '',
+  selectedSymbols: new Set(),
 };
+
+const isSelected = (symbol) => state.selectedSymbols.has(String(symbol ?? ''));
 
 const renderStocks = () => {
   const container = document.getElementById('stocks-container');
@@ -37,6 +40,9 @@ const renderStocks = () => {
       <div class="stock-meta">Moneda: ${item.currency ?? 'N/D'}</div>
       <div class="stock-meta">País: ${item.country ?? 'N/D'} • MIC: ${item.mic_code ?? 'N/D'}</div>
       <div class="stock-meta">Tipo: ${item.type ?? 'N/D'}</div>
+      <button type="button" class="add-btn" data-symbol="${item.symbol}" ${isSelected(item.symbol) ? 'disabled' : ''}>
+        ${isSelected(item.symbol) ? 'Agregado' : 'Agregar'}
+      </button>
     </article>
   `);
   container.innerHTML = tiles.join('');
@@ -47,6 +53,8 @@ const matchesCategory = (item, category) => {
   const type = (item.type ?? '').toLowerCase();
   const currency = (item.currency ?? '').toUpperCase();
   switch (category) {
+    case 'selected':
+      return isSelected(item.symbol);
     case 'on':
       return micCode === 'XBUE' && type === 'common stock' && currency === 'ARS';
     case 'cedear':
@@ -78,6 +86,19 @@ const applyFilter = () => {
   renderStocks();
 };
 
+const fetchSelectedInstruments = async () => {
+  try {
+    const response = await getJson('/portfolio/instruments');
+    const items = Array.isArray(response?.data) ? response.data : [];
+    state.selectedSymbols = new Set(
+      items.filter((i) => i?.symbol).map((i) => String(i.symbol))
+    );
+    applyFilter();
+  } catch {
+    state.selectedSymbols = new Set();
+  }
+};
+
 const fetchStocks = async () => {
   state.loading = true;
   state.error = '';
@@ -93,6 +114,37 @@ const fetchStocks = async () => {
   } finally {
     state.loading = false;
     renderStocks();
+  }
+};
+
+const handleAddToPortfolio = async (event) => {
+  const button = event.target.closest('button[data-symbol]');
+  if (!button || button.disabled) return;
+  const symbol = button.dataset.symbol;
+  const instrument = state.stocks.find((item) => item.symbol === symbol);
+  if (!instrument) return;
+  button.disabled = true;
+  try {
+    await postJson('/portfolio/instruments', {
+      symbol: instrument.symbol,
+      name: instrument.name ?? '',
+      exchange: instrument.exchange ?? '',
+      currency: instrument.currency ?? '',
+      country: instrument.country ?? '',
+      type: instrument.type ?? '',
+      mic_code: instrument.mic_code ?? '',
+    });
+    state.selectedSymbols.add(symbol);
+    applyFilter();
+  } catch (error) {
+    button.disabled = false;
+    const container = document.getElementById('stocks-container');
+    if (container) {
+      container.insertAdjacentHTML(
+        'afterbegin',
+        `<p class="price-error">No se pudo agregar ${symbol}: ${error?.error?.message ?? 'Error inesperado'}</p>`
+      );
+    }
   }
 };
 
@@ -131,9 +183,11 @@ const init = () => {
   setToolbarUserName('');
   loadProfile();
   fetchStocks();
+  fetchSelectedInstruments();
 
   const filterInput = document.getElementById('filter-input');
   const categoryFilter = document.getElementById('category-filter');
+  const container = document.getElementById('stocks-container');
   filterInput?.addEventListener('input', (event) => {
     state.searchTerm = event.target.value.trim();
     applyFilter();
@@ -142,6 +196,7 @@ const init = () => {
     state.category = event.target.value;
     applyFilter();
   });
+  container?.addEventListener('click', handleAddToPortfolio);
 };
 
 document.addEventListener('DOMContentLoaded', init);
