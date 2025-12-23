@@ -20,13 +20,14 @@ $logger = $container->get('logger');
 $pdo = $container->get('pdo');
 $jwt = $container->get('jwt');
 $passwordHasher = $container->get('password_hasher');
+$priceService = $container->get('price_service');
 
 $traceId = generateTraceId();
 set_error_handler(fn ($severity, $message, $file, $line) => handleFatalError($logger, $traceId, $message, $file, $line));
 
 $userRepository = new PdoUserRepository($pdo);
 $authService = new AuthService($userRepository, $passwordHasher, $jwt, $config);
-$dispatcher = new ApiDispatcher($config, $logger, $authService);
+$dispatcher = new ApiDispatcher($config, $logger, $authService, $priceService);
 $dispatcher->dispatch($traceId);
 
 function generateTraceId(): string
