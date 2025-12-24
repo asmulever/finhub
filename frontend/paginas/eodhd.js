@@ -11,6 +11,7 @@ const state = {
   exchangesList: [],
   selectedExchange: '',
   symbolsLoadedExchange: '',
+  filterTerm: '',
 };
 
 const isAdminProfile = (profile) => String(profile?.role ?? '').toLowerCase() === 'admin';
@@ -72,7 +73,13 @@ const renderExchange = () => {
     container.innerHTML = '<p class="muted">Sin resultados.</p>';
     return;
   }
-  const rows = state.exchangeSymbols.slice(0, 50).map((s) => `
+  const filtered = state.filterTerm
+    ? state.exchangeSymbols.filter((s) => {
+        const code = String(s.Code ?? s.code ?? '').toUpperCase();
+        return code.startsWith(state.filterTerm.toUpperCase());
+      })
+    : state.exchangeSymbols;
+  const rows = filtered.slice(0, 50).map((s) => `
     <tr>
       <td data-symbol="${s.Code ?? s.code ?? ''}">${s.Code ?? s.code ?? ''}</td>
       <td>${s.Name ?? s.name ?? ''}</td>
@@ -81,7 +88,7 @@ const renderExchange = () => {
     </tr>
   `).join('');
   container.innerHTML = `
-    <p class="muted">Mostrando ${Math.min(50, state.exchangeSymbols.length)} de ${state.exchangeSymbols.length} símbolos (doble clic para EOD).</p>
+    <p class="muted">Mostrando ${Math.min(50, filtered.length)} de ${filtered.length} símbolos (doble clic para EOD).</p>
     <div style="max-height:320px; overflow:auto;">
       <table id="symbols-table">
         <thead><tr><th>Code</th><th>Nombre</th><th>Exchange</th><th>Tipo</th></tr></thead>
@@ -211,6 +218,10 @@ const init = async () => {
     const symbol = cell?.dataset?.symbol;
     if (!symbol) return;
     fetchEodWithSymbol(symbol);
+  });
+  document.getElementById('symbol-filter')?.addEventListener('input', (event) => {
+    state.filterTerm = event.target.value.trim();
+    renderExchange();
   });
   renderEod();
   renderExchange();
