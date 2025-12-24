@@ -21,6 +21,7 @@ $pdo = $container->get('pdo');
 $jwt = $container->get('jwt');
 $passwordHasher = $container->get('password_hasher');
 $priceService = $container->get('price_service');
+$eodhdClient = $container->get('eodhd_client');
 
 $traceId = generateTraceId();
 set_error_handler(fn ($severity, $message, $file, $line) => handleFatalError($logger, $traceId, $message, $file, $line));
@@ -35,7 +36,8 @@ $dispatcher = new ApiDispatcher(
     $userRepository,
     $jwt,
     $passwordHasher,
-    $pdo
+    $pdo,
+    $eodhdClient
 );
 $dispatcher->dispatch($traceId);
 

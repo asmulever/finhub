@@ -8,6 +8,7 @@ use FinHub\Infrastructure\Config\Container;
 use FinHub\Infrastructure\Logging\FileLogger;
 use FinHub\Application\MarketData\PriceService;
 use FinHub\Infrastructure\MarketData\TwelveDataClient;
+use FinHub\Infrastructure\MarketData\EodhdClient;
 use FinHub\Infrastructure\Security\JwtTokenProvider;
 use FinHub\Infrastructure\Security\PasswordHasher;
 
@@ -65,6 +66,7 @@ final class ApplicationBootstrap
             );
         }
         $priceService = new PriceService($twelveDataClient);
+        $eodhdClient = new EodhdClient($config);
 
         return new Container([
             'config' => $config,
@@ -73,6 +75,7 @@ final class ApplicationBootstrap
             'jwt' => $jwt,
             'password_hasher' => $passwordHasher,
             'price_service' => $priceService,
+            'eodhd_client' => $eodhdClient,
         ]);
     }
 
