@@ -11,6 +11,7 @@ use FinHub\Infrastructure\Config\Config;
 use FinHub\Infrastructure\Logging\LoggerInterface;
 use FinHub\Infrastructure\Security\JwtTokenProvider;
 use FinHub\Infrastructure\Security\PasswordHasher;
+use PDO;
 
 final class ApiDispatcher
 {
@@ -21,7 +22,7 @@ final class ApiDispatcher
     private UserRepositoryInterface $userRepository;
     private JwtTokenProvider $jwt;
     private PasswordHasher $passwordHasher;
-    private \PDO $pdo;
+    private PDO $pdo;
     /** Rutas base deben terminar sin barra final. */
     private string $apiBase;
 
@@ -99,6 +100,19 @@ final class ApiDispatcher
             $request = PriceRequest::fromArray($_GET ?? []);
             $quote = $this->priceService->getPrice($request);
             $this->sendJson($quote);
+            return;
+        }
+        if ($method === 'POST' && $path === '/datalake/prices/collect') {
+            $this->handleCollectPrices($traceId);
+            return;
+        }
+        if ($method === 'GET' && $path === '/datalake/prices/symbols') {
+            $symbols = $this->getPortfolioSymbols();
+            $this->sendJson(['symbols' => $symbols]);
+            return;
+        }
+        if ($method === 'GET' && $path === '/datalake/prices/series') {
+            $this->handlePriceSeries();
             return;
         }
         if ($method === 'GET' && $path === '/portfolio/instruments') {
@@ -238,6 +252,255 @@ final class ApiDispatcher
             throw new \RuntimeException('Usuario no encontrado', 404);
         }
         $this->sendJson(['deleted' => true]);
+    }
+
+    /**
+     * Lanza la recolección de precios para todos los símbolos de portafolios y guarda snapshots.
+     * Endpoint público sin auth por requerimiento.
+     */
+    private function handleCollectPrices(string $traceId): void
+    {
+        $this->ensureDataLakeTables();
+        $symbols = $this->getPortfolioSymbols();
+        $startedAt = microtime(true);
+        $results = [
+            'started_at' => date('c', (int) $startedAt),
+            'finished_at' => null,
+            'total_symbols' => count($symbols),
+            'ok' => 0,
+            'failed' => 0,
+            'errors' => [],
+        ];
+
+        foreach ($symbols as $symbol) {
+            $snapshot = $this->fetchPriceFromProvider($symbol);
+            $stored = $this->storeSnapshot($snapshot);
+            if ($stored['success']) {
+                $results['ok']++;
+            } else {
+                $results['failed']++;
+                $results['errors'][] = ['symbol' => $symbol, 'reason' => $stored['reason']];
+            }
+        }
+
+        $results['finished_at'] = date('c');
+        $this->sendJson($results);
+    }
+
+    /**
+     * Devuelve la serie temporal para un símbolo en un período.
+     */
+    private function handlePriceSeries(): void
+    {
+        $this->ensureDataLakeTables();
+        $symbol = trim((string) ($_GET['symbol'] ?? ''));
+        $period = trim((string) ($_GET['period'] ?? '1m'));
+        if ($symbol === '') {
+            throw new \RuntimeException('symbol requerido', 422);
+        }
+        $since = $this->resolveSince($period);
+        $params = [':symbol' => $symbol];
+        $where = 'symbol = :symbol';
+        if ($since !== null) {
+            $where .= ' AND as_of >= :since';
+            $params[':since'] = $since->format('Y-m-d H:i:s.u');
+        }
+        $query = sprintf('SELECT as_of, payload_json FROM dl_price_snapshots WHERE %s ORDER BY as_of ASC', $where);
+        $stmt = $this->pdo->prepare($query);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $points = [];
+        foreach ($rows ?: [] as $row) {
+            $payload = $row['payload_json'];
+            if (is_string($payload)) {
+                $payload = json_decode($payload, true);
+            }
+            if (!is_array($payload)) {
+                continue;
+            }
+            $price = $this->extractPrice($payload);
+            if ($price === null) {
+                continue;
+            }
+            $asOfIso = (new \DateTimeImmutable((string) $row['as_of']))->format(\DateTimeInterface::ATOM);
+            $points[] = [
+                't' => $asOfIso,
+                'price' => $price,
+            ];
+        }
+        $this->sendJson([
+            'symbol' => $symbol,
+            'period' => $period,
+            'points' => $points,
+        ]);
+    }
+
+    /**
+     * Obtiene lista deduplicada de símbolos desde portfolio_instruments.
+     */
+    private function getPortfolioSymbols(): array
+    {
+        $sql = 'SELECT DISTINCT symbol FROM portfolio_instruments WHERE symbol IS NOT NULL AND symbol <> \'\' ORDER BY symbol ASC';
+        $stmt = $this->pdo->query($sql);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return array_values(array_filter(array_map(static fn ($r) => (string) $r['symbol'], $rows ?: [])));
+    }
+
+    /**
+     * Ejecuta consulta a proveedor externo (Twelve Data) sin reutilizar clases existentes.
+     */
+    private function fetchPriceFromProvider(string $symbol): array
+    {
+        $apiKey = (string) $this->config->get('TWELVE_DATA_API_KEY', '');
+        $baseUrl = rtrim((string) $this->config->get('TWELVE_DATA_BASE_URL', 'https://api.twelvedata.com'), '/');
+        $url = sprintf('%s/quote?symbol=%s&apikey=%s', $baseUrl, urlencode($symbol), urlencode($apiKey));
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => (int) $this->config->get('TWELVE_DATA_TIMEOUT_SECONDS', 5),
+        ]);
+        $responseBody = curl_exec($ch);
+        $httpStatus = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $errorMsg = curl_error($ch);
+        curl_close($ch);
+
+        $payload = null;
+        if ($responseBody !== false) {
+            $decoded = json_decode($responseBody, true);
+            $payload = is_array($decoded) ? $decoded : ['raw' => $responseBody];
+        }
+
+        $asOfString = $payload['datetime'] ?? $payload['as_of'] ?? $payload['timestamp'] ?? null;
+        $asOf = $asOfString ? new \DateTimeImmutable($asOfString) : new \DateTimeImmutable();
+
+        return [
+            'symbol' => $symbol,
+            'provider' => 'twelvedata',
+            'payload' => $payload ?? ['error' => $errorMsg ?: 'Respuesta vacía'],
+            'as_of' => $asOf,
+            'http_status' => $httpStatus ?: null,
+            'error_code' => $payload['code'] ?? null,
+            'error_msg' => $payload['message'] ?? ($errorMsg ?: null),
+        ];
+    }
+
+    /**
+     * Inserta snapshot y actualiza última versión.
+     */
+    private function storeSnapshot(array $snapshot): array
+    {
+        try {
+            $payloadJson = json_encode($snapshot['payload'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $hash = hash('sha256', $payloadJson, true);
+            $asOf = $snapshot['as_of'] instanceof \DateTimeInterface ? $snapshot['as_of']->format('Y-m-d H:i:s.u') : date('Y-m-d H:i:s.u');
+
+            $insert = <<<'SQL'
+INSERT IGNORE INTO dl_price_snapshots (symbol, provider, as_of, payload_json, payload_hash, http_status, error_code, error_msg)
+VALUES (:symbol, :provider, :as_of, :payload_json, :payload_hash, :http_status, :error_code, :error_msg)
+SQL;
+            $stmt = $this->pdo->prepare($insert);
+            $stmt->execute([
+                'symbol' => $snapshot['symbol'],
+                'provider' => $snapshot['provider'],
+                'as_of' => $asOf,
+                'payload_json' => $payloadJson,
+                'payload_hash' => $hash,
+                'http_status' => $snapshot['http_status'] ?? null,
+                'error_code' => $snapshot['error_code'] ?? null,
+                'error_msg' => $snapshot['error_msg'] ?? null,
+            ]);
+
+            $upsert = <<<'SQL'
+INSERT INTO dl_price_latest (symbol, provider, as_of, payload_json)
+VALUES (:symbol, :provider, :as_of, :payload_json)
+ON DUPLICATE KEY UPDATE
+    as_of = IF(VALUES(as_of) > as_of, VALUES(as_of), as_of),
+    payload_json = IF(VALUES(as_of) > as_of, VALUES(payload_json), payload_json),
+    updated_at = NOW(6)
+SQL;
+            $uStmt = $this->pdo->prepare($upsert);
+            $uStmt->execute([
+                'symbol' => $snapshot['symbol'],
+                'provider' => $snapshot['provider'],
+                'as_of' => $asOf,
+                'payload_json' => $payloadJson,
+            ]);
+
+            return ['success' => true];
+        } catch (\Throwable $e) {
+            $this->logger->error('datalake.store.error', [
+                'symbol' => $snapshot['symbol'] ?? '',
+                'message' => $e->getMessage(),
+            ]);
+            return ['success' => false, 'reason' => $e->getMessage()];
+        }
+    }
+
+    private function extractPrice(array $payload): ?float
+    {
+        $candidates = [
+            $payload['close'] ?? null,
+            $payload['price'] ?? null,
+            $payload['c'] ?? null,
+        ];
+        foreach ($candidates as $value) {
+            if (is_numeric($value)) {
+                return (float) $value;
+            }
+        }
+        return null;
+    }
+
+    private function resolveSince(string $period): ?\DateTimeImmutable
+    {
+        $now = new \DateTimeImmutable();
+        return match ($period) {
+            '1m' => $now->modify('-1 month'),
+            '3m' => $now->modify('-3 months'),
+            '6m' => $now->modify('-6 months'),
+            '1y' => $now->modify('-12 months'),
+            default => null,
+        };
+    }
+
+    /**
+     * Crea tablas del data lake si no existen.
+     */
+    private function ensureDataLakeTables(): void
+    {
+        $this->pdo->exec(
+            <<<'SQL'
+CREATE TABLE IF NOT EXISTS dl_price_snapshots (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  symbol VARCHAR(32) NOT NULL,
+  provider VARCHAR(32) NOT NULL DEFAULT 'twelvedata',
+  as_of DATETIME(6) NOT NULL,
+  payload_json JSON NOT NULL,
+  payload_hash BINARY(32) NOT NULL,
+  http_status SMALLINT UNSIGNED NULL,
+  error_code VARCHAR(64) NULL,
+  error_msg VARCHAR(255) NULL,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  UNIQUE KEY uniq_snapshot (symbol, provider, as_of, payload_hash),
+  INDEX idx_symbol_provider_asof (symbol, provider, as_of),
+  INDEX idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+SQL
+        );
+
+        $this->pdo->exec(
+            <<<'SQL'
+CREATE TABLE IF NOT EXISTS dl_price_latest (
+  symbol VARCHAR(32) NOT NULL,
+  provider VARCHAR(32) NOT NULL DEFAULT 'twelvedata',
+  as_of DATETIME(6) NOT NULL,
+  payload_json JSON NOT NULL,
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (symbol)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+SQL
+        );
     }
 
     /**

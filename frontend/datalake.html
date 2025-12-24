@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FinHub | Data Lake</title>
+  <link rel="icon" href="/logo/favicon.png" />
+  <script>
+    window.__ENV = window.__ENV ?? {};
+    window.__ENV.API_BASE_URL = '/api';
+  </script>
+  <link rel="preload" href="/logo/full_logoweb.png" as="image" />
+  <style>
+    :root {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: linear-gradient(145deg, #030712, #020f2a 45%, #0f172a);
+      color: #cbd5f5;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(145deg, #030712, #020f2a 45%, #0f172a);
+    }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      padding: 12px 32px;
+      background: rgba(2, 6, 23, 0.95);
+      gap: 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .toolbar-logo img {
+      height: 44px;
+    }
+    .toolbar-menu {
+      display: flex;
+      flex: 1;
+      gap: 16px;
+    }
+    .toolbar-menu button {
+      background: transparent;
+      border: 1px solid transparent;
+      color: inherit;
+      padding: 10px 18px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    .toolbar-menu button.active {
+      border-color: rgba(56, 189, 248, 0.6);
+      background: rgba(14, 165, 233, 0.1);
+    }
+    .toolbar-user {
+      position: relative;
+    }
+    .toolbar-user button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      color: inherit;
+      padding: 10px 16px;
+      border-radius: 999px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .toolbar-user .chevron {
+      font-size: 0.9rem;
+    }
+    .content-shell {
+      padding: 24px 32px;
+    }
+    #app {
+      display: grid;
+      gap: 24px;
+    }
+    .card {
+      background: rgba(15, 23, 42, 0.95);
+      border-radius: 20px;
+      padding: 26px;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      box-shadow: 0 25px 50px rgba(2, 6, 23, 0.7);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .muted {
+      color: #94a3b8;
+      font-size: 0.95rem;
+    }
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 12px 0;
+    }
+    select, button, input {
+      background: rgba(2, 6, 23, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      color: #e2e8f0;
+      padding: 10px 12px;
+      border-radius: 10px;
+      outline: none;
+    }
+    button.primary {
+      background: linear-gradient(120deg, #0ea5e9, #22d3ee);
+      color: #0b1224;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    #collect-result {
+      margin-top: 8px;
+      font-size: 0.95rem;
+    }
+    #chart-container {
+      position: relative;
+      height: 420px;
+    }
+    .user-dropdown {
+      position: fixed;
+      top: 60px;
+      right: 20px;
+      background: rgba(2, 6, 23, 0.95);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 180px;
+      z-index: 20;
+    }
+    .user-dropdown.visible {
+      display: flex;
+    }
+    .user-dropdown button {
+      background: transparent;
+      border: none;
+      color: inherit;
+      text-align: left;
+      padding: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .user-dropdown button:hover {
+      background: rgba(14, 165, 233, 0.15);
+    }
+    @media (max-width: 768px) {
+      .toolbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .toolbar-menu {
+        flex-wrap: wrap;
+      }
+      .content-shell {
+        padding: 16px;
+      }
+      #chart-container {
+        height: 320px;
+      }
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+<body>
+  <div id="toolbar-root"></div>
+  <div class="content-shell">
+    <main id="app">
+      <section class="card">
+        <div class="card-header">
+          <h2>Data Lake de Precios</h2>
+          <p class="muted">Recolecta y grafica precios históricos</p>
+        </div>
+        <div class="controls">
+          <button id="collect-btn" class="primary" type="button">Recolectar ahora</button>
+          <select id="period-select" aria-label="Período">
+            <option value="1m">Último mes</option>
+            <option value="3m">Últimos 3 meses</option>
+            <option value="6m">Últimos 6 meses</option>
+            <option value="1y">Último año</option>
+            <option value="all">Todo</option>
+          </select>
+          <select id="symbol-select" multiple size="5" aria-label="Seleccionar instrumentos"></select>
+        </div>
+        <div id="collect-result" class="muted"></div>
+        <div id="chart-container">
+          <canvas id="prices-chart" aria-label="Gráfico de precios"></canvas>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/Frontend/paginas/datalake.js"></script>
+</body>
+</html>
