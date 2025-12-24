@@ -123,6 +123,10 @@
       border-radius: 10px;
       outline: none;
     }
+    .form-row.dual input,
+    .form-row.dual select {
+      flex: 0 0 50%;
+    }
     .tile-grid {
       margin-top: 12px;
       display: grid;
@@ -209,25 +213,16 @@
           <h2>EODHD</h2>
           <p class="muted">Consultas puntuales (plan free: EOD y lista de símbolos)</p>
         </div>
-        <div class="form-row">
-          <input id="symbol-input" placeholder="AAPL.US" autocomplete="off" />
-          <button id="eod-btn" type="button">Consultar EOD</button>
-        </div>
-        <div id="eod-result" class="tile-grid">
-          <p class="muted">Ingresa un símbolo y consulta EOD.</p>
-        </div>
-        <hr style="border: 1px solid rgba(148, 163, 184, 0.15);" />
-        <div class="form-row">
-          <input id="exchange-input" placeholder="US" value="US" autocomplete="off" />
-          <button id="exchange-btn" type="button">Listar símbolos</button>
-          <select id="exchange-select" aria-label="Selecciona exchange" style="min-width:220px;">
+        <div class="form-row dual">
+          <select id="exchange-select" aria-label="Selecciona exchange">
             <option value="">seleccionar</option>
           </select>
-          <select id="symbol-select" aria-label="Selecciona símbolo" style="min-width:220px;">
-            <option value="">seleccionar</option>
-          </select>
+          <input id="exchange-input" placeholder="US" value="" autocomplete="off" readonly />
         </div>
         <div id="exchange-result" class="muted">Sin resultados.</div>
+        <div id="eod-result" class="tile-grid">
+          <p class="muted">Haz doble clic en un símbolo para ver su EOD.</p>
+        </div>
       </section>
     </main>
   </div>
