@@ -123,9 +123,13 @@
       border-radius: 10px;
       outline: none;
     }
-    .form-row.dual input,
     .form-row.dual select {
-      flex: 0 0 50%;
+      flex: 0 0 25%;
+      min-width: 180px;
+    }
+    .form-row.dual input {
+      flex: 0 0 90px;
+      max-width: 90px;
     }
     .tile-grid {
       margin-top: 12px;
@@ -217,7 +221,11 @@
           <select id="exchange-select" aria-label="Selecciona exchange">
             <option value="">seleccionar</option>
           </select>
-          <input id="exchange-input" placeholder="US" value="" autocomplete="off" readonly />
+          <input id="exchange-input" placeholder="US" value="" autocomplete="off" maxlength="4" readonly />
+          <label style="display:flex; align-items:center; gap:6px;">
+            <span class="muted" style="min-width:52px;">Buscar:</span>
+            <input id="symbol-filter" placeholder="Prefijo" autocomplete="off" maxlength="10" />
+          </label>
         </div>
         <div id="exchange-result" class="muted">Sin resultados.</div>
         <div id="eod-result" class="tile-grid">
