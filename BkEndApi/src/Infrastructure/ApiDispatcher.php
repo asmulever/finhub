@@ -129,6 +129,11 @@ final class ApiDispatcher
             $this->handleEodhdExchangeSymbols();
             return;
         }
+        if ($method === 'GET' && $path === '/eodhd/exchanges-list') {
+            $this->requireAdmin();
+            $this->handleEodhdExchangesList();
+            return;
+        }
         if ($method === 'GET' && $path === '/portfolio/instruments') {
             $user = $this->requireUser();
             $items = $this->listPortfolioInstruments($user->getId());
@@ -292,6 +297,15 @@ final class ApiDispatcher
         }
         $data = $this->eodhdClient->fetchExchangeSymbols($exchange);
         $this->sendJson(['exchange' => $exchange, 'data' => $data]);
+    }
+
+    /**
+     * Lista exchanges disponibles en EODHD (solo Admin).
+     */
+    private function handleEodhdExchangesList(): void
+    {
+        $data = $this->eodhdClient->fetchExchangesList();
+        $this->sendJson(['data' => $data]);
     }
 
     /**

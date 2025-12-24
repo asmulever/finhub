@@ -8,6 +8,10 @@ const state = {
   eodError: '',
   exchangeSymbols: [],
   exchangeError: '',
+  exchangesList: [],
+  selectedExchange: '',
+  selectedSymbol: '',
+  symbolsLoadedExchange: '',
 };
 
 const isAdminProfile = (profile) => String(profile?.role ?? '').toLowerCase() === 'admin';
@@ -52,7 +56,14 @@ const renderExchange = () => {
     container.innerHTML = '<p class="muted">Sin resultados.</p>';
     return;
   }
-  const rows = state.exchangeSymbols.slice(0, 50).map((s) => `
+  const filtered = state.selectedSymbol
+    ? state.exchangeSymbols.filter((s) => (s.Code ?? s.code ?? '') === state.selectedSymbol)
+    : state.exchangeSymbols;
+  if (!filtered.length) {
+    container.innerHTML = '<p class="muted">No hay símbolos para el filtro seleccionado.</p>';
+    return;
+  }
+  const rows = filtered.slice(0, 50).map((s) => `
     <tr>
       <td>${s.Code ?? s.code ?? ''}</td>
       <td>${s.Name ?? s.name ?? ''}</td>
@@ -61,7 +72,7 @@ const renderExchange = () => {
     </tr>
   `).join('');
   container.innerHTML = `
-    <p class="muted">Mostrando ${Math.min(50, state.exchangeSymbols.length)} de ${state.exchangeSymbols.length} símbolos.</p>
+    <p class="muted">Mostrando ${Math.min(50, filtered.length)} de ${filtered.length} símbolos.</p>
     <div style="max-height:320px; overflow:auto;">
       <table>
         <thead><tr><th>Code</th><th>Nombre</th><th>Exchange</th><th>Tipo</th></tr></thead>
@@ -93,17 +104,61 @@ const fetchEod = async () => {
 
 const fetchExchangeSymbols = async () => {
   const input = document.getElementById('exchange-input');
-  const exch = input?.value.trim() || 'US';
+  const exch = state.selectedExchange || input?.value.trim() || '';
   state.exchangeSymbols = [];
   state.exchangeError = '';
+  state.selectedSymbol = '';
   renderExchange();
+  if (!exch) {
+    state.exchangeError = 'Selecciona un exchange o un símbolo.';
+    renderExchange();
+    return;
+  }
   try {
     const data = await getJson(`/eodhd/exchange-symbols?exchange=${encodeURIComponent(exch)}`);
     state.exchangeSymbols = Array.isArray(data?.data) ? data.data : [];
+    state.symbolsLoadedExchange = exch;
   } catch (error) {
     state.exchangeError = error?.error?.message ?? 'No se pudo obtener la lista';
   }
   renderExchange();
+};
+
+const renderExchangeSelect = () => {
+  const select = document.getElementById('exchange-select');
+  if (!select) return;
+  select.innerHTML = ['<option value="">seleccionar</option>'].concat(
+    state.exchangesList.map((ex) => {
+      const code = ex.Code ?? ex.code ?? '';
+      const country = ex.Country ?? ex.country ?? '';
+      const name = ex.Name ?? ex.name ?? '';
+      return `<option value="${code}">${country ? country + ' - ' : ''}${code} | ${name}</option>`;
+    })
+  ).join('');
+};
+
+const renderSymbolSelect = () => {
+  const select = document.getElementById('symbol-select');
+  if (!select) return;
+  select.innerHTML = ['<option value="">seleccionar</option>'].concat(
+    state.exchangeSymbols.map((s) => {
+      const code = s.Code ?? s.code ?? '';
+      const name = s.Name ?? s.name ?? '';
+      return `<option value="${code}">${code} | ${name}</option>`;
+    })
+  ).join('');
+};
+
+const fetchExchangesList = async () => {
+  try {
+    const data = await getJson('/eodhd/exchanges-list');
+    state.exchangesList = Array.isArray(data?.data) ? data.data : [];
+  } catch (error) {
+    state.exchangesList = [];
+    const container = document.getElementById('exchange-result');
+    container?.insertAdjacentHTML('afterbegin', `<p class="price-error">${error?.error?.message ?? 'No se pudo obtener exchanges'}</p>`);
+  }
+  renderExchangeSelect();
 };
 
 const handleLogout = async () => {
@@ -145,10 +200,44 @@ const init = async () => {
     if (eod) eod.innerHTML = '<p class="price-error">Acceso restringido: solo Admin.</p>';
     document.getElementById('eod-btn')?.setAttribute('disabled', 'disabled');
     document.getElementById('exchange-btn')?.setAttribute('disabled', 'disabled');
+    document.getElementById('exchange-select')?.setAttribute('disabled', 'disabled');
+    document.getElementById('symbol-select')?.setAttribute('disabled', 'disabled');
     return;
   }
+  await fetchExchangesList();
   document.getElementById('eod-btn')?.addEventListener('click', fetchEod);
   document.getElementById('exchange-btn')?.addEventListener('click', fetchExchangeSymbols);
+  document.getElementById('exchange-select')?.addEventListener('change', (event) => {
+    const code = event.target.value;
+    state.selectedExchange = code;
+    state.selectedSymbol = '';
+    const input = document.getElementById('exchange-input');
+    if (input) input.value = code;
+    const symbolSelect = document.getElementById('symbol-select');
+    if (symbolSelect) symbolSelect.value = '';
+    if (code) {
+      fetchExchangeSymbols().then(renderSymbolSelect);
+    } else {
+      state.exchangeSymbols = [];
+      renderSymbolSelect();
+      state.exchangeError = 'Selecciona un exchange o un símbolo.';
+      renderExchange();
+    }
+  });
+  document.getElementById('symbol-select')?.addEventListener('change', (event) => {
+    const sym = event.target.value;
+    state.selectedSymbol = sym;
+    state.selectedExchange = '';
+    state.exchangeError = '';
+    const exchSelect = document.getElementById('exchange-select');
+    if (exchSelect) exchSelect.value = '';
+    const input = document.getElementById('exchange-input');
+    if (input) input.value = '';
+    if (!sym) {
+      state.exchangeError = 'Selecciona un exchange o un símbolo.';
+    }
+    renderExchange();
+  });
   renderEod();
   renderExchange();
 };

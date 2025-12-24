@@ -51,6 +51,20 @@ final class EodhdClient
     }
 
     /**
+     * Lista de exchanges disponibles (para armar combos).
+     *
+     * @throws \RuntimeException si falta API key o hay error HTTP.
+     */
+    public function fetchExchangesList(): array
+    {
+        if ($this->apiKey === '') {
+            throw new \RuntimeException('EODHD API key requerida');
+        }
+        $url = sprintf('%s/api/exchanges-list/?api_token=%s&fmt=json', $this->baseUrl, urlencode($this->apiKey));
+        return $this->doRequest($url);
+    }
+
+    /**
      * Ejecuta la llamada HTTP con cURL y retorna el JSON decodificado.
      */
     private function doRequest(string $url): array
