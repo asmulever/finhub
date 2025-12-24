@@ -10,6 +10,7 @@ const toolbarTemplate = `
       <button type="button" data-menu="portfolios" data-link="/Frontend/Portafolios.html">Portafolios</button>
       <button type="button" data-menu="prices" data-link="/Frontend/precios.html">Precios</button>
       <button type="button" id="datalake-menu" data-menu="datalake" data-link="/Frontend/datalake.html">DataLake</button>
+      <button type="button" id="eodhd-menu" data-menu="eodhd" data-link="/Frontend/eodhd.html">EODHD</button>
     </nav>
     <div class="toolbar-user">
       <button id="user-menu-button" type="button">
@@ -30,9 +31,11 @@ const isAdminProfile = (profile) => String(profile?.role ?? '').toLowerCase() ==
 export const setAdminMenuVisibility = (profile) => {
   const adminButton = document.getElementById('admin-users-action');
   const datalakeButton = document.getElementById('datalake-menu');
+  const eodhdButton = document.getElementById('eodhd-menu');
   const isAdmin = isAdminProfile(profile);
   if (adminButton) adminButton.hidden = !isAdmin;
   if (datalakeButton) datalakeButton.hidden = !isAdmin;
+  if (eodhdButton) eodhdButton.hidden = !isAdmin;
 };
 
 export const renderToolbar = () => {

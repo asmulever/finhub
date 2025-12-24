@@ -9,6 +9,7 @@ use FinHub\Application\MarketData\PriceService;
 use FinHub\Domain\User\UserRepositoryInterface;
 use FinHub\Infrastructure\Config\Config;
 use FinHub\Infrastructure\Logging\LoggerInterface;
+use FinHub\Infrastructure\MarketData\EodhdClient;
 use FinHub\Infrastructure\Security\JwtTokenProvider;
 use FinHub\Infrastructure\Security\PasswordHasher;
 use PDO;
@@ -23,6 +24,7 @@ final class ApiDispatcher
     private JwtTokenProvider $jwt;
     private PasswordHasher $passwordHasher;
     private PDO $pdo;
+    private EodhdClient $eodhdClient;
     /** Rutas base deben terminar sin barra final. */
     private string $apiBase;
 
@@ -34,7 +36,8 @@ final class ApiDispatcher
         UserRepositoryInterface $userRepository,
         JwtTokenProvider $jwt,
         PasswordHasher $passwordHasher,
-        \PDO $pdo
+        \PDO $pdo,
+        EodhdClient $eodhdClient
     )
     {
         $this->config = $config;
@@ -46,6 +49,7 @@ final class ApiDispatcher
         $this->jwt = $jwt;
         $this->passwordHasher = $passwordHasher;
         $this->pdo = $pdo;
+        $this->eodhdClient = $eodhdClient;
     }
 
     /**
@@ -113,6 +117,16 @@ final class ApiDispatcher
         }
         if ($method === 'GET' && $path === '/datalake/prices/series') {
             $this->handlePriceSeries();
+            return;
+        }
+        if ($method === 'GET' && $path === '/eodhd/eod') {
+            $this->requireAdmin();
+            $this->handleEodhdEod();
+            return;
+        }
+        if ($method === 'GET' && $path === '/eodhd/exchange-symbols') {
+            $this->requireAdmin();
+            $this->handleEodhdExchangeSymbols();
             return;
         }
         if ($method === 'GET' && $path === '/portfolio/instruments') {
@@ -252,6 +266,32 @@ final class ApiDispatcher
             throw new \RuntimeException('Usuario no encontrado', 404);
         }
         $this->sendJson(['deleted' => true]);
+    }
+
+    /**
+     * Consulta EODHD EOD para un símbolo (solo Admin).
+     */
+    private function handleEodhdEod(): void
+    {
+        $symbol = trim((string) ($_GET['symbol'] ?? ''));
+        if ($symbol === '') {
+            throw new \RuntimeException('symbol requerido', 422);
+        }
+        $data = $this->eodhdClient->fetchEod($symbol);
+        $this->sendJson(['symbol' => $symbol, 'data' => $data]);
+    }
+
+    /**
+     * Lista símbolos de un exchange en EODHD (solo Admin).
+     */
+    private function handleEodhdExchangeSymbols(): void
+    {
+        $exchange = trim((string) ($_GET['exchange'] ?? 'US'));
+        if ($exchange === '') {
+            throw new \RuntimeException('exchange requerido', 422);
+        }
+        $data = $this->eodhdClient->fetchExchangeSymbols($exchange);
+        $this->sendJson(['exchange' => $exchange, 'data' => $data]);
     }
 
     /**
