@@ -14,6 +14,23 @@ const state = {
 };
 
 const isAdminProfile = (profile) => String(profile?.role ?? '').toLowerCase() === 'admin';
+const cookieKey = (profile) => {
+  const email = profile?.email ? String(profile.email).toLowerCase().replace(/[^a-z0-9._-]/g, '') : 'default';
+  return `eodhd_exchange_${email}`;
+};
+const setCookie = (name, value) => {
+  document.cookie = `${name}=${encodeURIComponent(value || '')}; path=/; expires=Fri, 31 Dec 9999 23:59:59 GMT`;
+};
+const getCookie = (name) => {
+  const cookies = document.cookie ? document.cookie.split(';') : [];
+  for (const raw of cookies) {
+    const [k, ...rest] = raw.trim().split('=');
+    if (k === name) {
+      return decodeURIComponent(rest.join('='));
+    }
+  }
+  return '';
+};
 
 const renderEod = () => {
   const container = document.getElementById('eod-result');
@@ -165,9 +182,20 @@ const init = async () => {
     return;
   }
   await fetchExchangesList();
+  // restaurar selección previa del usuario desde cookie
+  const lastExchange = getCookie(cookieKey(state.profile ?? authStore.getProfile()));
+  if (lastExchange) {
+    state.selectedExchange = lastExchange;
+    const sel = document.getElementById('exchange-select');
+    const input = document.getElementById('exchange-input');
+    if (sel) sel.value = lastExchange;
+    if (input) input.value = lastExchange;
+    await fetchExchangeSymbols();
+  }
   document.getElementById('exchange-select')?.addEventListener('change', (event) => {
     const code = event.target.value;
     state.selectedExchange = code;
+    setCookie(cookieKey(state.profile ?? authStore.getProfile()), code || '');
     const input = document.getElementById('exchange-input');
     if (input) input.value = code;
     if (code) {
