@@ -10,7 +10,6 @@ const state = {
   exchangeError: '',
   exchangesList: [],
   selectedExchange: '',
-  selectedSymbol: '',
   symbolsLoadedExchange: '',
 };
 
@@ -56,25 +55,18 @@ const renderExchange = () => {
     container.innerHTML = '<p class="muted">Sin resultados.</p>';
     return;
   }
-  const filtered = state.selectedSymbol
-    ? state.exchangeSymbols.filter((s) => (s.Code ?? s.code ?? '') === state.selectedSymbol)
-    : state.exchangeSymbols;
-  if (!filtered.length) {
-    container.innerHTML = '<p class="muted">No hay símbolos para el filtro seleccionado.</p>';
-    return;
-  }
-  const rows = filtered.slice(0, 50).map((s) => `
+  const rows = state.exchangeSymbols.slice(0, 50).map((s) => `
     <tr>
-      <td>${s.Code ?? s.code ?? ''}</td>
+      <td data-symbol="${s.Code ?? s.code ?? ''}">${s.Code ?? s.code ?? ''}</td>
       <td>${s.Name ?? s.name ?? ''}</td>
       <td>${s.Exchange ?? s.exchange ?? ''}</td>
       <td>${s.Type ?? s.type ?? ''}</td>
     </tr>
   `).join('');
   container.innerHTML = `
-    <p class="muted">Mostrando ${Math.min(50, filtered.length)} de ${filtered.length} símbolos.</p>
+    <p class="muted">Mostrando ${Math.min(50, state.exchangeSymbols.length)} de ${state.exchangeSymbols.length} símbolos (doble clic para EOD).</p>
     <div style="max-height:320px; overflow:auto;">
-      <table>
+      <table id="symbols-table">
         <thead><tr><th>Code</th><th>Nombre</th><th>Exchange</th><th>Tipo</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -82,35 +74,14 @@ const renderExchange = () => {
   `;
 };
 
-const fetchEod = async () => {
-  const input = document.getElementById('symbol-input');
-  const symbol = input?.value.trim();
-  state.eod = null;
-  state.eodError = '';
-  renderEod();
-  if (!symbol) {
-    state.eodError = 'Ingresa un símbolo (ej: AAPL.US)';
-    renderEod();
-    return;
-  }
-  try {
-    const data = await getJson(`/eodhd/eod?symbol=${encodeURIComponent(symbol)}`);
-    state.eod = data;
-  } catch (error) {
-    state.eodError = error?.error?.message ?? 'No se pudo obtener el EOD';
-  }
-  renderEod();
-};
-
 const fetchExchangeSymbols = async () => {
   const input = document.getElementById('exchange-input');
   const exch = state.selectedExchange || input?.value.trim() || '';
   state.exchangeSymbols = [];
   state.exchangeError = '';
-  state.selectedSymbol = '';
   renderExchange();
   if (!exch) {
-    state.exchangeError = 'Selecciona un exchange o un símbolo.';
+    state.exchangeError = 'Selecciona un exchange.';
     renderExchange();
     return;
   }
@@ -138,15 +109,7 @@ const renderExchangeSelect = () => {
 };
 
 const renderSymbolSelect = () => {
-  const select = document.getElementById('symbol-select');
-  if (!select) return;
-  select.innerHTML = ['<option value="">seleccionar</option>'].concat(
-    state.exchangeSymbols.map((s) => {
-      const code = s.Code ?? s.code ?? '';
-      const name = s.Name ?? s.name ?? '';
-      return `<option value="${code}">${code} | ${name}</option>`;
-    })
-  ).join('');
+  // Eliminado: ya no se usa selector de símbolos independiente
 };
 
 const fetchExchangesList = async () => {
@@ -198,48 +161,45 @@ const init = async () => {
   if (!isAdminProfile(state.profile ?? authStore.getProfile())) {
     const eod = document.getElementById('eod-result');
     if (eod) eod.innerHTML = '<p class="price-error">Acceso restringido: solo Admin.</p>';
-    document.getElementById('eod-btn')?.setAttribute('disabled', 'disabled');
-    document.getElementById('exchange-btn')?.setAttribute('disabled', 'disabled');
     document.getElementById('exchange-select')?.setAttribute('disabled', 'disabled');
-    document.getElementById('symbol-select')?.setAttribute('disabled', 'disabled');
     return;
   }
   await fetchExchangesList();
-  document.getElementById('eod-btn')?.addEventListener('click', fetchEod);
-  document.getElementById('exchange-btn')?.addEventListener('click', fetchExchangeSymbols);
   document.getElementById('exchange-select')?.addEventListener('change', (event) => {
     const code = event.target.value;
     state.selectedExchange = code;
-    state.selectedSymbol = '';
     const input = document.getElementById('exchange-input');
     if (input) input.value = code;
-    const symbolSelect = document.getElementById('symbol-select');
-    if (symbolSelect) symbolSelect.value = '';
     if (code) {
-      fetchExchangeSymbols().then(renderSymbolSelect);
+      fetchExchangeSymbols();
     } else {
       state.exchangeSymbols = [];
-      renderSymbolSelect();
-      state.exchangeError = 'Selecciona un exchange o un símbolo.';
+      state.exchangeError = 'Selecciona un exchange.';
       renderExchange();
     }
   });
-  document.getElementById('symbol-select')?.addEventListener('change', (event) => {
-    const sym = event.target.value;
-    state.selectedSymbol = sym;
-    state.selectedExchange = '';
-    state.exchangeError = '';
-    const exchSelect = document.getElementById('exchange-select');
-    if (exchSelect) exchSelect.value = '';
-    const input = document.getElementById('exchange-input');
-    if (input) input.value = '';
-    if (!sym) {
-      state.exchangeError = 'Selecciona un exchange o un símbolo.';
-    }
-    renderExchange();
+  document.getElementById('exchange-result')?.addEventListener('dblclick', (event) => {
+    const cell = event.target.closest('[data-symbol]');
+    const symbol = cell?.dataset?.symbol;
+    if (!symbol) return;
+    fetchEodWithSymbol(symbol);
   });
   renderEod();
   renderExchange();
+};
+
+// Helper to fetch EOD by symbol (used on double click)
+const fetchEodWithSymbol = async (symbol) => {
+  state.eod = null;
+  state.eodError = '';
+  renderEod();
+  try {
+    const data = await getJson(`/eodhd/eod?symbol=${encodeURIComponent(symbol)}`);
+    state.eod = data;
+  } catch (error) {
+    state.eodError = error?.error?.message ?? 'No se pudo obtener el EOD';
+  }
+  renderEod();
 };
 
 document.addEventListener('DOMContentLoaded', init);
