@@ -14,6 +14,10 @@ const state = {
 };
 
 const isAdminProfile = (profile) => String(profile?.role ?? '').toLowerCase() === 'admin';
+const exchangeKey = (profile) => {
+  const email = profile?.email ? String(profile.email).toLowerCase() : 'default';
+  return `eodhd_exchange_${email}`;
+};
 
 const renderEod = () => {
   const container = document.getElementById('eod-result');
@@ -165,9 +169,21 @@ const init = async () => {
     return;
   }
   await fetchExchangesList();
+  // Restaurar última selección por usuario
+  const stored = localStorage.getItem(exchangeKey(state.profile ?? authStore.getProfile()));
+  if (stored) {
+    state.selectedExchange = stored;
+    const sel = document.getElementById('exchange-select');
+    const input = document.getElementById('exchange-input');
+    if (sel) sel.value = stored;
+    if (input) input.value = stored;
+    fetchExchangeSymbols();
+  }
+
   document.getElementById('exchange-select')?.addEventListener('change', (event) => {
     const code = event.target.value;
     state.selectedExchange = code;
+    localStorage.setItem(exchangeKey(state.profile ?? authStore.getProfile()), code || '');
     const input = document.getElementById('exchange-input');
     if (input) input.value = code;
     if (code) {
