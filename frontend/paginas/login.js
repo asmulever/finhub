@@ -46,7 +46,7 @@ const render = () => {
                 <input id="remember-user" name="remember" type="checkbox" />
                 <span>Recordar usuario</span>
               </label>
-              <a href="/register" class="register-link">Registrar nuevo usuario</a>
+              <a href="/Frontend/register.html" class="register-link">Registrar nuevo usuario</a>
             </div>
             <button type="submit">Ingresar</button>
             <p id="error-message" class="error" aria-live="polite"></p>
