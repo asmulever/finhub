@@ -11,6 +11,7 @@ docs/
 
 # EXCEPCIÓN: este archivo NO se ignora
 !AGENTS.MD
+!Pendientes.md
 
 # Ignore VSCode editor files
 .vscode/
