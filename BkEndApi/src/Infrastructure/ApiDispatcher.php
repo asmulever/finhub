@@ -191,6 +191,19 @@ final class ApiDispatcher
     }
 
     /**
+     * Envía una respuesta HTML simple con el código HTTP indicado.
+     */
+    private function sendHtml(string $body, int $status = 200): void
+    {
+        if (!headers_sent()) {
+            http_response_code($status);
+            header('Content-Type: text/html; charset=utf-8');
+        }
+        echo $body;
+        exit;
+    }
+
+    /**
      * Calcula el path relativo al API base configurado.
      */
     private function getRoutePath(string $uri): string
@@ -316,6 +329,9 @@ final class ApiDispatcher
     {
         $this->ensureDataLakeTables();
         $symbols = $this->getPortfolioSymbols();
+        if (empty($symbols)) {
+            throw new \RuntimeException('No hay símbolos configurados para ingesta', 400);
+        }
         $startedAt = microtime(true);
         $results = [
             'started_at' => date('c', (int) $startedAt),
@@ -338,7 +354,9 @@ final class ApiDispatcher
         }
 
         $results['finished_at'] = date('c');
-        $this->sendJson($results);
+        // Si todas las consultas fallaron, marcar error 500; si hay símbolos pero ninguno, ya se lanzó 400 arriba.
+        $status = $results['failed'] === $results['total_symbols'] ? 500 : 200;
+        $this->sendHtml('tarea ejecutada', $status);
     }
 
     /**
