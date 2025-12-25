@@ -24,7 +24,7 @@ const render = () => {
             <p class="caption">Registro</p>
             <h2>Crear cuenta FinHub</h2>
           </div>
-          <p class="panel-copy">Completa tus datos. Tu cuenta se creará como <strong>user</strong> y <strong>inactive</strong> hasta aprobación.</p>
+          <p class="panel-copy">Completa tus datos. Tu cuenta se creará pero estará inactiva hasta aprobación. Espera el mail de confirmación.</p>
           <form id="register-form">
             <div class="input-grid">
               <div class="form-group">
