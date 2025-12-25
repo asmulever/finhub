@@ -38,8 +38,7 @@ const init = async () => {
   });
   highlightToolbar();
   await loadProfile();
-  const frame = document.getElementById('app-frame');
-  frame?.addEventListener('load', () => {});
+  setFrameSrc('/Frontend/dashboard.html');
 };
 
 document.addEventListener('DOMContentLoaded', init);

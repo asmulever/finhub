@@ -11,6 +11,9 @@
   <script>
     window.__ENV = window.__ENV ?? {};
     window.__ENV.API_BASE_URL = '/api';
+    if (window.history?.replaceState) {
+      window.history.replaceState(null, '', '/');
+    }
   </script>
   <link rel="preload" href="/logo/full_logoweb.png" as="image" />
   <style>
