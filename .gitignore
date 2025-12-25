@@ -9,5 +9,8 @@ logs/
 *.md
 docs/
 
+# EXCEPCIÓN: este archivo NO se ignora
+!AGENTS.MD
+
 # Ignore VSCode editor files
 .vscode/
