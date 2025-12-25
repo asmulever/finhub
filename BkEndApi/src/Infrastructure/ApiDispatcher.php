@@ -254,7 +254,7 @@ final class ApiDispatcher
         }
 
         $hash = $this->passwordHasher->hash($password);
-        $user = $this->userRepository->create($email, 'user', 'inactive', $hash);
+        $user = $this->userRepository->create($email, 'user', 'disabled', $hash);
         $this->sendJson($user->toResponse(), 201);
     }
 
