@@ -9,6 +9,10 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <script>
+    window.__ENV = window.__ENV ?? {};
+    window.__ENV.API_BASE_URL = '/api';
+  </script>
+  <script>
     if (window.history?.replaceState) {
       window.history.replaceState(null, '', '/');
     }

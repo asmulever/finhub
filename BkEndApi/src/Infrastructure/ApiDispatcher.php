@@ -140,9 +140,21 @@ final class ApiDispatcher
             $this->sendJson(['data' => $items]);
             return;
         }
+        if ($method === 'GET' && $path === '/portfolios') {
+            $user = $this->requireUser();
+            $items = $this->listPortfolios($user->getId());
+            $this->sendJson(['data' => $items]);
+            return;
+        }
         if ($method === 'POST' && $path === '/portfolio/instruments') {
             $user = $this->requireUser();
             $this->handleAddInstrument($user);
+            return;
+        }
+        if ($method === 'DELETE' && preg_match('#^/portfolio/instruments/(.+)$#', $path, $matches)) {
+            $user = $this->requireUser();
+            $symbol = urldecode((string) ($matches[1] ?? ''));
+            $this->handleRemoveInstrument($user, $symbol);
             return;
         }
         if ($method === 'GET' && $path === '/users') {
@@ -212,10 +224,13 @@ final class ApiDispatcher
      */
     private function getRoutePath(string $uri): string
     {
+        $path = $uri;
         if ($this->apiBase !== '' && str_starts_with($uri, $this->apiBase)) {
-            return '/' . trim(substr($uri, strlen($this->apiBase)), '/');
+            $path = substr($uri, strlen($this->apiBase));
         }
-        return $uri;
+        // Normaliza: un solo slash inicial y sin slash final (excepto raíz).
+        $normalized = '/' . trim($path, '/');
+        return $normalized === '/' ? '/' : $normalized;
     }
 
     private function handleLogin(): void
@@ -686,6 +701,49 @@ SQL;
         ] : [];
 
         $this->sendJson($item, 201);
+    }
+
+    /**
+     * Elimina un instrumento del portafolio del usuario autenticado.
+     */
+    private function handleRemoveInstrument(\FinHub\Domain\User\User $user, string $symbol): void
+    {
+        $symbol = trim($symbol);
+        if ($symbol === '') {
+            throw new \RuntimeException('Símbolo requerido', 422);
+        }
+
+        $portfolioId = $this->ensureUserPortfolio($user->getId());
+        $delete = $this->pdo->prepare('DELETE FROM portfolio_instruments WHERE portfolio_id = :portfolio_id AND symbol = :symbol');
+        $delete->execute([
+            'portfolio_id' => $portfolioId,
+            'symbol' => $symbol,
+        ]);
+
+        $this->sendJson(['deleted' => true, 'symbol' => $symbol]);
+    }
+
+    /**
+     * Devuelve la lista de portafolios del usuario (al menos uno garantizado).
+     */
+    private function listPortfolios(int $userId): array
+    {
+        // Garantiza que exista el portafolio principal
+        $this->ensureUserPortfolio($userId);
+        $select = $this->pdo->prepare(
+            'SELECT id, name, base_currency, created_at, updated_at FROM portfolios WHERE user_id = :user_id AND deleted_at IS NULL ORDER BY id ASC'
+        );
+        $select->execute(['user_id' => $userId]);
+        $rows = $select->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        return array_map(static function (array $row): array {
+            return [
+                'id' => (int) $row['id'],
+                'name' => (string) ($row['name'] ?? ''),
+                'base_currency' => (string) ($row['base_currency'] ?? 'USD'),
+                'created_at' => $row['created_at'] ?? null,
+                'updated_at' => $row['updated_at'] ?? null,
+            ];
+        }, $rows);
     }
 
     /**

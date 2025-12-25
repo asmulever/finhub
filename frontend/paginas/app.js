@@ -1,4 +1,5 @@
 import { authStore } from '../auth/authStore.js';
+import { getJson } from '../apicliente.js';
 import { bindToolbarNavigation, bindUserMenu, highlightToolbar, renderToolbar, setAdminMenuVisibility, setToolbarUserName } from '../components/toolbar.js';
 
 const setFrameSrc = (src) => {
@@ -16,10 +17,6 @@ const loadProfile = async () => {
   } catch {
     authStore.clearToken();
     window.location.href = '/';
-    return;
-    const cached = authStore.getProfile();
-    setToolbarUserName(cached?.email ?? '');
-    setAdminMenuVisibility(cached);
   }
 };
 

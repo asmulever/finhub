@@ -140,6 +140,32 @@
       gap: 12px;
       flex-wrap: wrap;
     }
+    .tabs {
+      display: inline-flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .tab-btn {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      color: inherit;
+      padding: 10px 16px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tab-btn.active {
+      background: rgba(14, 165, 233, 0.15);
+      border-color: rgba(56, 189, 248, 0.6);
+      color: #e2e8f0;
+    }
+    .tab-panel {
+      display: none;
+      margin-top: 16px;
+    }
+    .tab-panel.active {
+      display: block;
+    }
     .muted {
       color: #94a3b8;
       font-size: 0.95rem;
@@ -158,6 +184,13 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
+    }
+    .selected-tile {
+      border-color: rgba(251, 191, 36, 0.5);
+    }
+    .price-value {
+      font-size: 1.05rem;
+      color: #e2e8f0;
     }
     .stock-symbol {
       display: flex;
@@ -213,6 +246,20 @@
       border-color: rgba(14, 165, 233, 0.8);
       box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
     }
+    .remove-btn {
+      margin-top: 10px;
+      background: #facc15;
+      color: #0f172a;
+      border: none;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .remove-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
     .user-dropdown {
       position: fixed;
       top: 60px;
@@ -263,21 +310,35 @@
       <section class="card">
         <div class="card-header">
           <h2>Portafolios</h2>
-          <p class="muted">Tickers disponibles en Twelve Data</p>
+          <p class="muted">Organiza tu cartera y busca instrumentos</p>
         </div>
-        <div class="filter-row">
-          <select id="category-filter" aria-label="Filtrar por categoría">
-            <option value="all">Todas las categorías</option>
-            <option value="on">Acción local (ON)</option>
-            <option value="cedear">CEDEAR</option>
-            <option value="bond">Bono</option>
-            <option value="etf">ETF / Trust</option>
-            <option value="selected">Seleccionados</option>
-          </select>
-          <input id="filter-input" placeholder="Filtrar por símbolo, nombre o país..." autocomplete="off" />
+        <div class="tabs">
+          <button type="button" class="tab-btn active" data-tab="selected">Cartera seleccionada</button>
+          <button type="button" class="tab-btn" data-tab="search">Buscar instrumentos</button>
         </div>
-        <div id="stocks-container" class="stocks-grid">
-          <p class="muted">Cargando tickers...</p>
+
+        <div id="tab-selected" class="tab-panel active">
+          <p class="muted">Instrumentos agregados a tu portafolio. Botón amarillo para quitar.</p>
+          <div id="selected-container" class="stocks-grid">
+            <p class="muted">Cargando cartera...</p>
+          </div>
+        </div>
+
+        <div id="tab-search" class="tab-panel">
+          <div class="filter-row">
+            <select id="category-filter" aria-label="Filtrar por categoría">
+              <option value="">Seleccionar</option>
+              <option value="all">Todas las categorías</option>
+              <option value="on">Acción local (ON)</option>
+              <option value="cedear">CEDEAR</option>
+              <option value="bond">Bono</option>
+              <option value="etf">ETF / Trust</option>
+            </select>
+            <input id="filter-input" placeholder="Filtrar por símbolo, nombre o país..." autocomplete="off" disabled />
+          </div>
+          <div id="stocks-container" class="stocks-grid">
+            <p class="muted">Selecciona una categoría para listar instrumentos.</p>
+          </div>
         </div>
       </section>
     </main>
