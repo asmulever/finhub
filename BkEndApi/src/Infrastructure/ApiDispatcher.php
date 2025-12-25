@@ -174,6 +174,10 @@ final class ApiDispatcher
             $this->handleLogin();
             return;
         }
+        if ($method === 'POST' && $path === '/auth/register') {
+            $this->handleRegister();
+            return;
+        }
         throw new \RuntimeException('Ruta no encontrada', 404);
     }
 
@@ -226,6 +230,32 @@ final class ApiDispatcher
 
         $payload = $this->authService->authenticate($email, $password);
         $this->sendJson($payload);
+    }
+
+    private function handleRegister(): void
+    {
+        $data = $this->parseJsonBody();
+        $email = trim((string) ($data['email'] ?? ''));
+        $password = (string) ($data['password'] ?? '');
+
+        if ($email === '' || $password === '') {
+            throw new \RuntimeException('Email y contraseña requeridos', 422);
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new \RuntimeException('Email inválido', 422);
+        }
+        if (strlen($password) < 6) {
+            throw new \RuntimeException('La contraseña debe tener al menos 6 caracteres', 422);
+        }
+
+        $existing = $this->userRepository->findByEmail($email);
+        if ($existing !== null) {
+            throw new \RuntimeException('Email ya registrado', 409);
+        }
+
+        $hash = $this->passwordHasher->hash($password);
+        $user = $this->userRepository->create($email, 'user', 'inactive', $hash);
+        $this->sendJson($user->toResponse(), 201);
     }
 
     private function handleCreateUser(): void
