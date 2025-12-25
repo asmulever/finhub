@@ -3,7 +3,7 @@ import { authStore } from '../auth/authStore.js';
 const toolbarTemplate = `
   <header class="toolbar">
     <div class="toolbar-logo">
-      <a href="/Frontend/dashboard.html">
+      <a href="/Frontend/app.html">
         <img src="/logo/full_logoweb.png" alt="FinHub" style="height: 88px;" />
       </a>
     </div>
@@ -59,15 +59,21 @@ export const highlightToolbar = () => {
 };
 
 export const bindToolbarNavigation = () => {
+  const frame = document.getElementById('app-frame');
   document.querySelectorAll('.toolbar-menu button').forEach((button) => {
     button.addEventListener('click', (event) => {
       const link = button.getAttribute('data-link');
       if (!link) return;
-      event.preventDefault();
-      if (link === window.location.pathname) {
-        highlightToolbar();
+      if (frame) {
+        event.preventDefault();
+        if (frame.src !== link) {
+          frame.src = link;
+        }
+        document.querySelectorAll('.toolbar-menu button').forEach((b) => b.classList.remove('active'));
+        button.classList.add('active');
         return;
       }
+      event.preventDefault();
       window.location.href = link;
     });
   });
