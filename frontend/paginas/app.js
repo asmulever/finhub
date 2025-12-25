@@ -10,15 +10,13 @@ const setFrameSrc = (src) => {
 
 const loadProfile = async () => {
   try {
-    const response = await fetch('/api/me', {
-      headers: authStore.getToken() ? { Authorization: `Bearer ${authStore.getToken()}` } : {},
-      credentials: 'include',
-    });
-    if (!response.ok) throw new Error('no auth');
-    const profile = await response.json();
+    const profile = await getJson('/me');
     setToolbarUserName(profile?.email ?? '');
     setAdminMenuVisibility(profile);
   } catch {
+    authStore.clearToken();
+    window.location.href = '/';
+    return;
     const cached = authStore.getProfile();
     setToolbarUserName(cached?.email ?? '');
     setAdminMenuVisibility(cached);
