@@ -6,7 +6,7 @@ const toolbarTemplate = `
       <img src="/logo/full_logoweb.png" alt="FinHub" />
     </div>
     <nav class="toolbar-menu">
-      <button type="button" data-menu="overview" data-link="/Frontend/Dashboard.html">Resumen</button>
+      <button type="button" data-menu="overview" data-link="/Frontend/dashboard.html">Resumen</button>
       <button type="button" data-menu="portfolios" data-link="/Frontend/Portafolios.html">Portafolios</button>
       <button type="button" data-menu="prices" data-link="/Frontend/precios.html">Precios</button>
       <button type="button" id="datalake-menu" data-menu="datalake" data-link="/Frontend/datalake.html">DataLake</button>
