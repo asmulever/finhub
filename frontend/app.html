@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FinHub | App</title>
+  <link rel="icon" href="/logo/favicon.png" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <style>
+    :root { font-family: 'Inter', system-ui, sans-serif; background: #0b1224; color: #cbd5f5; }
+    body { margin: 0; min-height: 100vh; background: #0b1224; }
+    #frame-container { width: 100%; height: calc(100vh - 90px); }
+    #app-frame { width: 100%; height: 100%; border: none; display: block; }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      padding: 12px 32px;
+      background: rgba(2, 6, 23, 0.95);
+      gap: 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .toolbar-logo img { height: 88px; }
+    .toolbar-menu { display: flex; flex: 1; gap: 16px; }
+    .toolbar-menu button {
+      background: transparent;
+      border: 1px solid transparent;
+      color: inherit;
+      padding: 10px 18px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    .toolbar-menu button.active {
+      border-color: rgba(56, 189, 248, 0.6);
+      background: rgba(14, 165, 233, 0.1);
+    }
+    .toolbar-user { position: relative; }
+    .toolbar-user button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      color: inherit;
+      padding: 10px 16px;
+      border-radius: 999px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .toolbar-user .chevron { font-size: 0.9rem; }
+    .user-dropdown {
+      position: fixed;
+      top: 60px;
+      right: 20px;
+      background: rgba(2, 6, 23, 0.95);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 180px;
+      z-index: 20;
+    }
+    .user-dropdown.visible { display: flex; }
+    .user-dropdown button {
+      background: transparent;
+      border: none;
+      color: inherit;
+      text-align: left;
+      padding: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .user-dropdown button:hover { background: rgba(14, 165, 233, 0.15); }
+    @media (max-width: 768px) {
+      .toolbar { flex-direction: column; align-items: flex-start; }
+      .toolbar-menu { flex-wrap: wrap; }
+      #frame-container { height: calc(100vh - 130px); }
+    }
+  </style>
+</head>
+<body>
+  <div id="toolbar-root"></div>
+  <div id="frame-container">
+    <iframe id="app-frame" title="FinHub" src="/Frontend/dashboard.html"></iframe>
+  </div>
+  <script type="module" src="/Frontend/paginas/app.js"></script>
+</body>
+</html>

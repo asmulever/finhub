@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>FinHub | Data Lake</title>
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <link rel="icon" href="/logo/favicon.png" />
   <script>
     window.__ENV = window.__ENV ?? {};
@@ -20,56 +23,6 @@
       margin: 0;
       min-height: 100vh;
       background: linear-gradient(145deg, #030712, #020f2a 45%, #0f172a);
-    }
-    .toolbar {
-      display: flex;
-      align-items: center;
-      padding: 12px 32px;
-      background: rgba(2, 6, 23, 0.95);
-      gap: 24px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-    .toolbar-logo img {
-      height: 44px;
-    }
-    .toolbar-menu {
-      display: flex;
-      flex: 1;
-      gap: 16px;
-    }
-    .toolbar-menu button {
-      background: transparent;
-      border: 1px solid transparent;
-      color: inherit;
-      padding: 10px 18px;
-      border-radius: 999px;
-      cursor: pointer;
-      font-size: 0.95rem;
-    }
-    .toolbar-menu button.active {
-      border-color: rgba(56, 189, 248, 0.6);
-      background: rgba(14, 165, 233, 0.1);
-    }
-    .toolbar-user {
-      position: relative;
-    }
-    .toolbar-user button {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(15, 23, 42, 0.6);
-      border: 1px solid rgba(148, 163, 184, 0.5);
-      color: inherit;
-      padding: 10px 16px;
-      border-radius: 999px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .toolbar-user .chevron {
-      font-size: 0.9rem;
     }
     .content-shell {
       padding: 24px 32px;
@@ -160,13 +113,6 @@
       background: rgba(14, 165, 233, 0.15);
     }
     @media (max-width: 768px) {
-      .toolbar {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-      .toolbar-menu {
-        flex-wrap: wrap;
-      }
       .content-shell {
         padding: 16px;
       }
@@ -179,7 +125,6 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 </head>
 <body>
-  <div id="toolbar-root"></div>
   <div class="content-shell">
     <main id="app">
       <section class="card">
