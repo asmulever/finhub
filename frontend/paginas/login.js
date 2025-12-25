@@ -1,4 +1,4 @@
-import { postJson } from '../apicliente.js';
+import { getJson, postJson } from '../apicliente.js';
 import { authStore } from '../auth/authStore.js';
 import { setupPasswordToggle } from '../components/passwordToggle.js';
 
@@ -88,3 +88,14 @@ const render = () => {
 };
 
 document.addEventListener('DOMContentLoaded', render);
+
+// Validar sesión al iniciar y redirigir si es válida
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    if (!authStore.getToken()) return;
+    await getJson('/me');
+    window.location.href = '/Frontend/app.html';
+  } catch {
+    // sesión no válida, continuar en login
+  }
+});

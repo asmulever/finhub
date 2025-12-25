@@ -1,7 +1,8 @@
 AGENTS_APB – INSTRUCCIONES PARA OPENAI CODEX / AGENTES SOBRE APB
 
-hablame siempre en español.
-no hagas commit automatico , siempre espera la peticion expresa.
+_hablame siempre en español.
+_no hagas commit automatico , siempre espera la peticion expresa.
+_siempre espera confirmacion expresa para hacer modificaciones.
 
 1. Rol del agente
 
