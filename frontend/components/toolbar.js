@@ -3,10 +3,11 @@ import { authStore } from '../auth/authStore.js';
 const toolbarTemplate = `
   <header class="toolbar">
     <div class="toolbar-logo">
-      <img src="/logo/full_logoweb.png" alt="FinHub" />
+      <a href="/Frontend/dashboard.html">
+        <img src="/logo/full_logoweb.png" alt="FinHub" style="height: 88px;" />
+      </a>
     </div>
     <nav class="toolbar-menu">
-      <button type="button" data-menu="overview" data-link="/Frontend/dashboard.html">Resumen</button>
       <button type="button" data-menu="portfolios" data-link="/Frontend/Portafolios.html">Portafolios</button>
       <button type="button" data-menu="prices" data-link="/Frontend/precios.html">Precios</button>
       <button type="button" id="datalake-menu" data-menu="datalake" data-link="/Frontend/datalake.html">DataLake</button>
