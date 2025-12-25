@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FinHub | Registro</title>
+  <link rel="icon" href="/logo/favicon.png" />
+  <script>
+    window.__ENV = window.__ENV ?? {};
+    window.__ENV.API_BASE_URL = '/api';
+  </script>
+  <link rel="preload" href="/logo/full_logoweb.png" as="image" />
+  <style>
+    :root {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: linear-gradient(135deg, #f8fafc 0%, #0f172a 42%, #020617 58%, #e0f2fe 100%);
+      color: #e2e8f0;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #f8fafc 0%, #0f172a 40%, #020617 60%, #e0f2fe 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+    }
+    #app {
+      width: min(1100px, 100%);
+      display: grid;
+      place-items: center;
+    }
+    .landing-grid {
+      width: 100%;
+      max-width: 1024px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 32px;
+      align-items: stretch;
+    }
+    .hero {
+      padding: 32px;
+      border-radius: 20px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      box-shadow: 0 20px 50px rgba(2, 6, 23, 0.5);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 16px;
+      animation: slideFade 1s ease both;
+    }
+    .hero h1 { margin: 0; font-size: clamp(2rem, 3vw, 2.5rem); color: #cbd5f5; }
+    .hero p.description { margin: 0; color: #94a3b8; line-height: 1.6; }
+    .hero .tagline { font-size: 1.15rem; margin: 0; color: #82cfff; }
+    .feature-list { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 10px; font-size: 0.95rem; }
+    .feature { display: flex; align-items: center; gap: 10px; color: #e0f2fe; opacity: 0.9; }
+    .feature::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #0ea5e9; box-shadow: 0 0 12px rgba(14, 165, 233, 0.5); }
+    .panel { background: rgba(2, 6, 23, 0.92); border-radius: 24px; padding: 32px; box-shadow: 0 20px 60px rgba(15, 23, 42, 0.8); border: 1px solid rgba(148, 163, 184, 0.2); animation: slideUp 0.85s ease-out both; position: relative; overflow: hidden; width: min(420px, 100%); margin: 0 auto; }
+    .login-card { border: 1px solid rgba(14, 165, 233, 0.35); background: radial-gradient(circle at top right, rgba(14, 165, 233, 0.15), rgba(2, 6, 23, 0.95) 70%); }
+    .panel-copy { color: #cbd5f5; margin-bottom: 24px; font-size: 1rem; line-height: 1.5; }
+    .panel::after { content: ''; position: absolute; inset: 0; background: linear-gradient(160deg, rgba(14, 165, 233, 0.2), transparent 70%); pointer-events: none; }
+    .panel-content { position: relative; z-index: 1; }
+    .login-header { margin-bottom: 18px; }
+    .login-header h2 { margin: 0; font-size: 1.8rem; color: #f8fafc; }
+    .login-header .caption { font-size: 0.85rem; letter-spacing: 0.3em; text-transform: uppercase; color: #38bdf8; }
+    .logo { width: 160px; margin-bottom: 12px; }
+    label { font-size: 0.85rem; display: block; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.8; margin-bottom: 6px; }
+    form { display: flex; flex-direction: column; gap: 16px; align-items: center; width: min(340px, 100%); margin: 0 auto; }
+    .input-grid { width: 100%; display: grid; gap: 16px; }
+    .form-group { width: 100%; }
+    .input-field { width: 100%; }
+    input { width: 100%; box-sizing: border-box; border-radius: 8px; border: 1px solid rgba(148, 163, 184, 0.3); padding: 12px 14px; background: rgba(15, 23, 42, 0.5); color: inherit; font-size: 1rem; }
+    .password-field { position: relative; width: 100%; display: flex; align-items: center; gap: 8px; }
+    .password-field input { flex: 1; padding-right: 12px; min-width: 0; }
+    .form-options { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+    .error { color: #f87171; min-height: 20px; }
+    .login-footer { margin-top: 10px; color: #cbd5f5; display: flex; flex-direction: column; gap: 4px; font-size: 0.95rem; }
+    @media (max-width: 768px) { body { padding: 16px; } .panel { padding: 24px; } }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/Frontend/paginas/register.js"></script>
+</body>
+</html>
