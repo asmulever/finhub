@@ -4,6 +4,7 @@
 # Ignore logs
 *.log
 logs/
+!finhub.log
 
 # Ignore Docs
 *.md
