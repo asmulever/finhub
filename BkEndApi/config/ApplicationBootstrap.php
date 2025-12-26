@@ -8,10 +8,14 @@ use FinHub\Infrastructure\Config\Container;
 use FinHub\Infrastructure\Logging\FileLogger;
 use FinHub\Application\MarketData\PriceService;
 use FinHub\Application\MarketData\ProviderUsageService;
+use FinHub\Application\Portfolio\PortfolioService;
+use FinHub\Application\DataLake\DataLakeService;
 use FinHub\Infrastructure\MarketData\TwelveDataClient;
 use FinHub\Infrastructure\MarketData\EodhdClient;
 use FinHub\Infrastructure\Security\JwtTokenProvider;
 use FinHub\Infrastructure\Security\PasswordHasher;
+use FinHub\Infrastructure\Portfolio\PdoPortfolioRepository;
+use FinHub\Infrastructure\DataLake\PdoPriceSnapshotRepository;
 
 final class ApplicationBootstrap
 {
@@ -74,6 +78,10 @@ final class ApplicationBootstrap
         );
         $priceService = new PriceService($twelveDataClient, $eodhdClient, $metrics);
         $providerUsageService = new ProviderUsageService($twelveDataClient, $eodhdClient, $metrics, $logger);
+        $portfolioRepository = new PdoPortfolioRepository($pdo);
+        $priceSnapshotRepository = new PdoPriceSnapshotRepository($pdo, $logger);
+        $portfolioService = new PortfolioService($portfolioRepository);
+        $dataLakeService = new DataLakeService($priceSnapshotRepository, $priceService, $logger);
 
         return new Container([
             'config' => $config,
@@ -85,6 +93,10 @@ final class ApplicationBootstrap
             'eodhd_client' => $eodhdClient,
             'provider_metrics' => $metrics,
             'provider_usage' => $providerUsageService,
+            'portfolio_repository' => $portfolioRepository,
+            'price_snapshot_repository' => $priceSnapshotRepository,
+            'portfolio_service' => $portfolioService,
+            'datalake_service' => $dataLakeService,
         ]);
     }
 
