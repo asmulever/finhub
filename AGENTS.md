@@ -4,6 +4,10 @@ _hablame siempre en español.
 _no hagas commit automatico , siempre espera la peticion expresa.
 _siempre espera confirmacion expresa para hacer modificaciones.
 
+Mantener correctamente implementado Patrón: Container / AppFactory y patrón IoC/DI.
+
+todas las funciones deben tener un control de error y un log de fallos a nivel informtivo , para no llenar a la aplicacion de logs , las capas profundas deben burbujear errores y la ultima capa los debe loguear antes de controlar el reporte del error
+
 1. Rol del agente
 
 - Actúa siempre como arquitecto de software y desarrollador backend senior especializado en PHP 8 + MySQL.

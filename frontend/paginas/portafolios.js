@@ -144,11 +144,11 @@ const applyFilter = () => {
   renderStocks();
 };
 
-const fetchQuote = async (symbol) => {
+const fetchSelectedQuote = async (symbol) => {
   try {
-    return await getJson(`/prices?symbol=${encodeURIComponent(symbol)}`);
+    return await getJson(`/datalake/prices/latest?symbol=${encodeURIComponent(symbol)}`);
   } catch (error) {
-    return { symbol, error: { message: error?.error?.message ?? 'No se pudo obtener el precio' } };
+    return { symbol, error: { message: error?.error?.message ?? 'No se pudo obtener el precio del Data Lake' } };
   }
 };
 
@@ -165,7 +165,7 @@ const fetchSelectedPortfolio = async () => {
     const enriched = [];
     for (const item of items) {
       // eslint-disable-next-line no-await-in-loop
-      const quote = await fetchQuote(item.symbol);
+      const quote = await fetchSelectedQuote(item.symbol);
       enriched.push({ ...item, quote });
     }
     state.selectedItems = enriched;
@@ -223,7 +223,7 @@ const handleAddToPortfolio = async (event) => {
       mic_code: instrument.mic_code ?? '',
     });
     state.selectedSymbols.add(symbol);
-    const quote = await fetchQuote(symbol);
+    const quote = await fetchSelectedQuote(symbol);
     const exists = state.selectedItems.some((i) => i.symbol === symbol);
     if (!exists) {
       state.selectedItems.push({ ...instrument, quote });

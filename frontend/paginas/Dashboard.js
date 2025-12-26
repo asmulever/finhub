@@ -6,6 +6,7 @@ const state = {
   profile: null,
   portfolios: [],
   quote: null,
+  metrics: null,
 };
 
 const createCard = (title, body) => `
@@ -28,20 +29,25 @@ const renderOverview = () => {
       </div>
     `));
   }
-  const list = state.portfolios
-    .map((p) => `<li>${p.name} (${p.baseCurrency})</li>`)
-    .join('');
-  sections.push(createCard('Portafolios', `<ul>${list || '<li>No hay portafolios</li>'}</ul>`));
-  if (state.quote) {
-    sections.push(createCard('Última cotización', `
+  if (state.metrics) {
+    const td = state.metrics.providers?.twelvedata ?? {};
+    const eod = state.metrics.providers?.eodhd ?? {};
+    sections.push(createCard('Consumo de APIs', `
       <div class="controls">
-        <strong>${state.quote.symbol}</strong>
-        <span>${state.quote.close}</span>
-        <small>${new Date(state.quote.asOf).toLocaleString()}</small>
+        <div>
+          <strong>Twelve Data</strong><br/>
+          <small>Usadas: ${td.used ?? 0} / ${td.allowed ?? 'N/D'}</small><br/>
+          <small>Éxitos: ${td.success ?? 0} | Fallos: ${td.failed ?? 0}</small><br/>
+          <small>Restantes: ${td.remaining ?? 0}</small>
+        </div>
+        <div>
+          <strong>EODHD</strong><br/>
+          <small>Usadas: ${eod.used ?? 0} / ${eod.allowed ?? 'N/D'}</small><br/>
+          <small>Éxitos: ${eod.success ?? 0} | Fallos: ${eod.failed ?? 0}</small><br/>
+          <small>Restantes: ${eod.remaining ?? 0}</small>
+        </div>
       </div>
     `));
-  } else {
-    sections.push(createCard('Última cotización', '<p>Datos no disponibles</p>'));
   }
   app.innerHTML = sections.join('');
 };
@@ -106,9 +112,9 @@ const render = async () => {
     state.portfolios = [];
   }
   try {
-    state.quote = await getJson('/quotes?symbol=AAPL');
-  } catch (error) {
-    state.quote = null;
+    state.metrics = await getJson('/metrics/providers');
+  } catch {
+    state.metrics = null;
   }
   syncUserName();
   renderOverview();

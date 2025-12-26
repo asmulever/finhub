@@ -6,6 +6,7 @@ namespace FinHub\Infrastructure;
 use FinHub\Application\Auth\AuthService;
 use FinHub\Application\MarketData\Dto\PriceRequest;
 use FinHub\Application\MarketData\PriceService;
+use FinHub\Application\MarketData\ProviderUsageService;
 use FinHub\Domain\User\UserRepositoryInterface;
 use FinHub\Infrastructure\Config\Config;
 use FinHub\Infrastructure\Logging\LoggerInterface;
@@ -25,6 +26,7 @@ final class ApiDispatcher
     private PasswordHasher $passwordHasher;
     private PDO $pdo;
     private EodhdClient $eodhdClient;
+    private ProviderUsageService $providerUsage;
     /** Rutas base deben terminar sin barra final. */
     private string $apiBase;
 
@@ -37,7 +39,8 @@ final class ApiDispatcher
         JwtTokenProvider $jwt,
         PasswordHasher $passwordHasher,
         \PDO $pdo,
-        EodhdClient $eodhdClient
+        EodhdClient $eodhdClient,
+        ProviderUsageService $providerUsage
     )
     {
         $this->config = $config;
@@ -50,6 +53,7 @@ final class ApiDispatcher
         $this->passwordHasher = $passwordHasher;
         $this->pdo = $pdo;
         $this->eodhdClient = $eodhdClient;
+        $this->providerUsage = $providerUsage;
     }
 
     /**
@@ -91,13 +95,20 @@ final class ApiDispatcher
             return;
         }
         if ($method === 'GET' && $path === '/stocks') {
-            $stocks = $this->priceService->listStocks();
+            $exchange = trim((string) ($_GET['exchange'] ?? 'US'));
+            $stocks = $this->priceService->listStocks($exchange === '' ? 'US' : $exchange);
             $this->sendJson(['data' => $stocks]);
             return;
         }
         if ($method === 'GET' && $path === '/me') {
             $user = $this->requireUser();
             $this->sendJson($user->toResponse());
+            return;
+        }
+        if ($method === 'GET' && $path === '/metrics/providers') {
+            $this->requireUser();
+            $metrics = $this->providerUsage->getUsage();
+            $this->sendJson($metrics);
             return;
         }
         if ($method === 'GET' && ($path === '/prices' || $path === '/quotes')) {
@@ -117,6 +128,10 @@ final class ApiDispatcher
         }
         if ($method === 'GET' && $path === '/datalake/prices/series') {
             $this->handlePriceSeries();
+            return;
+        }
+        if ($method === 'GET' && $path === '/datalake/prices/latest') {
+            $this->handleLatestPrice();
             return;
         }
         if ($method === 'GET' && $path === '/eodhd/eod') {
@@ -453,6 +468,34 @@ final class ApiDispatcher
     }
 
     /**
+     * Devuelve el último precio almacenado en dl_price_latest para un símbolo.
+     */
+    private function handleLatestPrice(): void
+    {
+        $this->ensureDataLakeTables();
+        $symbol = trim((string) ($_GET['symbol'] ?? ''));
+        if ($symbol === '') {
+            throw new \RuntimeException('symbol requerido', 422);
+        }
+        $query = 'SELECT symbol, provider, as_of, payload_json FROM dl_price_latest WHERE symbol = :symbol LIMIT 1';
+        $stmt = $this->pdo->prepare($query);
+        $stmt->execute([':symbol' => $symbol]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row === false) {
+            throw new \RuntimeException('Precio no disponible en Data Lake', 404);
+        }
+        $payload = $row['payload_json'];
+        if (is_string($payload)) {
+            $payload = json_decode($payload, true);
+        }
+        if (!is_array($payload)) {
+            throw new \RuntimeException('Payload inválido en Data Lake', 500);
+        }
+        $quote = $this->normalizeSnapshotPayload($payload, $symbol, (string) $row['provider'], (string) $row['as_of']);
+        $this->sendJson($quote);
+    }
+
+    /**
      * Obtiene lista deduplicada de símbolos desde portfolio_instruments.
      */
     private function getPortfolioSymbols(): array
@@ -468,37 +511,17 @@ final class ApiDispatcher
      */
     private function fetchPriceFromProvider(string $symbol): array
     {
-        $apiKey = (string) $this->config->get('TWELVE_DATA_API_KEY', '');
-        $baseUrl = rtrim((string) $this->config->get('TWELVE_DATA_BASE_URL', 'https://api.twelvedata.com'), '/');
-        $url = sprintf('%s/quote?symbol=%s&apikey=%s', $baseUrl, urlencode($symbol), urlencode($apiKey));
-
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => (int) $this->config->get('TWELVE_DATA_TIMEOUT_SECONDS', 5),
-        ]);
-        $responseBody = curl_exec($ch);
-        $httpStatus = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $errorMsg = curl_error($ch);
-        curl_close($ch);
-
-        $payload = null;
-        if ($responseBody !== false) {
-            $decoded = json_decode($responseBody, true);
-            $payload = is_array($decoded) ? $decoded : ['raw' => $responseBody];
-        }
-
-        $asOfString = $payload['datetime'] ?? $payload['as_of'] ?? $payload['timestamp'] ?? null;
-        $asOf = $asOfString ? new \DateTimeImmutable($asOfString) : new \DateTimeImmutable();
-
+        $snapshot = $this->priceService->fetchSnapshot($symbol);
+        $asOfString = $snapshot['as_of'] ?? null;
+        $asOf = $asOfString ? new \DateTimeImmutable((string) $asOfString) : new \DateTimeImmutable();
         return [
-            'symbol' => $symbol,
-            'provider' => 'twelvedata',
-            'payload' => $payload ?? ['error' => $errorMsg ?: 'Respuesta vacía'],
+            'symbol' => $snapshot['symbol'] ?? $symbol,
+            'provider' => $snapshot['source'] ?? 'unknown',
+            'payload' => $snapshot['payload'] ?? $snapshot,
             'as_of' => $asOf,
-            'http_status' => $httpStatus ?: null,
-            'error_code' => $payload['code'] ?? null,
-            'error_msg' => $payload['message'] ?? ($errorMsg ?: null),
+            'http_status' => $snapshot['http_status'] ?? null,
+            'error_code' => $snapshot['error_code'] ?? null,
+            'error_msg' => $snapshot['error_msg'] ?? null,
         ];
     }
 
@@ -572,6 +595,34 @@ SQL;
             }
         }
         return null;
+    }
+
+    /**
+     * Normaliza un snapshot persistido para exponerlo como quote.
+     */
+    private function normalizeSnapshotPayload(array $payload, string $symbol, string $provider, string $asOf): array
+    {
+        $close = $payload['close'] ?? $payload['price'] ?? $payload['c'] ?? null;
+        $open = $payload['open'] ?? $payload['o'] ?? null;
+        $high = $payload['high'] ?? $payload['h'] ?? null;
+        $low = $payload['low'] ?? $payload['l'] ?? null;
+        $previousClose = $payload['previous_close'] ?? $payload['previousClose'] ?? $payload['pc'] ?? null;
+        $currency = $payload['currency'] ?? $payload['currency_code'] ?? null;
+        $name = $payload['name'] ?? $payload['symbol'] ?? null;
+        $asOfValue = $payload['as_of'] ?? $payload['datetime'] ?? $payload['timestamp'] ?? $payload['date'] ?? $asOf;
+
+        return [
+            'symbol' => $payload['symbol'] ?? $symbol,
+            'name' => $name,
+            'currency' => $currency,
+            'close' => $close !== null ? (float) $close : null,
+            'open' => $open !== null ? (float) $open : null,
+            'high' => $high !== null ? (float) $high : null,
+            'low' => $low !== null ? (float) $low : null,
+            'previous_close' => $previousClose !== null ? (float) $previousClose : null,
+            'asOf' => $asOfValue,
+            'source' => $provider,
+        ];
     }
 
     private function resolveSince(string $period): ?\DateTimeImmutable

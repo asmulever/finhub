@@ -8,6 +8,7 @@ final class TwelveDataClient
     private string $apiKey;
     private string $baseUrl;
     private int $timeoutSeconds;
+    private ?array $lastResponseHeaders = null;
 
     public function __construct(string $apiKey, string $baseUrl = 'https://api.twelvedata.com', int $timeoutSeconds = 5)
     {
@@ -48,12 +49,68 @@ final class TwelveDataClient
     }
 
     /**
+     * Recupera información de uso de la cuenta (requests restantes).
+     */
+    public function fetchUsage(): array
+    {
+        $response = $this->request('api_usage', ['apikey' => $this->apiKey]);
+
+        // Límites diarios
+        $dailyLimit = $this->extractFirstInt([
+            $response['plan_daily_limit'] ?? null,
+            $response['daily_usage']['limit'] ?? null,
+        ]);
+        $dailyUsed = $this->extractFirstInt([
+            $response['daily_usage'] ?? null,
+            $response['daily_usage']['used'] ?? null,
+        ]);
+        if ($dailyUsed === null && isset($response['daily_usage']) && is_numeric($response['daily_usage'])) {
+            $dailyUsed = (int) $response['daily_usage'];
+        }
+        $dailyRemaining = null;
+        if ($dailyLimit !== null && $dailyUsed !== null) {
+            $dailyRemaining = max(0, $dailyLimit - $dailyUsed);
+        }
+
+        // Ventana por minuto (opcional)
+        $perMinuteLimit = $this->extractFirstInt([
+            $response['plan_limit'] ?? null,
+            $response['current_usage']['limit'] ?? null,
+        ]);
+        $perMinuteUsed = $this->extractFirstInt([
+            $response['current_usage'] ?? null,
+            $response['current_usage']['used'] ?? null,
+            $response['current_usage']['value'] ?? null,
+        ]);
+        if ($perMinuteUsed === null && isset($response['current_usage']) && is_numeric($response['current_usage'])) {
+            $perMinuteUsed = (int) $response['current_usage'];
+        }
+        $perMinuteRemaining = null;
+        if ($perMinuteLimit !== null && $perMinuteUsed !== null) {
+            $perMinuteRemaining = max(0, $perMinuteLimit - $perMinuteUsed);
+        }
+
+        return [
+            'limit' => $dailyLimit,
+            'remaining' => $dailyRemaining,
+            'used' => $dailyUsed,
+            'per_minute_limit' => $perMinuteLimit,
+            'per_minute_remaining' => $perMinuteRemaining,
+            'per_minute_used' => $perMinuteUsed,
+            'headers' => $this->lastResponseHeaders,
+            'raw' => $response,
+        ];
+    }
+
+    /**
      * Ejecuta la llamada HTTP y devuelve el payload JSON decodificado.
      */
     private function request(string $endpoint, array $query): array
     {
         $url = sprintf('%s/%s?%s', $this->baseUrl, ltrim($endpoint, '/'), http_build_query($query, '', '&', PHP_QUERY_RFC3986));
-        $rawBody = $this->httpGet($url);
+        $responseHeaders = [];
+        $rawBody = $this->httpGet($url, $responseHeaders);
+        $this->lastResponseHeaders = $responseHeaders;
         $decoded = json_decode($rawBody, true);
 
         if (!is_array($decoded)) {
@@ -71,15 +128,34 @@ final class TwelveDataClient
         return $decoded;
     }
 
+    private function extractFirstInt(array $candidates): ?int
+    {
+        foreach ($candidates as $value) {
+            if (is_numeric($value)) {
+                return (int) $value;
+            }
+        }
+        return null;
+    }
+
     /**
      * Realiza un GET usando cURL si está disponible, o stream_context como alternativa.
      */
-    private function httpGet(string $url): string
+    private function httpGet(string $url, ?array &$responseHeaders = null): string
     {
+        $responseHeaders = [];
         if (function_exists('curl_init')) {
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeoutSeconds);
+            curl_setopt($ch, CURLOPT_HEADERFUNCTION, static function ($ch, string $header) use (&$responseHeaders): int {
+                $len = strlen($header);
+                $parts = explode(':', $header, 2);
+                if (count($parts) === 2) {
+                    $responseHeaders[strtolower(trim($parts[0]))] = trim($parts[1]);
+                }
+                return $len;
+            });
             $body = curl_exec($ch);
             if ($body === false) {
                 $error = curl_error($ch);
@@ -101,6 +177,14 @@ final class TwelveDataClient
             ],
         ]);
         $body = @file_get_contents($url, false, $context);
+        if (isset($http_response_header) && is_array($http_response_header)) {
+            foreach ($http_response_header as $headerLine) {
+                $parts = explode(':', $headerLine, 2);
+                if (count($parts) === 2) {
+                    $responseHeaders[strtolower(trim($parts[0]))] = trim($parts[1]);
+                }
+            }
+        }
         if ($body === false) {
             $statusLine = $http_response_header[0] ?? 'HTTP error';
             $code = 502;
