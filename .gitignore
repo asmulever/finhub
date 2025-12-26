@@ -12,6 +12,7 @@ docs/
 # EXCEPCIÓN: este archivo NO se ignora
 !AGENTS.MD
 !Pendientes.md
+!endpoints_gratuitos_twelve_data_y_eodhd.md
 
 # Ignore VSCode editor files
 .vscode/

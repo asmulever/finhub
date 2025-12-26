@@ -507,6 +507,11 @@ final class ApiDispatcher
      */
     private function storeSnapshot(array $snapshot): array
     {
+        // No persistir registros con código de error informado
+        if (isset($snapshot['error_code']) && $snapshot['error_code'] !== null && $snapshot['error_code'] !== '') {
+            return ['success' => false, 'reason' => sprintf('Error del proveedor: %s', $snapshot['error_code'])];
+        }
+
         try {
             $payloadJson = json_encode($snapshot['payload'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             $hash = hash('sha256', $payloadJson, true);
