@@ -7,6 +7,7 @@ use FinHub\Infrastructure\Config\Config;
 use FinHub\Infrastructure\Config\Container;
 use FinHub\Infrastructure\Logging\FileLogger;
 use FinHub\Application\MarketData\PriceService;
+use FinHub\Application\MarketData\ProviderUsageService;
 use FinHub\Infrastructure\MarketData\TwelveDataClient;
 use FinHub\Infrastructure\MarketData\EodhdClient;
 use FinHub\Infrastructure\Security\JwtTokenProvider;
@@ -65,8 +66,14 @@ final class ApplicationBootstrap
                 (int) $config->get('TWELVE_DATA_TIMEOUT_SECONDS', 5)
             );
         }
-        $priceService = new PriceService($twelveDataClient);
         $eodhdClient = new EodhdClient($config);
+        $metrics = new \FinHub\Infrastructure\MarketData\ProviderMetrics(
+            $this->rootDir . '/storage/metrics',
+            (int) $config->get('TWELVEDATA_DAILY_LIMIT', 800),
+            (int) $config->get('EODHD_DAILY_LIMIT', 20)
+        );
+        $priceService = new PriceService($twelveDataClient, $eodhdClient, $metrics);
+        $providerUsageService = new ProviderUsageService($twelveDataClient, $eodhdClient, $metrics, $logger);
 
         return new Container([
             'config' => $config,
@@ -76,6 +83,8 @@ final class ApplicationBootstrap
             'password_hasher' => $passwordHasher,
             'price_service' => $priceService,
             'eodhd_client' => $eodhdClient,
+            'provider_metrics' => $metrics,
+            'provider_usage' => $providerUsageService,
         ]);
     }
 

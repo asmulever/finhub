@@ -16,3 +16,9 @@ docs/
 
 # Ignore VSCode editor files
 .vscode/
+
+# Métricas locales
+storage/metrics/
+
+# Cache de EODHD (listados)
+storage/cache/

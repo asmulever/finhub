@@ -144,12 +144,21 @@ const fetchSelectedQuotes = async () => {
   for (const symbol of symbols) {
     // sequential to avoid flooding if la lista es corta; se puede paralelizar si hace falta
     // eslint-disable-next-line no-await-in-loop
-    const q = await fetchQuote(symbol);
+    const q = await fetchSelectedQuote(symbol);
     quotes.push(q);
   }
   state.selectedQuotes = quotes;
   state.loadingSelected = false;
   renderPrices();
+};
+
+const fetchSelectedQuote = async (symbol) => {
+  try {
+    const quote = await getJson(`/datalake/prices/latest?symbol=${encodeURIComponent(symbol)}`);
+    return quote;
+  } catch (error) {
+    return { symbol, error: { message: error?.error?.message ?? 'No se pudo obtener el precio del Data Lake' } };
+  }
 };
 
 const fetchTempQuote = async (symbol) => {
