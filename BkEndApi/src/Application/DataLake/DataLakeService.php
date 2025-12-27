@@ -29,37 +29,66 @@ final class DataLakeService
     {
         $this->repository->ensureTables();
         $startedAt = microtime(true);
+        $total = count($symbols);
         $results = [
             'started_at' => date('c', (int) $startedAt),
             'finished_at' => null,
-            'total_symbols' => count($symbols),
+            'total_symbols' => $total,
             'ok' => 0,
             'failed' => 0,
             'errors' => [],
+            'steps' => [],
         ];
 
-        foreach ($symbols as $symbol) {
-            $snapshot = $this->priceService->fetchSnapshot($symbol);
-            if (!isset($snapshot['provider']) || $snapshot['provider'] === null || $snapshot['provider'] === '') {
-                $snapshot['provider'] = $snapshot['source'] ?? 'unknown';
+        $this->appendStep($results['steps'], '', 'init', 'running', 'Iniciando proceso de ingesta', ['current' => 0, 'total' => $total]);
+
+        foreach ($symbols as $index => $symbol) {
+            $progress = ['current' => $index + 1, 'total' => $total];
+            $this->appendStep($results['steps'], $symbol, 'start', 'running', 'Iniciando ingesta de símbolo', $progress);
+
+            try {
+                $snapshot = $this->priceService->fetchSnapshot($symbol);
+                if (!isset($snapshot['provider']) || $snapshot['provider'] === null || $snapshot['provider'] === '') {
+                    $snapshot['provider'] = $snapshot['source'] ?? 'unknown';
+                }
+                $this->appendStep($results['steps'], $symbol, 'fetch', 'ok', 'Snapshot obtenido del proveedor', $progress);
+            } catch (\Throwable $e) {
+                $results['failed']++;
+                $results['errors'][] = ['symbol' => $symbol, 'reason' => $e->getMessage()];
+                $this->appendStep($results['steps'], $symbol, 'fetch', 'error', $e->getMessage(), $progress);
+                $this->logger->info('datalake.collect.fetch_failed', [
+                    'symbol' => $symbol,
+                    'message' => $e->getMessage(),
+                ]);
+                continue;
             }
             // Validar que el payload contenga precio antes de persistir
             $price = $this->extractPrice($snapshot['payload'] ?? []);
             if ($price === null) {
                 $results['failed']++;
                 $results['errors'][] = ['symbol' => $symbol, 'reason' => 'Precio no disponible en payload'];
+                $this->appendStep($results['steps'], $symbol, 'validate', 'error', 'Precio no disponible en payload', $progress);
                 continue;
             }
+
             $stored = $this->repository->storeSnapshot($snapshot);
             if ($stored['success']) {
                 $results['ok']++;
+                $this->appendStep($results['steps'], $symbol, 'store', 'ok', 'Snapshot almacenado', $progress);
             } else {
                 $results['failed']++;
                 $results['errors'][] = ['symbol' => $symbol, 'reason' => $stored['reason'] ?? 'unknown'];
+                $this->appendStep($results['steps'], $symbol, 'store', 'error', $stored['reason'] ?? 'Error al almacenar', $progress);
+                $this->logger->info('datalake.collect.store_failed', [
+                    'symbol' => $symbol,
+                    'message' => $stored['reason'] ?? 'Error al almacenar snapshot',
+                ]);
             }
         }
 
         $results['finished_at'] = date('c');
+        $results['duration_seconds'] = round(microtime(true) - $startedAt, 3);
+        $this->appendStep($results['steps'], '', 'complete', 'ok', 'Proceso finalizado', ['current' => $results['ok'] + $results['failed'], 'total' => $total]);
         return $results;
     }
 
@@ -169,6 +198,21 @@ final class DataLakeService
             'previous_close' => $previousClose !== null ? (float) $previousClose : null,
             'asOf' => $asOfValue,
             'source' => $provider,
+        ];
+    }
+
+    /**
+     * Agrega un paso de trazabilidad de ingesta al resultado.
+     */
+    private function appendStep(array &$steps, string $symbol, string $stage, string $status, string $message, array $progress): void
+    {
+        $steps[] = [
+            'at' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
+            'symbol' => $symbol,
+            'stage' => $stage,
+            'status' => $status,
+            'message' => $message,
+            'progress' => $progress,
         ];
     }
 }
