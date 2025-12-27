@@ -405,6 +405,14 @@ final class ApiDispatcher
             throw new \RuntimeException('No hay símbolos configurados para ingesta', 400);
         }
         $results = $this->dataLakeService->collect($symbols);
+        if ($results['failed'] > 0) {
+            $this->logger->info('datalake.collect.partial', [
+                'trace_id' => $traceId,
+                'ok' => $results['ok'],
+                'failed' => $results['failed'],
+                'total' => $results['total_symbols'],
+            ]);
+        }
         $status = $results['failed'] === $results['total_symbols'] ? 500 : 200;
         $this->sendJson($results, $status);
     }

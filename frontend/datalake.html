@@ -14,30 +14,12 @@
   </script>
   <link rel="preload" href="/logo/full_logoweb.png" as="image" />
   <style>
-    :root {
-      font-family: 'Inter', system-ui, sans-serif;
-      background: linear-gradient(145deg, #030712, #020f2a 45%, #0f172a);
-      color: #cbd5f5;
-    }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: linear-gradient(145deg, #030712, #020f2a 45%, #0f172a);
-    }
-    .content-shell {
-      padding: 24px 32px;
-    }
-    #app {
-      display: grid;
-      gap: 24px;
-    }
-    .card {
-      background: rgba(15, 23, 42, 0.95);
-      border-radius: 20px;
-      padding: 26px;
-      border: 1px solid rgba(148, 163, 184, 0.3);
-      box-shadow: 0 25px 50px rgba(2, 6, 23, 0.7);
-    }
+    :root { font-family: 'Inter', system-ui, sans-serif; background: linear-gradient(145deg, #030712, #020f2a 45%, #0f172a); color: #cbd5f5; }
+    html, body { height: 100%; }
+    body { margin: 0; background: linear-gradient(145deg, #030712, #020f2a 45%, #0f172a); overflow: hidden; }
+    .content-shell { padding: 16px 20px; height: 100vh; box-sizing: border-box; }
+    #app { display: grid; gap: 20px; height: 100%; }
+    .card { background: rgba(15, 23, 42, 0.95); border-radius: 20px; padding: 22px; border: 1px solid rgba(148, 163, 184, 0.3); box-shadow: 0 25px 50px rgba(2, 6, 23, 0.7); height: 100%; box-sizing: border-box; display: flex; flex-direction: column; }
     .card-header {
       display: flex;
       justify-content: space-between;
@@ -78,9 +60,38 @@
       margin-top: 8px;
       font-size: 0.95rem;
     }
-    #chart-container {
-      position: relative;
-      height: 420px;
+    #chart-container { position: relative; height: clamp(240px, 42vh, 440px); min-height: 200px; }
+    .datalake-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(320px, 1.1fr);
+      gap: 18px;
+      align-items: stretch;
+      margin-top: 12px;
+      min-height: 0;
+      height: 100%;
+    }
+    .panel-left { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+    .log-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      height: 100%;
+      min-height: 0;
+    }
+    .log-panel textarea {
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+      height: clamp(240px, 42vh, 440px);
+      resize: vertical;
+      background: rgba(2, 6, 23, 0.7);
+      color: #e2e8f0;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      border-radius: 12px;
+      padding: 12px;
+      font-family: "JetBrains Mono", "Fira Code", monospace;
+      font-size: 0.9rem;
+      line-height: 1.4;
     }
     .user-dropdown {
       position: fixed;
@@ -116,9 +127,9 @@
       .content-shell {
         padding: 16px;
       }
-      #chart-container {
-        height: 320px;
-      }
+      #chart-container { height: clamp(200px, 36vh, 360px); }
+      .datalake-layout { grid-template-columns: 1fr; }
+      .log-panel textarea { height: clamp(200px, 36vh, 360px); }
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -132,20 +143,31 @@
           <h2>Data Lake de Precios</h2>
           <p class="muted">Recolecta y grafica precios históricos</p>
         </div>
-        <div class="controls">
-          <button id="collect-btn" class="primary" type="button">Recolectar ahora</button>
-          <select id="period-select" aria-label="Período">
-            <option value="1m">Último mes</option>
-            <option value="3m">Últimos 3 meses</option>
-            <option value="6m">Últimos 6 meses</option>
-            <option value="1y">Último año</option>
-            <option value="all">Todo</option>
-          </select>
-          <select id="symbol-select" multiple size="5" aria-label="Seleccionar instrumentos"></select>
-        </div>
-        <div id="collect-result" class="muted"></div>
-        <div id="chart-container">
-          <canvas id="prices-chart" aria-label="Gráfico de precios"></canvas>
+        <div class="datalake-layout">
+          <div class="panel-left">
+            <div class="controls">
+              <button id="collect-btn" class="primary" type="button">Recolectar ahora</button>
+              <select id="period-select" aria-label="Período">
+                <option value="1m">Último mes</option>
+                <option value="3m">Últimos 3 meses</option>
+                <option value="6m">Últimos 6 meses</option>
+                <option value="1y">Último año</option>
+                <option value="all">Todo</option>
+              </select>
+              <select id="symbol-select" multiple size="5" aria-label="Seleccionar instrumentos"></select>
+            </div>
+            <div id="collect-result" class="muted"></div>
+            <div id="chart-container">
+              <canvas id="prices-chart" aria-label="Gráfico de precios"></canvas>
+            </div>
+          </div>
+          <div class="log-panel">
+            <div class="card-header" style="padding: 0; justify-content: space-between;">
+              <p class="muted" style="margin: 0;">Progreso de ingesta</p>
+              <small class="muted">Se reinicia en cada ejecución</small>
+            </div>
+            <textarea id="ingestion-log" aria-label="Trazas de ingesta" readonly></textarea>
+          </div>
         </div>
       </section>
     </main>

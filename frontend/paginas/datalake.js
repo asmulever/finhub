@@ -13,6 +13,48 @@ const state = {
 
 const isAdminProfile = (profile) => String(profile?.role ?? '').toLowerCase() === 'admin';
 
+const getLogArea = () => document.getElementById('ingestion-log');
+
+const timestamp = () => new Date().toISOString();
+
+const resetLog = (message = '') => {
+  const log = getLogArea();
+  if (!log) return;
+  log.value = '';
+  if (message) {
+    log.value = `[${timestamp()}] ${message}`;
+  }
+};
+
+const appendLog = (message, at = null) => {
+  const log = getLogArea();
+  if (!log) return;
+  const ts = at ?? timestamp();
+  const prefix = log.value === '' ? '' : '\n';
+  log.value = `${log.value}${prefix}[${ts}] ${message}`;
+  log.scrollTop = log.scrollHeight;
+};
+
+const formatStepLine = (step) => {
+  if (!step || typeof step !== 'object') return '';
+  const progress = step.progress ? ` (${step.progress.current}/${step.progress.total})` : '';
+  const symbol = step.symbol ? `[${step.symbol}] ` : '';
+  const stage = step.stage ? `${step.stage}: ` : '';
+  const status = step.status ? `${String(step.status).toUpperCase()} ` : '';
+  const message = step.message ?? '';
+  return `${symbol}${stage}${status}${message}${progress}`.trim();
+};
+
+const renderStepLog = (steps = []) => {
+  if (!Array.isArray(steps)) return;
+  steps.forEach((step) => {
+    const line = formatStepLine(step);
+    if (line !== '') {
+      appendLog(line, step.at ?? null);
+    }
+  });
+};
+
 const colors = [
   '#0ea5e9', '#22d3ee', '#a78bfa', '#f472b6', '#f59e0b',
   '#10b981', '#ef4444', '#6366f1', '#14b8a6', '#f97316',
@@ -84,17 +126,22 @@ const handleCollect = async () => {
   const btn = document.getElementById('collect-btn');
   const result = document.getElementById('collect-result');
   if (btn) btn.disabled = true;
+  resetLog('Iniciando ingesta de precios...');
   if (result) result.textContent = 'Recolectando...';
   try {
+    appendLog('Solicitando ingesta al servidor...');
     const response = await postJson('/datalake/prices/collect', {});
+    renderStepLog(response?.steps);
     if (result) {
       result.textContent = `OK: ${response.ok} | Fallidos: ${response.failed} | Total símbolos: ${response.total_symbols}`;
     }
+    appendLog(`Resultado final -> OK: ${response.ok} | Fallidos: ${response.failed} | Total: ${response.total_symbols}`);
     await fetchSeries();
   } catch (error) {
     if (result) {
       result.textContent = `Error al recolectar: ${error?.error?.message ?? 'Desconocido'}`;
     }
+    appendLog(`Error al recolectar: ${error?.error?.message ?? error?.message ?? 'Desconocido'}`);
   } finally {
     state.collecting = false;
     if (btn) btn.disabled = false;
@@ -160,6 +207,7 @@ const init = async () => {
   document.getElementById('collect-btn')?.addEventListener('click', handleCollect);
   document.getElementById('symbol-select')?.addEventListener('change', handleSymbolChange);
   document.getElementById('period-select')?.addEventListener('change', handlePeriodChange);
+  resetLog('Listo para iniciar ingesta.');
 };
 
 document.addEventListener('DOMContentLoaded', init);
