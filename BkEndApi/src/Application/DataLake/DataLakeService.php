@@ -30,6 +30,9 @@ final class DataLakeService
         $this->repository->ensureTables();
         $startedAt = microtime(true);
         $total = count($symbols);
+        $this->logger->info('datalake.collect.start', [
+            'total_symbols' => $total,
+        ]);
         $results = [
             'started_at' => date('c', (int) $startedAt),
             'finished_at' => null,
@@ -89,6 +92,20 @@ final class DataLakeService
         $results['finished_at'] = date('c');
         $results['duration_seconds'] = round(microtime(true) - $startedAt, 3);
         $this->appendStep($results['steps'], '', 'complete', 'ok', 'Proceso finalizado', ['current' => $results['ok'] + $results['failed'], 'total' => $total]);
+        $errorSymbols = array_map(static fn ($e) => $e['symbol'] ?? '', $results['errors']);
+        $results['summary'] = sprintf(
+            'OK: %d | Fallidos: %d | Total: %d | Errores: %s',
+            $results['ok'],
+            $results['failed'],
+            $results['total_symbols'],
+            empty($errorSymbols) ? 'ninguno' : implode(',', array_filter($errorSymbols))
+        );
+        $this->logger->info('datalake.collect.done', [
+            'ok' => $results['ok'],
+            'failed' => $results['failed'],
+            'total' => $results['total_symbols'],
+            'duration' => $results['duration_seconds'],
+        ]);
         return $results;
     }
 
@@ -127,12 +144,23 @@ final class DataLakeService
         $rows = $this->repository->fetchSeries($symbol, $since);
         $points = [];
         foreach ($rows as $row) {
-            $price = $this->extractPrice($row['payload']);
+            $normalized = $this->normalizeSnapshotPayload($row['payload'], $symbol, (string) ($row['provider'] ?? 'unknown'), (string) $row['as_of']);
+            $price = $normalized['close'];
+            $open = $normalized['open'] ?? null;
+            $high = $normalized['high'] ?? null;
+            $low = $normalized['low'] ?? null;
             if ($price === null) {
                 continue;
             }
             $asOfIso = (new \DateTimeImmutable((string) $row['as_of']))->format(\DateTimeInterface::ATOM);
-            $points[] = ['t' => $asOfIso, 'price' => $price];
+            $points[] = [
+                't' => $asOfIso,
+                'price' => $price,
+                'open' => $open !== null ? (float) $open : (float) $price,
+                'high' => $high !== null ? (float) $high : (float) $price,
+                'low' => $low !== null ? (float) $low : (float) $price,
+                'close' => $price !== null ? (float) $price : null,
+            ];
         }
         return [
             'symbol' => $symbol,

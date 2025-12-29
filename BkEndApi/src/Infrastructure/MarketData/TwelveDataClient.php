@@ -34,11 +34,11 @@ final class TwelveDataClient
     /**
      * Lista los tickers disponibles.
      */
-    public function listStocks(): array
+    public function listStocks(?string $exchange = null): array
     {
         $params = [
             'apikey' => $this->apiKey,
-            'mic_code' => 'XBUE',
+            'mic_code' => $exchange ? strtoupper($exchange) : 'XBUE',
         ];
         $response = $this->request('stocks', $params);
         $data = $response['data'] ?? $response;

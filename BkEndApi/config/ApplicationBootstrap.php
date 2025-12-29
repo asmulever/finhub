@@ -72,11 +72,20 @@ final class ApplicationBootstrap
         }
         $eodhdClient = new EodhdClient($config);
         $metrics = new \FinHub\Infrastructure\MarketData\ProviderMetrics(
-            $this->rootDir . '/storage/metrics',
+            $this->rootDir . '/storage',
             (int) $config->get('TWELVEDATA_DAILY_LIMIT', 800),
             (int) $config->get('EODHD_DAILY_LIMIT', 20)
         );
-        $priceService = new PriceService($twelveDataClient, $eodhdClient, $metrics);
+        $quoteCache = new \FinHub\Infrastructure\MarketData\QuoteCache(
+            $this->rootDir . '/storage/quote_cache',
+            86400
+        );
+        $symbolsAggregator = new \FinHub\Infrastructure\MarketData\QuoteSymbolsAggregator(
+            $eodhdClient,
+            $twelveDataClient,
+            $quoteCache
+        );
+        $priceService = new PriceService($twelveDataClient, $eodhdClient, $metrics, $quoteCache, $symbolsAggregator);
         $providerUsageService = new ProviderUsageService($twelveDataClient, $eodhdClient, $metrics, $logger);
         $portfolioRepository = new PdoPortfolioRepository($pdo);
         $priceSnapshotRepository = new PdoPriceSnapshotRepository($pdo, $logger);
@@ -92,7 +101,9 @@ final class ApplicationBootstrap
             'price_service' => $priceService,
             'eodhd_client' => $eodhdClient,
             'provider_metrics' => $metrics,
+            'quote_cache' => $quoteCache,
             'provider_usage' => $providerUsageService,
+            'symbols_aggregator' => $symbolsAggregator,
             'portfolio_repository' => $portfolioRepository,
             'price_snapshot_repository' => $priceSnapshotRepository,
             'portfolio_service' => $portfolioService,

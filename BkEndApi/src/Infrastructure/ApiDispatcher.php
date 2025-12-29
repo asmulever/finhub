@@ -130,6 +130,14 @@ final class ApiDispatcher
             $this->sendJson($quote);
             return;
         }
+        if ($method === 'GET' && $path === '/quote/search') {
+            $this->handleQuoteSearch();
+            return;
+        }
+        if ($method === 'GET' && $path === '/quote/symbols') {
+            $this->handleQuoteSymbols();
+            return;
+        }
         if ($method === 'POST' && $path === '/datalake/prices/collect') {
             $this->handleCollectPrices($traceId);
             return;
@@ -400,19 +408,29 @@ final class ApiDispatcher
      */
     private function handleCollectPrices(string $traceId): void
     {
-        $symbols = $this->portfolioService->listSymbols();
+        $symbols = [];
+        $body = $this->parseJsonBody();
+        if (isset($body['symbols']) && is_array($body['symbols'])) {
+            $symbols = array_values(array_filter(array_map('strval', $body['symbols'])));
+        }
+        if (empty($symbols)) {
+            $symbols = $this->portfolioService->listSymbols();
+        }
         if (empty($symbols)) {
             throw new \RuntimeException('No hay símbolos configurados para ingesta', 400);
         }
+        $this->logger->info('datalake.collect.request', [
+            'trace_id' => $traceId,
+            'symbols_count' => count($symbols),
+        ]);
         $results = $this->dataLakeService->collect($symbols);
-        if ($results['failed'] > 0) {
-            $this->logger->info('datalake.collect.partial', [
-                'trace_id' => $traceId,
-                'ok' => $results['ok'],
-                'failed' => $results['failed'],
-                'total' => $results['total_symbols'],
-            ]);
-        }
+        $this->logger->info('datalake.collect.summary', [
+            'trace_id' => $traceId,
+            'ok' => $results['ok'],
+            'failed' => $results['failed'],
+            'total' => $results['total_symbols'],
+            'status' => $results['failed'] === $results['total_symbols'] ? 'failed' : ($results['failed'] > 0 ? 'partial' : 'ok'),
+        ]);
         $status = $results['failed'] === $results['total_symbols'] ? 500 : 200;
         $this->sendJson($results, $status);
     }
@@ -429,6 +447,40 @@ final class ApiDispatcher
         }
         $series = $this->dataLakeService->series($symbol, $period);
         $this->sendJson($series);
+    }
+
+    /**
+     * Busca un precio en proveedores externos (EODHD/TwelveData) con fallback y cache.
+     */
+    private function handleQuoteSearch(): void
+    {
+        $symbol = strtoupper(trim((string) ($_GET['s'] ?? '')));
+        $exchange = isset($_GET['ex']) ? strtoupper(trim((string) $_GET['ex'])) : null;
+        $preferred = strtolower(trim((string) ($_GET['preferred'] ?? 'eodhd')));
+        $force = isset($_GET['force']) && (string) $_GET['force'] === '1';
+
+        if ($symbol === '') {
+            throw new \RuntimeException('Parámetro s (symbol) requerido', 422);
+        }
+        if ($preferred !== 'eodhd' && $preferred !== 'twelvedata') {
+            $preferred = 'eodhd';
+        }
+
+        $quote = $this->priceService->searchQuote($symbol, $exchange, $preferred, $force);
+        $this->sendJson($quote);
+    }
+
+    /**
+     * Lista unificada de símbolos (EODHD + TwelveData) para un exchange.
+     */
+    private function handleQuoteSymbols(): void
+    {
+        $exchange = strtoupper(trim((string) ($_GET['exchange'] ?? '')));
+        if ($exchange === '') {
+            throw new \RuntimeException('Parámetro exchange requerido', 422);
+        }
+        $symbols = $this->priceService->listSymbols($exchange);
+        $this->sendJson(['data' => $symbols]);
     }
 
     /**

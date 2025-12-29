@@ -14,12 +14,16 @@ final class PriceService
     private ?TwelveDataClient $twelveClient;
     private ?EodhdClient $eodhdClient;
     private ProviderMetrics $metrics;
+    private ?\FinHub\Infrastructure\MarketData\QuoteCache $quoteCache;
+    private ?\FinHub\Infrastructure\MarketData\QuoteSymbolsAggregator $symbolsAggregator;
 
-    public function __construct(?TwelveDataClient $client, ?EodhdClient $eodhdClient, ProviderMetrics $metrics)
+    public function __construct(?TwelveDataClient $client, ?EodhdClient $eodhdClient, ProviderMetrics $metrics, ?\FinHub\Infrastructure\MarketData\QuoteCache $quoteCache = null, ?\FinHub\Infrastructure\MarketData\QuoteSymbolsAggregator $symbolsAggregator = null)
     {
         $this->twelveClient = $client;
         $this->eodhdClient = $eodhdClient;
         $this->metrics = $metrics;
+        $this->quoteCache = $quoteCache;
+        $this->symbolsAggregator = $symbolsAggregator;
     }
 
     /**
@@ -45,6 +49,87 @@ final class PriceService
             'asOf' => $snapshot['as_of'] ?? null,
             'source' => $snapshot['source'] ?? null,
         ];
+    }
+
+    /**
+     * Busca precio directo con preferencia/fallback entre EODHD y Twelve Data, con cache de 1 día.
+     *
+     * @return array{symbol:string,name:?(string),currency:?(string),open:?float,high:?float,low:?float,close:?float,previous_close:?float,asOf:mixed,source:string,sources:array<string>,cached:bool,providers:array<int,array{provider:string,ok:bool,quote?:array,error?:string}>}
+     */
+    public function searchQuote(string $symbol, ?string $exchange, string $preferred, bool $forceRefresh = false): array
+    {
+        $symbol = strtoupper(trim($symbol));
+        $exchange = $exchange !== null ? strtoupper(trim($exchange)) : null;
+        if ($symbol === '') {
+            throw new \RuntimeException('Símbolo requerido', 422);
+        }
+
+        $cacheKey = sprintf('%s|%s', $symbol, $exchange ?? '');
+        if (!$forceRefresh && $this->quoteCache !== null) {
+            $cached = $this->quoteCache->get($cacheKey);
+            if ($cached !== null) {
+                $cached['cached'] = true;
+                return $cached;
+            }
+        }
+
+        $order = strtolower($preferred) === 'twelvedata' ? ['twelvedata', 'eodhd'] : ['eodhd', 'twelvedata'];
+        $result = null;
+        $sources = [];
+        $errors = [];
+        $providers = [];
+
+        // Resolver variantes de símbolo
+        $symbolUpper = $symbol;
+        $exchangeUpper = $exchange !== null ? $exchange : (str_contains($symbolUpper, '.') ? explode('.', $symbolUpper, 2)[1] : 'US');
+        $symbolWithEx = str_contains($symbolUpper, '.') ? $symbolUpper : sprintf('%s.%s', $symbolUpper, $exchangeUpper);
+        $baseSymbol = explode('.', $symbolUpper, 2)[0]; // AAPL.BA -> AAPL
+
+        foreach ($order as $provider) {
+            try {
+                if ($provider === 'eodhd') {
+                    $quote = $this->fetchEodhdQuoteNormalized($symbolWithEx, $symbolUpper);
+                } else {
+                    $quote = $this->fetchTwelveQuoteNormalized($baseSymbol, $symbolUpper);
+                }
+                $sources[] = $provider;
+                $providers[] = ['provider' => $provider, 'ok' => true, 'quote' => $quote];
+                if ($result === null) {
+                    $result = $quote;
+                }
+            } catch (\Throwable $e) {
+                $providers[] = ['provider' => $provider, 'ok' => false, 'error' => $e->getMessage()];
+                $errors[] = ['provider' => $provider, 'message' => $e->getMessage()];
+            }
+        }
+
+        if ($result === null) {
+            $firstError = $errors[0]['message'] ?? 'No se pudo obtener el precio';
+            throw new \RuntimeException($firstError, 502);
+        }
+
+        $result['sources'] = $sources;
+        $result['cached'] = false;
+        $result['providers'] = $providers;
+
+        if ($this->quoteCache !== null) {
+            $this->quoteCache->set($cacheKey, $result, 86400);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Devuelve lista de símbolos unificada por exchange con flags de proveedor.
+     *
+     * @return array<int,array{symbol:string,name:?string,exchange:?string,currency:?string,type:?string,mic_code:?string,in_eodhd:bool,in_twelvedata:bool}>
+     */
+    public function listSymbols(string $exchange): array
+    {
+        if ($this->symbolsAggregator === null) {
+            throw new \RuntimeException('Agregador de símbolos no disponible', 503);
+        }
+        return $this->symbolsAggregator->listSymbols($exchange);
     }
 
     /**
@@ -139,6 +224,7 @@ final class PriceService
             'http_status' => 200,
             'error_code' => null,
             'error_msg' => null,
+            'source' => 'twelvedata',
         ];
     }
 
@@ -199,5 +285,62 @@ final class PriceService
             return null;
         }
         return (float) $value;
+    }
+
+    /**
+     * Obtiene quote de EODHD según sufijo: .BA/.US -> us-quote-delayed; resto requiere exchange explícito.
+     */
+    private function fetchEodhdQuoteNormalized(string $symbolWithExchange, string $requestedSymbol): array
+    {
+        if ($this->eodhdClient === null) {
+            throw new \RuntimeException('Servicio EODHD no configurado', 503);
+        }
+        $symbolWithEx = strtoupper($symbolWithExchange);
+        $useUsQuote = str_ends_with($symbolWithEx, '.US') || str_ends_with($symbolWithEx, '.BA');
+
+        $raw = $useUsQuote
+            ? $this->eodhdClient->fetchUsQuoteDelayed($symbolWithEx)
+            : $this->eodhdClient->fetchEod($symbolWithEx);
+
+        if (isset($raw[0]) && is_array($raw[0])) {
+            $raw = $raw[0];
+        }
+        $normalized = $this->normalizeEodhdQuote($raw, $symbolWithEx);
+        return [
+            'symbol' => $requestedSymbol,
+            'name' => $normalized['name'],
+            'currency' => $normalized['currency'] ?? null,
+            'open' => $this->floatOrNull($normalized['open']),
+            'high' => $this->floatOrNull($normalized['high']),
+            'low' => $this->floatOrNull($normalized['low']),
+            'close' => $this->floatOrNull($normalized['close']),
+            'previous_close' => $this->floatOrNull($normalized['previous_close'] ?? null),
+            'asOf' => $normalized['as_of'] ?? $normalized['asOf'] ?? null,
+            'source' => 'eodhd',
+        ];
+    }
+
+    /**
+     * Obtiene quote de Twelve Data con normalización.
+     */
+    private function fetchTwelveQuoteNormalized(string $symbolForQuery, string $requestedSymbol): array
+    {
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        $raw = $this->twelveClient->fetchQuote($symbolForQuery);
+        $normalized = $this->normalizeTwelveDataQuote($raw, $symbolForQuery);
+        return [
+            'symbol' => $requestedSymbol,
+            'name' => $normalized['name'],
+            'currency' => $normalized['currency'] ?? null,
+            'open' => $this->floatOrNull($normalized['open']),
+            'high' => $this->floatOrNull($normalized['high']),
+            'low' => $this->floatOrNull($normalized['low']),
+            'close' => $this->floatOrNull($normalized['close']),
+            'previous_close' => $this->floatOrNull($normalized['previous_close'] ?? null),
+            'asOf' => $normalized['as_of'] ?? $normalized['asOf'] ?? null,
+            'source' => 'twelvedata',
+        ];
     }
 }

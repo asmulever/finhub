@@ -167,15 +167,23 @@
       <section class="card">
         <div class="card-header">
           <h2>Consultar precio</h2>
-          <p class="muted">Fuente: Twelve Data</p>
+          <p class="muted">Busca con fallback EODHD / TwelveData (cache 1 día)</p>
         </div>
         <form id="price-form" class="price-form">
-          <label for="ticker-input">Ticker</label>
+          <label for="ticker-input">Ticker y opciones</label>
           <div class="form-row">
             <input id="ticker-input" name="symbol" placeholder="AAPL" autocomplete="off" required />
+            <input id="exchange-input" name="exchange" placeholder="Exchange (ej: US, BA)" autocomplete="off" />
+            <select id="preferred-select" name="preferred" aria-label="Proveedor preferido">
+              <option value="eodhd" selected>EODHD primero</option>
+              <option value="twelvedata">TwelveData primero</option>
+            </select>
+            <label style="display:flex;align-items:center;gap:6px;">
+              <input type="checkbox" id="force-refresh" /> Forzar refresh
+            </label>
             <button type="submit">Consultar</button>
           </div>
-          <small class="muted">Ejemplos: AAPL, MSFT, TSLA</small>
+          <small class="muted">Ejemplos: AAPL.US, MSFT (US por defecto), YPFD.BA. El resultado se cachea 1 día salvo que fuerces refresh.</small>
         </form>
         <div id="prices-content" class="price-grid">
           <p class="muted">Ingresa un ticker y presiona "Consultar".</p>

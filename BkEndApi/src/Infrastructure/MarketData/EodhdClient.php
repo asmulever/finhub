@@ -40,6 +40,18 @@ final class EodhdClient
     }
 
     /**
+     * Devuelve precio diferido para símbolos .US o .BA.
+     */
+    public function fetchUsQuoteDelayed(string $symbol): array
+    {
+        if ($this->apiKey === '') {
+            throw new \RuntimeException('EODHD API key requerida');
+        }
+        $url = sprintf('%s/api/us-quote-delayed?s=%s&api_token=%s&fmt=json', $this->baseUrl, urlencode($symbol), urlencode($this->apiKey));
+        return $this->doRequest($url);
+    }
+
+    /**
      * Precio en vivo de un símbolo.
      */
     public function fetchLive(string $symbol): array
