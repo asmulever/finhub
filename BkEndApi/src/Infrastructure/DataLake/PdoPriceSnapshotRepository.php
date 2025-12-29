@@ -139,7 +139,7 @@ SQL;
             $where .= ' AND as_of >= :since';
             $params[':since'] = $since->format('Y-m-d H:i:s.u');
         }
-        $query = sprintf('SELECT as_of, payload_json FROM dl_price_snapshots WHERE %s ORDER BY as_of ASC', $where);
+        $query = sprintf('SELECT as_of, provider, payload_json FROM dl_price_snapshots WHERE %s ORDER BY as_of ASC', $where);
         $stmt = $this->pdo->prepare($query);
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -154,6 +154,7 @@ SQL;
             }
             $snapshots[] = [
                 'as_of' => (string) $row['as_of'],
+                'provider' => (string) $row['provider'],
                 'payload' => $payload,
             ];
         }

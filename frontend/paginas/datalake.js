@@ -60,42 +60,137 @@ const colors = [
   '#10b981', '#ef4444', '#6366f1', '#14b8a6', '#f97316',
 ];
 
-const renderSymbols = () => {
-  const select = document.getElementById('symbol-select');
-  if (!select) return;
-  select.innerHTML = state.symbols.map((s) => `<option value="${s}" ${state.selectedSymbols.includes(s) ? 'selected' : ''}>${s}</option>`).join('');
+const numberOrNull = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  if (Number.isNaN(Number(value))) return null;
+  return Number(value);
+};
+
+const candlestickPlugin = {
+  id: 'candles',
+  afterDatasetsDraw(chart) {
+    const { ctx, scales } = chart;
+    const xScale = scales.x;
+    const yScale = scales.y;
+    if (!xScale || !yScale) return;
+
+    chart.data.datasets.forEach((dataset) => {
+      const data = dataset.data || [];
+      const upColor = dataset.colorUp || '#10b981';
+      const downColor = dataset.colorDown || '#ef4444';
+      data.forEach((point, idx) => {
+        const { x, o, h, l, c } = point;
+        if ([o, h, l, c].some((v) => v === null || v === undefined)) return;
+        const xPos = xScale.getPixelForValue(x);
+        const next = data[idx + 1];
+        const prev = data[idx - 1];
+        const nextX = next ? xScale.getPixelForValue(next.x) : xPos;
+        const prevX = prev ? xScale.getPixelForValue(prev.x) : xPos;
+        const gap = Math.max(6, Math.min(24, Math.min(Math.abs(nextX - xPos) || 12, Math.abs(xPos - prevX) || 12)));
+        const bodyWidth = Math.max(4, Math.min(18, gap * 0.6));
+
+        const yHigh = yScale.getPixelForValue(h);
+        const yLow = yScale.getPixelForValue(l);
+        const yOpen = yScale.getPixelForValue(o);
+        const yClose = yScale.getPixelForValue(c);
+        const isUp = c >= o;
+        const color = isUp ? upColor : downColor;
+
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = 1;
+        // Mecha
+        ctx.beginPath();
+        ctx.moveTo(xPos, yHigh);
+        ctx.lineTo(xPos, yLow);
+        ctx.stroke();
+        // Cuerpo
+        const bodyTop = Math.min(yOpen, yClose);
+        const bodyBottom = Math.max(yOpen, yClose);
+        const bodyHeight = Math.max(1, bodyBottom - bodyTop);
+        ctx.fillRect(xPos - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
+        ctx.restore();
+      });
+    });
+  },
+};
+
+if (typeof Chart !== 'undefined') {
+  Chart.register(candlestickPlugin);
+}
+
+const buildCandles = (serie) => (serie?.points ?? []).map((p) => ({
+  x: new Date(p.t),
+  o: numberOrNull(p.open ?? p.price ?? p.close),
+  h: numberOrNull(p.high ?? p.price ?? p.close),
+  l: numberOrNull(p.low ?? p.price ?? p.close),
+  c: numberOrNull(p.close ?? p.price),
+  y: numberOrNull(p.close ?? p.price),
+})).filter((p) => p.o !== null && p.h !== null && p.l !== null && p.c !== null && p.y !== null);
+
+const getTimeUnit = (period) => {
+  if (period === '1m' || period === '3m' || period === '6m') return 'day';
+  return 'month';
 };
 
 const updateChart = (series) => {
   const ctx = document.getElementById('prices-chart');
   if (!ctx) return;
+  const timeUnit = getTimeUnit(state.period);
   const datasets = series.map((serie, idx) => ({
     label: serie.symbol,
-    data: serie.points.map((p) => ({ x: p.t, y: p.price })),
+    data: buildCandles(serie),
     borderColor: colors[idx % colors.length],
-    backgroundColor: colors[idx % colors.length],
-    tension: 0.2,
+    colorUp: '#10b981',
+    colorDown: '#ef4444',
+    showLine: false,
+    pointRadius: 0,
+    type: 'scatter',
+    parsing: { xAxisKey: 'x', yAxisKey: 'y' },
   }));
 
   if (state.chart) {
-    state.chart.data.datasets = datasets;
-    state.chart.update();
-    return;
+    state.chart.destroy();
   }
 
   state.chart = new Chart(ctx, {
-    type: 'line',
+    type: 'scatter',
     data: { datasets },
     options: {
-      responsive: true,
+      maintainAspectRatio: false,
       scales: {
-        x: { type: 'time', time: { tooltipFormat: 'yyyy-MM-dd HH:mm' }, ticks: { color: '#cbd5f5' } },
-        y: { ticks: { color: '#cbd5f5' } },
+        x: {
+          type: 'time',
+          time: { tooltipFormat: 'yyyy-MM-dd', unit: timeUnit },
+          ticks: { color: '#cbd5f5' },
+          grid: { color: 'rgba(148,163,184,0.15)' },
+          title: { display: true, text: 'Fecha', color: '#cbd5f5' },
+        },
+        y: {
+          ticks: { color: '#cbd5f5' },
+          grid: { color: 'rgba(148,163,184,0.15)' },
+          title: { display: true, text: 'Moneda', color: '#cbd5f5' },
+        },
       },
       plugins: {
-        legend: { labels: { color: '#cbd5f5' } },
+        legend: {
+          position: 'bottom',
+          labels: { color: '#cbd5f5', font: { size: 10 }, boxWidth: 10, padding: 6 },
+        },
+        tooltip: {
+          callbacks: {
+            label(context) {
+              const d = context.raw || {};
+              return `O:${d.o ?? '-'} H:${d.h ?? '-'} L:${d.l ?? '-'} C:${d.c ?? '-'}`;
+            },
+          },
+        },
       },
+      elements: { line: { tension: 0 } },
+      interaction: { intersect: false, mode: 'index' },
     },
+    plugins: [candlestickPlugin],
   });
 };
 
@@ -103,7 +198,6 @@ const fetchSymbols = async () => {
   const response = await getJson('/datalake/prices/symbols');
   state.symbols = Array.isArray(response?.symbols) ? response.symbols : [];
   state.selectedSymbols = [...state.symbols];
-  renderSymbols();
 };
 
 const fetchSeries = async () => {
@@ -146,12 +240,6 @@ const handleCollect = async () => {
     state.collecting = false;
     if (btn) btn.disabled = false;
   }
-};
-
-const handleSymbolChange = (event) => {
-  const options = Array.from(event.target.selectedOptions || []);
-  state.selectedSymbols = options.map((opt) => opt.value);
-  fetchSeries();
 };
 
 const handlePeriodChange = (event) => {
@@ -205,7 +293,6 @@ const init = async () => {
   await fetchSeries();
 
   document.getElementById('collect-btn')?.addEventListener('click', handleCollect);
-  document.getElementById('symbol-select')?.addEventListener('change', handleSymbolChange);
   document.getElementById('period-select')?.addEventListener('change', handlePeriodChange);
   resetLog('Listo para iniciar ingesta.');
 };

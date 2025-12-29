@@ -108,6 +108,6 @@ final class ProviderMetrics
 
     private function pathForDate(string $date): string
     {
-        return sprintf('%s/providers_%s.json', $this->baseDir, str_replace('-', '', $date));
+        return sprintf('%s/metrics_%s.json', $this->baseDir, str_replace('-', '', $date));
     }
 }

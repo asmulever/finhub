@@ -31,12 +31,8 @@
       color: #94a3b8;
       font-size: 0.95rem;
     }
-    .controls {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin: 12px 0;
-    }
+    .controls { display: none; }
+    .controls-bottom { display: flex; gap: 12px; align-items: center; justify-content: flex-start; margin-top: 6px; flex-wrap: wrap; }
     select, button, input {
       background: rgba(2, 6, 23, 0.7);
       border: 1px solid rgba(148, 163, 184, 0.5);
@@ -60,7 +56,7 @@
       margin-top: 8px;
       font-size: 0.95rem;
     }
-    #chart-container { position: relative; height: clamp(240px, 42vh, 440px); min-height: 200px; }
+    #chart-container { position: relative; height: clamp(300px, 55vh, 540px); min-height: 240px; }
     .datalake-layout {
       display: grid;
       grid-template-columns: minmax(0, 2fr) minmax(320px, 1.1fr);
@@ -145,20 +141,18 @@
         </div>
         <div class="datalake-layout">
           <div class="panel-left">
-            <div class="controls">
-              <button id="collect-btn" class="primary" type="button">Recolectar ahora</button>
-              <select id="period-select" aria-label="Período">
-                <option value="1m">Último mes</option>
-                <option value="3m">Últimos 3 meses</option>
-                <option value="6m">Últimos 6 meses</option>
-                <option value="1y">Último año</option>
-                <option value="all">Todo</option>
-              </select>
-              <select id="symbol-select" multiple size="5" aria-label="Seleccionar instrumentos"></select>
-            </div>
             <div id="collect-result" class="muted"></div>
             <div id="chart-container">
               <canvas id="prices-chart" aria-label="Gráfico de precios"></canvas>
+            </div>
+            <div class="controls-bottom">
+              <button id="collect-btn" class="primary" type="button">Recolectar ahora</button>
+              <select id="period-select" aria-label="Período">
+                <option value="1m" selected>Diario</option>
+                <option value="3m">3 meses</option>
+                <option value="6m">6 meses</option>
+                <option value="1y">1 año</option>
+              </select>
             </div>
           </div>
           <div class="log-panel">
