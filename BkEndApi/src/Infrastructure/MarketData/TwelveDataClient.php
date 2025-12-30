@@ -32,6 +32,57 @@ final class TwelveDataClient
     }
 
     /**
+     * Recupera precios para múltiples símbolos en una sola llamada.
+     *
+     * @param array<int,string> $symbols
+     * @return array<string,array<string,mixed>>
+     */
+    public function fetchQuotes(array $symbols): array
+    {
+        $symbols = array_values(array_filter(array_map(static fn ($s) => strtoupper(trim((string) $s)), $symbols), static fn ($s) => $s !== ''));
+        if (empty($symbols)) {
+            throw new \RuntimeException('Símbolos requeridos para Twelve Data', 422);
+        }
+        $params = [
+            'symbol' => implode(',', $symbols),
+            'apikey' => $this->apiKey,
+        ];
+        $response = $this->request('price', $params);
+
+        if (isset($response['data']) && is_array($response['data'])) {
+            $response = $response['data'];
+        }
+        if (!is_array($response)) {
+            throw new \RuntimeException('Respuesta inválida desde Twelve Data (batch)', 502);
+        }
+
+        $result = [];
+        foreach ($response as $key => $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $symbolKey = strtoupper((string) ($row['symbol'] ?? $key));
+            if ($symbolKey === '') {
+                continue;
+            }
+            $result[$symbolKey] = $row;
+        }
+
+        if (empty($result) && isset($response['symbol']) && is_array($response)) {
+            $symbolKey = strtoupper((string) ($response['symbol'] ?? ''));
+            if ($symbolKey !== '') {
+                $result[$symbolKey] = $response;
+            }
+        }
+
+        if (empty($result)) {
+            throw new \RuntimeException('Respuesta vacía desde Twelve Data (batch)', 502);
+        }
+
+        return $result;
+    }
+
+    /**
      * Lista los tickers disponibles.
      */
     public function listStocks(?string $exchange = null): array

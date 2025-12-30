@@ -19,7 +19,7 @@ final class EodhdClient
 
     public function __construct(Config $config)
     {
-        $this->apiKey = (string) $config->get('eodhd_api_key', '');
+        $this->apiKey = (string) ($config->get('eodhd_api_key') ?? $config->get('EODHD_API_KEY', ''));
         $this->baseUrl = rtrim((string) $config->get('EODHD_BASE_URL', 'https://eodhd.com'), '/');
         $this->timeout = (int) $config->get('EODHD_TIMEOUT_SECONDS', 5);
         $this->cacheDir = rtrim((string) $config->get('EODHD_CACHE_DIR', $config->get('CACHE_DIR', sys_get_temp_dir() . '/finhub_cache')), '/');
@@ -61,6 +61,37 @@ final class EodhdClient
         }
         $url = sprintf('%s/api/live/%s?api_token=%s&fmt=json', $this->baseUrl, urlencode($symbol), urlencode($this->apiKey));
         return $this->doRequest($url);
+    }
+
+    /**
+     * Precio en vivo para múltiples símbolos (formato TICKER.EX).
+     *
+     * @param array<int,string> $symbolsWithExchange
+     */
+    public function fetchRealTimeBatch(array $symbolsWithExchange): array
+    {
+        if ($this->apiKey === '') {
+            throw new \RuntimeException('EODHD API key requerida');
+        }
+        $symbols = array_values(array_filter(array_map(static fn ($s) => strtoupper(trim((string) $s)), $symbolsWithExchange), static fn ($s) => $s !== ''));
+        if (empty($symbols)) {
+            throw new \RuntimeException('Símbolos requeridos para consulta batch de EODHD', 422);
+        }
+        $url = sprintf(
+            '%s/api/real-time/%s?api_token=%s&fmt=json',
+            $this->baseUrl,
+            urlencode(implode(',', $symbols)),
+            urlencode($this->apiKey)
+        );
+        return $this->doRequest($url);
+    }
+
+    /**
+     * Alias explícito para consulta EOD puntual (formato TICKER.EX).
+     */
+    public function fetchEodSingle(string $symbolWithExchange): array
+    {
+        return $this->fetchEod($symbolWithExchange);
     }
 
     /**

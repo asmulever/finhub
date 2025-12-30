@@ -3,16 +3,16 @@
     "providers": {
         "twelvedata": {
             "allowed": 800,
-            "used": 19,
-            "success": 15,
-            "failed": 4,
+            "used": 100,
+            "success": 32,
+            "failed": 68,
             "last_reset": "2025-12-29T05:48:30+00:00"
         },
         "eodhd": {
             "allowed": 20,
-            "used": 8,
+            "used": 104,
             "success": 4,
-            "failed": 4,
+            "failed": 100,
             "last_reset": "2025-12-29T05:48:30+00:00"
         }
     }

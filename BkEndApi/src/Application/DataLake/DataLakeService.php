@@ -14,15 +14,18 @@ final class DataLakeService
     private PriceSnapshotRepositoryInterface $repository;
     private PriceService $priceService;
     private LoggerInterface $logger;
+    private int $batchSize;
 
     public function __construct(
         PriceSnapshotRepositoryInterface $repository,
         PriceService $priceService,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        int $batchSize = 10
     ) {
         $this->repository = $repository;
         $this->priceService = $priceService;
         $this->logger = $logger;
+        $this->batchSize = $batchSize > 0 ? $batchSize : 10;
     }
 
     public function collect(array $symbols): array
@@ -45,47 +48,69 @@ final class DataLakeService
 
         $this->appendStep($results['steps'], '', 'init', 'running', 'Iniciando proceso de ingesta', ['current' => 0, 'total' => $total]);
 
-        foreach ($symbols as $index => $symbol) {
-            $progress = ['current' => $index + 1, 'total' => $total];
-            $this->appendStep($results['steps'], $symbol, 'start', 'running', 'Iniciando ingesta de símbolo', $progress);
+        $processed = 0;
+        $batchSize = max(1, $this->batchSize);
 
+        foreach (array_chunk($symbols, $batchSize) as $chunkIndex => $chunk) {
+            $batchSnapshots = [];
             try {
-                $snapshot = $this->priceService->fetchSnapshot($symbol);
+                $batchSnapshots = $this->priceService->fetchSnapshotsBulk($chunk);
+            } catch (\Throwable $e) {
+                $this->logger->info('datalake.collect.batch_failed', [
+                    'batch_index' => $chunkIndex,
+                    'count' => count($chunk),
+                    'message' => $e->getMessage(),
+                ]);
+            }
+
+            foreach ($chunk as $symbol) {
+                $processed++;
+                $progress = ['current' => $processed, 'total' => $total];
+                $this->appendStep($results['steps'], $symbol, 'start', 'running', 'Iniciando ingesta de símbolo', $progress);
+
+                $snapshot = $batchSnapshots[$symbol] ?? null;
+                if ($snapshot === null) {
+                    try {
+                        $snapshot = $this->priceService->fetchSnapshot($symbol);
+                    } catch (\Throwable $e) {
+                        $results['failed']++;
+                        $results['errors'][] = ['symbol' => $symbol, 'reason' => $e->getMessage()];
+                        $this->appendStep($results['steps'], $symbol, 'fetch', 'error', $e->getMessage(), $progress);
+                        $this->logger->info('datalake.collect.fetch_failed', [
+                            'symbol' => $symbol,
+                            'message' => $e->getMessage(),
+                        ]);
+                        continue;
+                    }
+                }
+
                 if (!isset($snapshot['provider']) || $snapshot['provider'] === null || $snapshot['provider'] === '') {
                     $snapshot['provider'] = $snapshot['source'] ?? 'unknown';
                 }
                 $this->appendStep($results['steps'], $symbol, 'fetch', 'ok', 'Snapshot obtenido del proveedor', $progress);
-            } catch (\Throwable $e) {
-                $results['failed']++;
-                $results['errors'][] = ['symbol' => $symbol, 'reason' => $e->getMessage()];
-                $this->appendStep($results['steps'], $symbol, 'fetch', 'error', $e->getMessage(), $progress);
-                $this->logger->info('datalake.collect.fetch_failed', [
-                    'symbol' => $symbol,
-                    'message' => $e->getMessage(),
-                ]);
-                continue;
-            }
-            // Validar que el payload contenga precio antes de persistir
-            $price = $this->extractPrice($snapshot['payload'] ?? []);
-            if ($price === null) {
-                $results['failed']++;
-                $results['errors'][] = ['symbol' => $symbol, 'reason' => 'Precio no disponible en payload'];
-                $this->appendStep($results['steps'], $symbol, 'validate', 'error', 'Precio no disponible en payload', $progress);
-                continue;
-            }
 
-            $stored = $this->repository->storeSnapshot($snapshot);
-            if ($stored['success']) {
-                $results['ok']++;
-                $this->appendStep($results['steps'], $symbol, 'store', 'ok', 'Snapshot almacenado', $progress);
-            } else {
-                $results['failed']++;
-                $results['errors'][] = ['symbol' => $symbol, 'reason' => $stored['reason'] ?? 'unknown'];
-                $this->appendStep($results['steps'], $symbol, 'store', 'error', $stored['reason'] ?? 'Error al almacenar', $progress);
-                $this->logger->info('datalake.collect.store_failed', [
-                    'symbol' => $symbol,
-                    'message' => $stored['reason'] ?? 'Error al almacenar snapshot',
-                ]);
+                // Validar que el payload contenga precio antes de persistir
+                $price = $this->extractPrice($snapshot['payload'] ?? []);
+                if ($price === null) {
+                    $results['failed']++;
+                    $results['errors'][] = ['symbol' => $symbol, 'reason' => 'Precio no disponible en payload'];
+                    $this->appendStep($results['steps'], $symbol, 'validate', 'error', 'Precio no disponible en payload', $progress);
+                    continue;
+                }
+
+                $stored = $this->repository->storeSnapshot($snapshot);
+                if ($stored['success']) {
+                    $results['ok']++;
+                    $this->appendStep($results['steps'], $symbol, 'store', 'ok', 'Snapshot almacenado', $progress);
+                } else {
+                    $results['failed']++;
+                    $results['errors'][] = ['symbol' => $symbol, 'reason' => $stored['reason'] ?? 'unknown'];
+                    $this->appendStep($results['steps'], $symbol, 'store', 'error', $stored['reason'] ?? 'Error al almacenar', $progress);
+                    $this->logger->info('datalake.collect.store_failed', [
+                        'symbol' => $symbol,
+                        'message' => $stored['reason'] ?? 'Error al almacenar snapshot',
+                    ]);
+                }
             }
         }
 
