@@ -32,6 +32,7 @@ const renderOverview = () => {
   if (state.metrics) {
     const td = state.metrics.providers?.twelvedata ?? {};
     const eod = state.metrics.providers?.eodhd ?? {};
+    const av = state.metrics.providers?.alphavantage ?? {};
     sections.push(createCard('Consumo de APIs', `
       <div class="controls">
         <div>
@@ -45,6 +46,12 @@ const renderOverview = () => {
           <small>Usadas: ${eod.used ?? 0} / ${eod.allowed ?? 'N/D'}</small><br/>
           <small>Éxitos: ${eod.success ?? 0} | Fallos: ${eod.failed ?? 0}</small><br/>
           <small>Restantes: ${eod.remaining ?? 0}</small>
+        </div>
+        <div>
+          <strong>Alpha Vantage</strong><br/>
+          <small>Usadas: ${av.used ?? 0} / ${av.allowed ?? 'N/D'}</small><br/>
+          <small>Éxitos: ${av.success ?? 0} | Fallos: ${av.failed ?? 0}</small><br/>
+          <small>Restantes: ${av.remaining ?? 0}</small>
         </div>
       </div>
     `));

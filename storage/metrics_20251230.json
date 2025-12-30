@@ -1,0 +1,19 @@
+{
+    "date": "2025-12-30",
+    "providers": {
+        "twelvedata": {
+            "allowed": 800,
+            "used": 55,
+            "success": 25,
+            "failed": 30,
+            "last_reset": "2025-12-30T00:23:34+00:00"
+        },
+        "eodhd": {
+            "allowed": 20,
+            "used": 85,
+            "success": 15,
+            "failed": 70,
+            "last_reset": "2025-12-30T00:23:34+00:00"
+        }
+    }
+}

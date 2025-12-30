@@ -12,12 +12,14 @@ final class ProviderMetrics
     private string $baseDir;
     private int $twelveDailyLimit;
     private int $eodhdDailyLimit;
+    private int $alphaDailyLimit;
 
-    public function __construct(string $baseDir, int $twelveDailyLimit = 800, int $eodhdDailyLimit = 20)
+    public function __construct(string $baseDir, int $twelveDailyLimit = 800, int $eodhdDailyLimit = 20, int $alphaDailyLimit = 25)
     {
         $this->baseDir = rtrim($baseDir, '/');
         $this->twelveDailyLimit = $twelveDailyLimit;
         $this->eodhdDailyLimit = $eodhdDailyLimit;
+        $this->alphaDailyLimit = $alphaDailyLimit;
     }
 
     /**
@@ -45,6 +47,11 @@ final class ProviderMetrics
     public function getAll(): array
     {
         $data = $this->load();
+        foreach (['twelvedata', 'eodhd', 'alphavantage'] as $providerName) {
+            if (!isset($data['providers'][$providerName])) {
+                $data['providers'][$providerName] = $this->defaults($providerName);
+            }
+        }
         foreach ($data['providers'] as $name => &$provider) {
             $provider['remaining'] = max(0, ($provider['allowed'] ?? 0) - ($provider['used'] ?? 0));
         }
@@ -80,6 +87,7 @@ final class ProviderMetrics
             'providers' => [
                 'twelvedata' => $this->defaults('twelvedata'),
                 'eodhd' => $this->defaults('eodhd'),
+                'alphavantage' => $this->defaults('alphavantage'),
             ],
         ];
     }
@@ -88,6 +96,7 @@ final class ProviderMetrics
     {
         $allowed = match ($provider) {
             'eodhd' => $this->eodhdDailyLimit,
+            'alphavantage' => $this->alphaDailyLimit,
             default => $this->twelveDailyLimit,
         };
         return [

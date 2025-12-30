@@ -211,26 +211,23 @@ const applyFilter = () => {
   renderStocks();
 };
 
-const fetchSelectedQuote = async (symbol) => {
-  const cacheKey = `${symbol}|${state.exchange}|${state.preferred}|${state.forceRefresh ? '1' : '0'}`;
-  if (!state.forceRefresh && state.quoteCache.has(cacheKey)) {
-    return { ...state.quoteCache.get(cacheKey), cached: true };
-  }
-  // Siempre intentar DataLake primero; si falla, disparar ingesta y reintentar.
+const fetchQuotesBulk = async (symbols, { force = false } = {}) => {
+  const unique = Array.from(new Set(symbols.map((s) => String(s ?? '').toUpperCase()).filter(Boolean)));
+  if (!unique.length) return {};
+  const params = new URLSearchParams();
+  params.set('s', unique.join(','));
+  if (state.exchange) params.set('ex', state.exchange);
+  params.set('preferred', state.preferred);
+  if (force || state.forceRefresh) params.set('force', '1');
   try {
-    const quote = await getJson(`/datalake/prices/latest?symbol=${encodeURIComponent(symbol)}`);
-    state.quoteCache.set(cacheKey, quote);
-    return quote;
-  } catch {
-    // Disparar ingesta puntual para el ticker
-    try {
-      await postJson('/datalake/prices/collect', { symbols: [symbol] });
-      const quote = await getJson(`/datalake/prices/latest?symbol=${encodeURIComponent(symbol)}`);
-      state.quoteCache.set(cacheKey, quote);
-      return quote;
-    } catch (error) {
-      return { symbol, error: { message: error?.error?.message ?? 'No se pudo obtener el precio del Data Lake' } };
-    }
+    const resp = await getJson(`/quote/search/bulk?${params.toString()}`);
+    return resp?.data ?? {};
+  } catch (error) {
+    const fallback = {};
+    unique.forEach((symbol) => {
+      fallback[symbol] = { symbol, error: { message: error?.error?.message ?? 'No se pudieron obtener precios' } };
+    });
+    return fallback;
   }
 };
 
@@ -245,9 +242,10 @@ const fetchSelectedPortfolio = async () => {
       items.filter((i) => i?.symbol).map((i) => String(i.symbol))
     );
     const enriched = [];
+    const symbols = Array.from(state.selectedSymbols);
+    const quotesMap = symbols.length ? await fetchQuotesBulk(symbols) : {};
     for (const item of items) {
-      // eslint-disable-next-line no-await-in-loop
-      const quote = await fetchSelectedQuote(item.symbol);
+      const quote = quotesMap[item.symbol] ?? { symbol: item.symbol, error: { message: 'Precio no disponible' } };
       enriched.push({ ...item, quote });
     }
     state.selectedItems = enriched;
@@ -307,7 +305,8 @@ const handleAddToPortfolio = async (event) => {
       mic_code: instrument.mic_code ?? '',
     });
     state.selectedSymbols.add(symbol);
-    const quote = await fetchSelectedQuote(symbol);
+    const quoteMap = await fetchQuotesBulk([symbol]);
+    const quote = quoteMap[symbol] ?? { symbol, error: { message: 'Precio no disponible' } };
     const exists = state.selectedItems.some((i) => i.symbol === symbol);
     if (!exists) {
       state.selectedItems.push({ ...instrument, quote });

@@ -55,19 +55,14 @@ const renderProviderSection = (providerResult) => {
     return '';
   }
   const q = providerResult.quote ?? {};
-  if (q.close === undefined && q.price === undefined) return '';
+  const price = q.close ?? q.price;
+  if (price === undefined) return '';
   const asOf = q.asOf ? new Date(q.asOf).toLocaleString() : 'Fecha n/d';
   return `<div class="provider-row">
     <div><strong>${provider}</strong> <small class="muted">${q.currency ?? ''}</small></div>
-    <div class="price-meta">
-      <span>${formatCurrency(q.close ?? q.price)}</span>
+    <div class="price-meta compact">
+      <span>${formatCurrency(price)}</span>
       <small>${asOf}</small>
-    </div>
-    <div class="price-meta">
-      <span>O:${formatCurrency(q.open ?? q.close)}</span>
-      <span>H:${formatCurrency(q.high ?? q.close)}</span>
-      <span>L:${formatCurrency(q.low ?? q.close)}</span>
-      <span>P:${formatCurrency(q.previous_close ?? q.close)}</span>
     </div>
   </div>`;
 };
@@ -206,16 +201,31 @@ const fetchSelectedQuotes = async () => {
     return;
   }
   const symbols = Array.from(new Set(state.selectedSymbols));
-  const quotes = [];
-  for (const symbol of symbols) {
-    // sequential to avoid flooding if la lista es corta; se puede paralelizar si hace falta
-    // eslint-disable-next-line no-await-in-loop
-    const q = await fetchSelectedQuote(symbol);
-    quotes.push(q);
-  }
-  state.selectedQuotes = quotes;
+  const bulkQuotes = await fetchQuoteSearchBulk(symbols);
+  state.selectedQuotes = symbols.map((symbol) => bulkQuotes[symbol] ?? { symbol, error: { message: 'Precio no disponible' } });
   state.loadingSelected = false;
   renderPrices();
+};
+
+const fetchQuoteSearchBulk = async (symbols, { force = false } = {}) => {
+  const unique = Array.from(new Set(symbols.map((s) => String(s ?? '').toUpperCase()).filter(Boolean)));
+  if (!unique.length) return {};
+  const params = new URLSearchParams();
+  params.set('s', unique.join(','));
+  if (state.exchange) params.set('ex', state.exchange);
+  params.set('preferred', state.preferred);
+  if (force || state.forceRefresh) params.set('force', '1');
+  try {
+    const resp = await getJson(`/quote/search/bulk?${params.toString()}`);
+    const data = resp?.data ?? {};
+    return data;
+  } catch (error) {
+    const fallback = {};
+    unique.forEach((symbol) => {
+      fallback[symbol] = { symbol, error: { message: error?.error?.message ?? 'No se pudieron obtener precios' } };
+    });
+    return fallback;
+  }
 };
 
 const fetchQuoteSearch = async (symbol, { force = false } = {}) => {
