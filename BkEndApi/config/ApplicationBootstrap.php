@@ -10,6 +10,7 @@ use FinHub\Application\MarketData\PriceService;
 use FinHub\Application\MarketData\ProviderUsageService;
 use FinHub\Application\Portfolio\PortfolioService;
 use FinHub\Application\DataLake\DataLakeService;
+use FinHub\Infrastructure\MarketData\AlphaVantageClient;
 use FinHub\Infrastructure\MarketData\TwelveDataClient;
 use FinHub\Infrastructure\MarketData\EodhdClient;
 use FinHub\Infrastructure\Security\JwtTokenProvider;
@@ -71,10 +72,12 @@ final class ApplicationBootstrap
             );
         }
         $eodhdClient = new EodhdClient($config);
+        $alphaClient = new AlphaVantageClient($config);
         $metrics = new \FinHub\Infrastructure\MarketData\ProviderMetrics(
             $this->rootDir . '/storage',
             (int) $config->get('TWELVEDATA_DAILY_LIMIT', 800),
-            (int) $config->get('EODHD_DAILY_LIMIT', 20)
+            (int) $config->get('EODHD_DAILY_LIMIT', 20),
+            (int) $config->get('ALPHAVANTAGE_DAILY_LIMIT', 25)
         );
         $quoteCache = new \FinHub\Infrastructure\MarketData\QuoteCache(
             $this->rootDir . '/storage/quote_cache',
@@ -85,12 +88,14 @@ final class ApplicationBootstrap
             $twelveDataClient,
             $quoteCache
         );
-        $priceService = new PriceService($twelveDataClient, $eodhdClient, $metrics, $quoteCache, $symbolsAggregator);
+        $providerOrder = $config->get('PRICE_PROVIDER_ORDER', 'eodhd,twelvedata,alphavantage');
+        $priceService = new PriceService($twelveDataClient, $eodhdClient, $metrics, $quoteCache, $symbolsAggregator, $providerOrder, $alphaClient);
         $providerUsageService = new ProviderUsageService($twelveDataClient, $eodhdClient, $metrics, $logger);
         $portfolioRepository = new PdoPortfolioRepository($pdo);
         $priceSnapshotRepository = new PdoPriceSnapshotRepository($pdo, $logger);
         $portfolioService = new PortfolioService($portfolioRepository);
-        $dataLakeService = new DataLakeService($priceSnapshotRepository, $priceService, $logger);
+        $ingestBatchSize = (int) $config->get('DATALAKE_INGEST_BATCH_SIZE', 10);
+        $dataLakeService = new DataLakeService($priceSnapshotRepository, $priceService, $logger, $ingestBatchSize);
 
         return new Container([
             'config' => $config,

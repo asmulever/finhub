@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FinHub | Alpha Vantage</title>
+  <link rel="icon" href="/logo/favicon.png" />
+  <script>
+    window.__ENV = window.__ENV ?? {};
+    window.__ENV.API_BASE_URL = '/api';
+  </script>
+  <link rel="preload" href="/logo/full_logoweb.png" as="image" />
+  <style>
+    :root { font-family: 'Inter', system-ui, sans-serif; }
+    body { margin: 0; background: #0b1021; color: #e2e8f0; }
+    .content-shell { padding: 24px 32px; }
+    main { display: grid; gap: 20px; max-width: 1400px; margin: 0 auto; }
+    .card { background: rgba(13, 18, 35, 0.9); border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 14px; padding: 18px 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.35); }
+    h2, h3 { margin: 0 0 8px 0; }
+    .muted { color: #94a3b8; font-size: 0.95rem; }
+    .form-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+    input, select { background: #0f172a; color: #e2e8f0; border: 1px solid rgba(148,163,184,0.4); border-radius: 10px; padding: 10px 12px; min-width: 140px; }
+    button { background: linear-gradient(120deg, #22d3ee, #0ea5e9); border: none; color: #0b1021; padding: 10px 14px; border-radius: 10px; font-weight: 600; cursor: pointer; }
+    pre { background: #0f172a; color: #e2e8f0; border-radius: 10px; padding: 12px; overflow: auto; font-size: 0.9rem; max-height: 260px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+    .error { color: #f87171; font-weight: 600; min-height: 20px; }
+  </style>
+</head>
+<body>
+  <div class="content-shell">
+    <main>
+      <section class="card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+          <div>
+            <h2>Alpha Vantage</h2>
+            <p class="muted">Pruebas rápidas de endpoints: quote, search, daily/intraday, FX, cripto, SMA, RSI, overview. Requiere API key y rol admin.</p>
+            <p class="muted">Límite típico: 5 req/min, 25/día.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card grid">
+        <div>
+          <h3>GLOBAL_QUOTE</h3>
+          <div class="form-row">
+            <input id="quote-symbol" placeholder="Símbolo (ej. AAPL)" />
+            <button id="btn-quote">Consultar</button>
+          </div>
+          <div id="quote-error" class="error"></div>
+          <pre id="quote-output">{}</pre>
+        </div>
+        <div>
+          <h3>SYMBOL_SEARCH</h3>
+          <div class="form-row">
+            <input id="search-keywords" placeholder="keywords (ej. tesla)" />
+            <button id="btn-search">Buscar</button>
+          </div>
+          <div id="search-error" class="error"></div>
+          <pre id="search-output">{}</pre>
+        </div>
+        <div>
+          <h3>TIME_SERIES_DAILY</h3>
+          <div class="form-row">
+            <input id="daily-symbol" placeholder="Símbolo (ej. MSFT)" />
+            <select id="daily-size">
+              <option value="compact">compact</option>
+              <option value="full">full</option>
+            </select>
+            <button id="btn-daily">Consultar</button>
+          </div>
+          <div id="daily-error" class="error"></div>
+          <pre id="daily-output">{}</pre>
+        </div>
+      </section>
+
+      <section class="card grid">
+       <div>
+         <h3>TIME_SERIES_INTRADAY</h3>
+         <div class="form-row">
+           <input id="intraday-symbol" placeholder="Símbolo (ej. AAPL)" />
+           <select id="intraday-interval">
+             <option value="1min">1min</option>
+             <option value="5min" selected>5min</option>
+             <option value="15min">15min</option>
+             <option value="30min">30min</option>
+             <option value="60min">60min</option>
+           </select>
+           <select id="intraday-size">
+             <option value="compact">compact</option>
+             <option value="full">full</option>
+           </select>
+           <button id="btn-intraday">Consultar</button>
+         </div>
+         <div id="intraday-error" class="error"></div>
+         <pre id="intraday-output">{}</pre>
+       </div>
+        <div>
+          <h3>FX_DAILY</h3>
+          <div class="form-row">
+            <input id="fxd-from" placeholder="From (ej. EUR)" />
+            <input id="fxd-to" placeholder="To (ej. USD)" />
+            <button id="btn-fx-daily">Consultar</button>
+          </div>
+          <div id="fx-daily-error" class="error"></div>
+          <pre id="fx-daily-output">{}</pre>
+        </div>
+      </section>
+
+      <section class="card grid">
+        <div>
+          <h3>CRYPTO_INTRADAY</h3>
+          <div class="form-row">
+            <input id="crypto-symbol" placeholder="Crypto (ej. BTC)" />
+            <input id="crypto-market" placeholder="Market (ej. USD)" value="USD" />
+            <select id="crypto-interval">
+              <option value="1min">1min</option>
+              <option value="5min" selected>5min</option>
+              <option value="15min">15min</option>
+              <option value="30min">30min</option>
+              <option value="60min">60min</option>
+            </select>
+            <button id="btn-crypto">Consultar</button>
+          </div>
+          <div id="crypto-error" class="error"></div>
+          <pre id="crypto-output">{}</pre>
+        </div>
+        <div>
+          <h3>SMA</h3>
+          <div class="form-row">
+            <input id="sma-symbol" placeholder="Símbolo" />
+            <select id="sma-interval">
+              <option value="daily" selected>daily</option>
+              <option value="weekly">weekly</option>
+              <option value="monthly">monthly</option>
+              <option value="1min">1min</option>
+              <option value="5min">5min</option>
+              <option value="15min">15min</option>
+              <option value="30min">30min</option>
+              <option value="60min">60min</option>
+            </select>
+            <input id="sma-period" type="number" min="1" value="20" style="max-width:90px" />
+            <select id="sma-series">
+              <option value="close" selected>close</option>
+              <option value="open">open</option>
+              <option value="high">high</option>
+              <option value="low">low</option>
+            </select>
+            <button id="btn-sma">Consultar</button>
+          </div>
+          <div id="sma-error" class="error"></div>
+          <pre id="sma-output">{}</pre>
+        </div>
+        <div>
+          <h3>RSI</h3>
+          <div class="form-row">
+            <input id="rsi-symbol" placeholder="Símbolo" />
+            <select id="rsi-interval">
+              <option value="daily" selected>daily</option>
+              <option value="weekly">weekly</option>
+              <option value="monthly">monthly</option>
+              <option value="1min">1min</option>
+              <option value="5min">5min</option>
+              <option value="15min">15min</option>
+              <option value="30min">30min</option>
+              <option value="60min">60min</option>
+            </select>
+            <input id="rsi-period" type="number" min="1" value="14" style="max-width:90px" />
+            <select id="rsi-series">
+              <option value="close" selected>close</option>
+              <option value="open">open</option>
+              <option value="high">high</option>
+              <option value="low">low</option>
+            </select>
+            <button id="btn-rsi">Consultar</button>
+          </div>
+          <div id="rsi-error" class="error"></div>
+          <pre id="rsi-output">{}</pre>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Company OVERVIEW</h3>
+        <div class="form-row">
+          <input id="overview-symbol" placeholder="Símbolo (ej. AAPL)" />
+          <button id="btn-overview">Consultar</button>
+        </div>
+        <div id="overview-error" class="error"></div>
+        <pre id="overview-output">{}</pre>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/Frontend/paginas/alphavantage.js"></script>
+</body>
+</html>

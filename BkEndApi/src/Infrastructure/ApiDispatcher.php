@@ -124,10 +124,19 @@ final class ApiDispatcher
             $this->sendJson($metrics);
             return;
         }
+        if ($method === 'GET' && str_starts_with($path, '/alphavantage/')) {
+            $this->requireAdmin();
+            $this->handleAlphaVantage($path);
+            return;
+        }
         if ($method === 'GET' && ($path === '/prices' || $path === '/quotes')) {
             $request = PriceRequest::fromArray($_GET ?? []);
             $quote = $this->priceService->getPrice($request);
             $this->sendJson($quote);
+            return;
+        }
+        if ($method === 'GET' && $path === '/quote/search/bulk') {
+            $this->handleQuoteSearchBulk();
             return;
         }
         if ($method === 'GET' && $path === '/quote/search') {
@@ -447,6 +456,132 @@ final class ApiDispatcher
         }
         $series = $this->dataLakeService->series($symbol, $period);
         $this->sendJson($series);
+    }
+
+    /**
+     * Busca un precio en proveedores externos (EODHD/TwelveData) con fallback y cache.
+     */
+    private function handleQuoteSearchBulk(): void
+    {
+        $rawSymbols = $_GET['s'] ?? '';
+        $symbols = [];
+        if (is_array($rawSymbols)) {
+            foreach ($rawSymbols as $chunk) {
+                $parts = preg_split('/,/', (string) $chunk, -1, PREG_SPLIT_NO_EMPTY);
+                if (is_array($parts)) {
+                    foreach ($parts as $p) {
+                        $symbols[] = strtoupper(trim($p));
+                    }
+                }
+            }
+        } else {
+            $parts = preg_split('/,/', (string) $rawSymbols, -1, PREG_SPLIT_NO_EMPTY);
+            if (is_array($parts)) {
+                foreach ($parts as $p) {
+                    $symbols[] = strtoupper(trim($p));
+                }
+            }
+        }
+
+        $symbols = array_values(array_filter(array_unique($symbols), static fn ($s) => $s !== ''));
+        if (empty($symbols)) {
+            throw new \RuntimeException('Parámetro s (symbols) requerido', 422);
+        }
+
+        $exchange = isset($_GET['ex']) ? strtoupper(trim((string) $_GET['ex'])) : null;
+        $preferred = strtolower(trim((string) ($_GET['preferred'] ?? 'eodhd')));
+        $force = isset($_GET['force']) && (string) $_GET['force'] === '1';
+
+        $quotes = $this->priceService->searchQuotes($symbols, $exchange, $preferred, $force);
+        $this->sendJson(['data' => $quotes]);
+    }
+
+    /**
+     * Endpoints de prueba para Alpha Vantage (solo admin).
+     */
+    private function handleAlphaVantage(string $path): void
+    {
+        if ($path === '/alphavantage/quote') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $quote = $this->priceService->alphaQuote($symbol);
+            $this->sendJson(['data' => $quote]);
+            return;
+        }
+        if ($path === '/alphavantage/search') {
+            $keywords = trim((string) ($_GET['keywords'] ?? ''));
+            if ($keywords === '') {
+                throw new \RuntimeException('keywords requerido', 422);
+            }
+            $result = $this->priceService->alphaSearch($keywords);
+            $this->sendJson(['data' => $result]);
+            return;
+        }
+        if ($path === '/alphavantage/daily') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $outputSize = strtolower(trim((string) ($_GET['outputsize'] ?? 'compact')));
+            $data = $this->priceService->alphaDaily($symbol, $outputSize === 'full' ? 'full' : 'compact');
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/alphavantage/intraday') {
+            throw new \RuntimeException('Endpoint no disponible', 404);
+        }
+        if ($path === '/alphavantage/fx-intraday') {
+            throw new \RuntimeException('Endpoint no disponible', 404);
+        }
+        if ($path === '/alphavantage/fx-daily') {
+            $from = strtoupper(trim((string) ($_GET['from'] ?? '')));
+            $to = strtoupper(trim((string) ($_GET['to'] ?? '')));
+            if ($from === '' || $to === '') {
+                throw new \RuntimeException('from/to requeridos', 422);
+            }
+            $data = $this->priceService->alphaFxDaily($from, $to);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/alphavantage/crypto-intraday') {
+            throw new \RuntimeException('Endpoint no disponible', 404);
+        }
+        if ($path === '/alphavantage/sma') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            $interval = strtolower(trim((string) ($_GET['interval'] ?? 'daily')));
+            $timePeriod = (int) ($_GET['time_period'] ?? 20);
+            $seriesType = strtolower(trim((string) ($_GET['series_type'] ?? 'close')));
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $data = $this->priceService->alphaSma($symbol, $interval, $timePeriod, $seriesType);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/alphavantage/rsi') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            $interval = strtolower(trim((string) ($_GET['interval'] ?? 'daily')));
+            $timePeriod = (int) ($_GET['time_period'] ?? 14);
+            $seriesType = strtolower(trim((string) ($_GET['series_type'] ?? 'close')));
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $data = $this->priceService->alphaRsi($symbol, $interval, $timePeriod, $seriesType);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/alphavantage/overview') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $data = $this->priceService->alphaOverview($symbol);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        throw new \RuntimeException('Ruta no encontrada', 404);
     }
 
     /**

@@ -12,7 +12,13 @@ const state = {
   selectedExchange: '',
   symbolsLoadedExchange: '',
   filterTerm: '',
+  fallbackMode: false,
 };
+
+const FALLBACK_EXCHANGES = [
+  { Code: 'US', Name: 'Estados Unidos', Country: 'US' },
+  { Code: 'BA', Name: 'Argentina (BCBA)', Country: 'AR' },
+];
 
 const isAdminProfile = (profile) => String(profile?.role ?? '').toLowerCase() === 'admin';
 const cookieKey = (profile) => {
@@ -114,7 +120,11 @@ const fetchExchangeSymbols = async () => {
     state.exchangeSymbols = Array.isArray(data?.data) ? data.data : [];
     state.symbolsLoadedExchange = exch;
   } catch (error) {
-    state.exchangeError = error?.error?.message ?? 'No se pudo obtener la lista';
+    const msg = error?.error?.message ?? 'No se pudo obtener la lista';
+    state.exchangeError = msg;
+    if (/402|403|forbidden|payment/i.test(msg)) {
+      state.exchangeError = `${msg} • Verifica plan o API key de EODHD`;
+    }
   }
   renderExchange();
 };
@@ -140,10 +150,17 @@ const fetchExchangesList = async () => {
   try {
     const data = await getJson('/eodhd/exchanges-list');
     state.exchangesList = Array.isArray(data?.data) ? data.data : [];
+    state.fallbackMode = false;
   } catch (error) {
-    state.exchangesList = [];
+    const msg = error?.error?.message ?? 'No se pudo obtener exchanges';
+    const isForbidden = /402|403|forbidden|payment/i.test(msg);
+    state.exchangesList = isForbidden ? FALLBACK_EXCHANGES : [];
+    state.fallbackMode = isForbidden;
     const container = document.getElementById('exchange-result');
-    container?.insertAdjacentHTML('afterbegin', `<p class="price-error">${error?.error?.message ?? 'No se pudo obtener exchanges'}</p>`);
+    container?.insertAdjacentHTML(
+      'afterbegin',
+      `<p class="price-error">${msg}${isForbidden ? ' • usando lista básica local (US, BA)' : ''}</p>`
+    );
   }
   renderExchangeSelect();
 };
