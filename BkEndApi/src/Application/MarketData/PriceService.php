@@ -596,6 +596,14 @@ final class PriceService
         return $this->twelveClient->fetchTechnicalIndicator($function, $params);
     }
 
+    public function twelveExchanges(): array
+    {
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        return $this->twelveClient->fetchExchanges();
+    }
+
     /**
      * Devuelve snapshot crudo con el proveedor usado (para Data Lake).
      */
