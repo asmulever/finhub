@@ -129,6 +129,11 @@ final class ApiDispatcher
             $this->handleAlphaVantage($path);
             return;
         }
+        if ($method === 'GET' && str_starts_with($path, '/twelvedata/')) {
+            $this->requireAdmin();
+            $this->handleTwelveData($path);
+            return;
+        }
         if ($method === 'GET' && ($path === '/prices' || $path === '/quotes')) {
             $request = PriceRequest::fromArray($_GET ?? []);
             $quote = $this->priceService->getPrice($request);
@@ -581,6 +586,170 @@ final class ApiDispatcher
             $this->sendJson(['data' => $data]);
             return;
         }
+        throw new \RuntimeException('Ruta no encontrada', 404);
+    }
+
+    private function handleTwelveData(string $path): void
+    {
+        if ($path === '/twelvedata/time_series') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $interval = (string) ($_GET['interval'] ?? '1day');
+            $outputsize = (string) ($_GET['outputsize'] ?? 'compact');
+            $data = $this->priceService->twelveTimeSeries($symbol, [
+                'interval' => $interval,
+                'outputsize' => $outputsize,
+            ]);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+
+        if ($path === '/twelvedata/quote') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $data = $this->priceService->twelveQuote($symbol);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+
+        if ($path === '/twelvedata/price') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $data = $this->priceService->twelvePrice($symbol);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+
+        if ($path === '/twelvedata/quotes') {
+            $symbolsParam = (string) ($_GET['symbols'] ?? '');
+            $symbols = array_filter(array_map(static fn ($s) => strtoupper(trim((string) $s)), explode(',', $symbolsParam)), static fn ($s) => $s !== '');
+            if (empty($symbols)) {
+                throw new \RuntimeException('symbols requeridos', 422);
+            }
+            $data = $this->priceService->twelveQuotes($symbols);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+
+        if ($path === '/twelvedata/stocks') {
+            $exchange = trim((string) ($_GET['exchange'] ?? ''));
+            $data = $this->priceService->twelveStocks($exchange === '' ? null : $exchange);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+
+        if ($path === '/twelvedata/stocks/by-exchange') {
+            $exchange = trim((string) ($_GET['exchange'] ?? ''));
+            if ($exchange === '') {
+                throw new \RuntimeException('exchange requerido', 422);
+            }
+            $data = $this->priceService->twelveStocksByExchange($exchange);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+
+        if ($path === '/twelvedata/usage') {
+            $data = $this->priceService->twelveUsage();
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+
+        if ($path === '/twelvedata/exchange_rate') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $data = $this->priceService->twelveExchangeRate($symbol);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+
+        if ($path === '/twelvedata/currency_conversion') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            $amount = (float) ($_GET['amount'] ?? 0);
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            if ($amount <= 0) {
+                throw new \RuntimeException('amount debe ser mayor a 0', 422);
+            }
+            $data = $this->priceService->twelveCurrencyConversion($symbol, $amount);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+
+        if ($path === '/twelvedata/market_state') {
+            $data = $this->priceService->twelveMarketState();
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+
+        if ($path === '/twelvedata/cryptocurrency_exchanges') {
+            $data = $this->priceService->twelveCryptoExchanges();
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+
+        if ($path === '/twelvedata/instrument_type') {
+            $data = $this->priceService->twelveInstrumentTypes();
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+
+        if ($path === '/twelvedata/symbol_search') {
+            $keywords = trim((string) ($_GET['symbol'] ?? ''));
+            if ($keywords === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $data = $this->priceService->twelveSymbolSearch($keywords);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+
+        if ($path === '/twelvedata/forex_pairs') {
+            $data = $this->priceService->twelveForexPairs();
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+
+        if ($path === '/twelvedata/cryptocurrencies') {
+            $data = $this->priceService->twelveCryptocurrencies();
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+
+        if ($path === '/twelvedata/earliest_timestamp') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            $exchange = isset($_GET['exchange']) ? strtoupper(trim((string) $_GET['exchange'])) : null;
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $data = $this->priceService->twelveEarliestTimestamp($symbol, $exchange);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+
+        if ($path === '/twelvedata/technical_indicator') {
+            $function = trim((string) ($_GET['function'] ?? ''));
+            $symbol = trim((string) ($_GET['symbol'] ?? ''));
+            $interval = trim((string) ($_GET['interval'] ?? '1day'));
+            if ($function === '' || $symbol === '') {
+                throw new \RuntimeException('function y symbol requeridos', 422);
+            }
+            $params = $_GET;
+            $params['symbol'] = $symbol;
+            $params['interval'] = $interval;
+            $data = $this->priceService->twelveTechnicalIndicator($function, $params);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+
         throw new \RuntimeException('Ruta no encontrada', 404);
     }
 

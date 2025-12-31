@@ -7,11 +7,12 @@ const toolbarTemplate = `
         <img src="/logo/full_logoweb.png" alt="FinHub" style="height: 88px;" />
       </a>
     </div>
-    <nav class="toolbar-menu">
+  <nav class="toolbar-menu">
       <button type="button" data-menu="portfolios" data-link="/Frontend/Portafolios.html">Portafolios</button>
       <button type="button" data-menu="prices" data-link="/Frontend/precios.html">Precios</button>
       <button type="button" id="datalake-menu" data-menu="datalake" data-link="/Frontend/datalake.html">DataLake</button>
       <button type="button" id="eodhd-menu" data-menu="eodhd" data-link="/Frontend/eodhd.html">EODHD</button>
+      <button type="button" id="twelvedata-menu" data-menu="twelvedata" data-link="/Frontend/twelvedata.html">TwelveData</button>
       <button type="button" id="alphavantage-menu" data-menu="alphavantage" data-link="/Frontend/alphavantage.html">Alpha Vantage</button>
     </nav>
     <div class="toolbar-user">
@@ -35,11 +36,13 @@ export const setAdminMenuVisibility = (profile) => {
   const datalakeButton = document.getElementById('datalake-menu');
   const eodhdButton = document.getElementById('eodhd-menu');
   const alphaButton = document.getElementById('alphavantage-menu');
+  const twelveButton = document.getElementById('twelvedata-menu');
   const isAdmin = isAdminProfile(profile);
   if (adminButton) adminButton.hidden = !isAdmin;
   if (datalakeButton) datalakeButton.hidden = !isAdmin;
   if (eodhdButton) eodhdButton.hidden = !isAdmin;
   if (alphaButton) alphaButton.hidden = !isAdmin;
+  if (twelveButton) twelveButton.hidden = !isAdmin;
 };
 
 export const renderToolbar = () => {
