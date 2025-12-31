@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FinHub | Análisis</title>
+  <link rel="icon" href="/logo/favicon.png" />
+  <script>
+    window.__ENV = window.__ENV ?? {};
+    window.__ENV.API_BASE_URL = '/api';
+  </script>
+  <link rel="preload" href="/logo/full_logoweb.png" as="image" />
+  <style>
+    :root { font-family: 'Inter', system-ui, sans-serif; }
+    body { margin: 0; background: #0b1021; color: #e2e8f0; }
+    .content-shell { padding: 24px 32px; }
+    main { display: grid; gap: 20px; max-width: 1400px; margin: 0 auto; }
+    .card { background: rgba(13, 18, 35, 0.9); border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 14px; padding: 18px 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.35); }
+    h2, h3 { margin: 0 0 8px 0; }
+    .muted { color: #94a3b8; font-size: 0.95rem; }
+    .form-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+    input, select { background: #0f172a; color: #e2e8f0; border: 1px solid rgba(148,163,184,0.4); border-radius: 10px; padding: 10px 12px; min-width: 140px; }
+    button { background: linear-gradient(120deg, #22d3ee, #0ea5e9); border: none; color: #0b1021; padding: 10px 14px; border-radius: 10px; font-weight: 600; cursor: pointer; }
+    pre { background: #0f172a; color: #e2e8f0; border-radius: 10px; padding: 12px; overflow: auto; font-size: 0.9rem; max-height: 260px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+    .error { color: #f87171; font-weight: 600; min-height: 20px; }
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 10px; }
+    .metric { background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 12px; padding: 10px 12px; }
+  </style>
+</head>
+<body>
+  <div class="content-shell">
+    <main>
+      <section class="card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+          <div>
+            <h2>Análisis</h2>
+            <p class="muted">Consulta un ticker y obtén histórico, métricas básicas, RSI y sugerencia (compra/venta) en horizonte corto/mediano/largo. Conversión a ARS vía Exchange Rate.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Entrada</h3>
+        <div class="form-row">
+          <input id="an-symbol" placeholder="Símbolo (ej. AAPL o AAPL.US)" />
+          <select id="an-provider">
+            <option value="twelvedata">TwelveData</option>
+            <option value="eodhd">EODHD</option>
+          </select>
+          <select id="an-interval">
+            <option value="1day" selected>1day</option>
+            <option value="1week">1week</option>
+            <option value="1month">1month</option>
+          </select>
+          <select id="an-outputsize">
+            <option value="180">180 días</option>
+            <option value="365" selected>365 días</option>
+            <option value="720">720 días</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <select id="an-exchange">
+            <option value="">Exchange (opcional)</option>
+          </select>
+          <input id="an-currency" placeholder="Moneda base (ej. USD)" />
+          <button id="btn-analizar">Analizar</button>
+        </div>
+        <div id="an-error" class="error"></div>
+      </section>
+
+      <section class="card grid">
+        <div>
+          <h3>Histórico</h3>
+          <pre id="an-hist-output">{}</pre>
+        </div>
+        <div>
+          <h3>Métricas y recomendación</h3>
+          <div class="metrics">
+            <div class="metric"><strong>Último</strong><div id="m-last">-</div></div>
+            <div class="metric"><strong>Variación 30d</strong><div id="m-chg30">-</div></div>
+            <div class="metric"><strong>RSI</strong><div id="m-rsi">-</div></div>
+            <div class="metric"><strong>SMA corto/medio</strong><div id="m-sma">-</div></div>
+          </div>
+          <div style="margin-top:10px;">
+            <div><strong>Sugerencia corto:</strong> <span id="m-rec-short">-</span></div>
+            <div><strong>Sugerencia mediano:</strong> <span id="m-rec-mid">-</span></div>
+            <div><strong>Sugerencia largo:</strong> <span id="m-rec-long">-</span></div>
+            <div><strong>Precio en ARS:</strong> <span id="m-ars">-</span></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/Frontend/paginas/analisis.js"></script>
+</body>
+</html>
