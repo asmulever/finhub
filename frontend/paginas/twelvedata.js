@@ -234,7 +234,7 @@ const fetchCryptocurrencies = async () => {
 const fetchEarliestTimestamp = async () => {
   if (!guardAdmin()) return;
   const symbol = document.getElementById('td-earliest-symbol')?.value.trim().toUpperCase();
-  const exchange = document.getElementById('td-earliest-exchange')?.value || '';
+  const exchange = (document.getElementById('td-earliest-exchange')?.value || '').toUpperCase();
   const interval = document.getElementById('td-earliest-interval')?.value || '1day';
   setError('td-earliest-error', '');
   if (!symbol) return setError('td-earliest-error', 'Ingresa símbolo');
@@ -246,6 +246,27 @@ const fetchEarliestTimestamp = async () => {
   } catch (error) {
     logError('earliest_timestamp', error);
     setError('td-earliest-error', error?.error?.message ?? 'Error en earliest_timestamp');
+  }
+};
+
+const loadExchangeOptions = async () => {
+  const select = document.getElementById('td-earliest-exchange');
+  if (!select) return;
+  try {
+    const resp = await getJson('/eodhd/exchanges-list');
+    const list = Array.isArray(resp?.data) ? resp.data : [];
+    const options = ['<option value=\"\">Exchange (opcional)</option>'].concat(
+      list.map((ex) => {
+        const code = ex.Code ?? ex.code ?? '';
+        const name = ex.Name ?? ex.name ?? '';
+        if (!code) return '';
+        return `<option value=\"${code}\">${code}${name ? ' - ' + name : ''}</option>`;
+      }).filter(Boolean)
+    );
+    select.innerHTML = options.join('');
+  } catch (error) {
+    logError('exchanges-load', error);
+    setError('td-earliest-error', 'No se pudo cargar exchanges');
   }
 };
 
