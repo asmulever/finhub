@@ -83,6 +83,152 @@ final class TwelveDataClient
     }
 
     /**
+     * Precio simple (valor único).
+     */
+    public function fetchPrice(string $symbol): array
+    {
+        $params = [
+            'symbol' => $symbol,
+            'apikey' => $this->apiKey,
+        ];
+        return $this->request('price', $params);
+    }
+
+    /**
+     * Serie de tiempo OHLCV (histórica o intradía).
+     */
+    public function fetchTimeSeries(string $symbol, array $query = []): array
+    {
+        $params = array_merge([
+            'symbol' => $symbol,
+            'apikey' => $this->apiKey,
+            'interval' => $query['interval'] ?? '1day',
+            'outputsize' => $query['outputsize'] ?? 'compact',
+        ], $query);
+        return $this->request('time_series', $params);
+    }
+
+    /**
+     * Tipo de cambio (forex/cripto).
+     */
+    public function fetchExchangeRate(string $symbol): array
+    {
+        $params = [
+            'symbol' => $symbol,
+            'apikey' => $this->apiKey,
+        ];
+        return $this->request('exchange_rate', $params);
+    }
+
+    /**
+     * Conversión de monto entre monedas.
+     */
+    public function fetchCurrencyConversion(string $symbol, float $amount): array
+    {
+        $params = [
+            'symbol' => $symbol,
+            'amount' => $amount,
+            'apikey' => $this->apiKey,
+        ];
+        return $this->request('currency_conversion', $params);
+    }
+
+    /**
+     * Estado de mercado (abierto/cerrado).
+     */
+    public function fetchMarketState(): array
+    {
+        return $this->request('market_state', ['apikey' => $this->apiKey]);
+    }
+
+    /**
+     * Lista de exchanges de cripto.
+     */
+    public function fetchCryptocurrencyExchanges(): array
+    {
+        return $this->request('cryptocurrency_exchanges', ['apikey' => $this->apiKey]);
+    }
+
+    /**
+     * Tipos de instrumento disponibles.
+     */
+    public function fetchInstrumentTypes(): array
+    {
+        return $this->request('instrument_type', ['apikey' => $this->apiKey]);
+    }
+
+    /**
+     * Búsqueda de símbolos.
+     */
+    public function symbolSearch(string $keywords): array
+    {
+        $params = [
+            'symbol' => $keywords,
+            'apikey' => $this->apiKey,
+        ];
+        return $this->request('symbol_search', $params);
+    }
+
+    /**
+     * Listas de forex pairs.
+     */
+    public function fetchForexPairs(): array
+    {
+        return $this->request('forex_pairs', ['apikey' => $this->apiKey]);
+    }
+
+    /**
+     * Lista de criptomonedas.
+     */
+    public function fetchCryptocurrencies(): array
+    {
+        return $this->request('cryptocurrencies', ['apikey' => $this->apiKey]);
+    }
+
+    /**
+     * Lista de acciones por exchange.
+     */
+    public function fetchStocksByExchange(string $exchange): array
+    {
+        $params = [
+            'exchange' => $exchange,
+            'apikey' => $this->apiKey,
+        ];
+        return $this->request('stocks', $params);
+    }
+
+    /**
+     * Primer timestamp disponible para un instrumento.
+     */
+    public function fetchEarliestTimestamp(string $symbol, ?string $exchange = null): array
+    {
+        $params = [
+            'symbol' => $symbol,
+            'apikey' => $this->apiKey,
+        ];
+        if ($exchange) {
+            $params['exchange'] = $exchange;
+        }
+        return $this->request('earliest_timestamp', $params);
+    }
+
+    /**
+     * Indicadores técnicos (wrapper genérico).
+     *
+     * @param array<string,mixed> $params
+     */
+    public function fetchTechnicalIndicator(string $function, array $params): array
+    {
+        $query = array_merge([
+            'symbol' => $params['symbol'] ?? '',
+            'interval' => $params['interval'] ?? '1day',
+            'apikey' => $this->apiKey,
+        ], $params);
+        return $this->request($function, $query);
+    }
+
+
+    /**
      * Lista los tickers disponibles.
      */
     public function listStocks(?string $exchange = null): array

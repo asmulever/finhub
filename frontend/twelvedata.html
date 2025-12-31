@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FinHub | Twelve Data</title>
+  <link rel="icon" href="/logo/favicon.png" />
+  <script>
+    window.__ENV = window.__ENV ?? {};
+    window.__ENV.API_BASE_URL = '/api';
+  </script>
+  <link rel="preload" href="/logo/full_logoweb.png" as="image" />
+  <style>
+    :root { font-family: 'Inter', system-ui, sans-serif; }
+    body { margin: 0; background: #0b1021; color: #e2e8f0; }
+    .content-shell { padding: 24px 32px; }
+    main { display: grid; gap: 20px; max-width: 1400px; margin: 0 auto; }
+    .card { background: rgba(13, 18, 35, 0.9); border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 14px; padding: 18px 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.35); }
+    h2, h3 { margin: 0 0 8px 0; }
+    .muted { color: #94a3b8; font-size: 0.95rem; }
+    .form-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+    input, select { background: #0f172a; color: #e2e8f0; border: 1px solid rgba(148,163,184,0.4); border-radius: 10px; padding: 10px 12px; min-width: 140px; }
+    button { background: linear-gradient(120deg, #22d3ee, #0ea5e9); border: none; color: #0b1021; padding: 10px 14px; border-radius: 10px; font-weight: 600; cursor: pointer; }
+    pre { background: #0f172a; color: #e2e8f0; border-radius: 10px; padding: 12px; overflow: auto; font-size: 0.9rem; max-height: 260px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+    .error { color: #f87171; font-weight: 600; min-height: 20px; }
+  </style>
+</head>
+<body>
+  <div class="content-shell">
+    <main>
+      <section class="card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+          <div>
+            <h2>Twelve Data</h2>
+            <p class="muted">Pruebas rápidas de endpoints: quote puntual, batch de quotes, listado de símbolos y uso de API. Requiere API key y rol admin.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card grid">
+        <div>
+          <h3>QUOTE</h3>
+          <div class="form-row">
+            <input id="td-quote-symbol" placeholder="Símbolo (ej. AAPL)" />
+            <button id="td-btn-quote">Consultar</button>
+          </div>
+          <div id="td-quote-error" class="error"></div>
+          <pre id="td-quote-output">{}</pre>
+        </div>
+        <div>
+          <h3>QUOTES BATCH</h3>
+          <div class="form-row">
+            <input id="td-batch-symbols" placeholder="Símbolos separados por coma (ej. AAPL,MSFT,TSLA)" />
+            <button id="td-btn-batch">Consultar</button>
+          </div>
+          <div id="td-batch-error" class="error"></div>
+          <pre id="td-batch-output">{}</pre>
+        </div>
+      </section>
+
+      <section class="card grid">
+        <div>
+          <h3>PRICE</h3>
+          <div class="form-row">
+            <input id="td-price-symbol" placeholder="Símbolo (ej. TSLA)" />
+            <button id="td-btn-price">Consultar</button>
+          </div>
+          <div id="td-price-error" class="error"></div>
+          <pre id="td-price-output">{}</pre>
+        </div>
+        <div>
+          <h3>TIME SERIES</h3>
+          <div class="form-row">
+            <input id="td-ts-symbol" placeholder="Símbolo (ej. MSFT)" />
+            <select id="td-ts-interval">
+              <option value="1min">1min</option>
+              <option value="5min">5min</option>
+              <option value="15min">15min</option>
+              <option value="30min">30min</option>
+              <option value="60min">60min</option>
+              <option value="1day" selected>1day</option>
+            </select>
+            <select id="td-ts-size">
+              <option value="30" selected>30 (compact)</option>
+              <option value="5000">5000 (full)</option>
+            </select>
+            <button id="td-btn-ts">Consultar</button>
+          </div>
+          <div id="td-ts-error" class="error"></div>
+          <pre id="td-ts-output">{}</pre>
+        </div>
+      </section>
+
+      <section class="card grid">
+        <div>
+          <h3>EXCHANGE RATE</h3>
+          <div class="form-row">
+            <input id="td-exrate-symbol" placeholder="Par (ej. EUR/USD)" />
+            <button id="td-btn-exrate">Consultar</button>
+          </div>
+          <div id="td-exrate-error" class="error"></div>
+          <pre id="td-exrate-output">{}</pre>
+        </div>
+        <div>
+          <h3>CURRENCY CONVERSION</h3>
+          <div class="form-row">
+            <input id="td-conv-symbol" placeholder="Par (ej. EUR/USD)" />
+            <input id="td-conv-amount" type="number" min="0" step="0.01" placeholder="Monto" />
+            <button id="td-btn-conv">Convertir</button>
+          </div>
+          <div id="td-conv-error" class="error"></div>
+          <pre id="td-conv-output">{}</pre>
+        </div>
+      </section>
+
+      <section class="card grid">
+        <div>
+          <h3>MARKET STATE</h3>
+          <div class="form-row">
+            <button id="td-btn-market">Consultar</button>
+          </div>
+          <div id="td-market-error" class="error"></div>
+          <pre id="td-market-output">{}</pre>
+        </div>
+        <div>
+          <h3>CRYPTO EXCHANGES</h3>
+          <div class="form-row">
+            <button id="td-btn-cryptoex">Listar</button>
+          </div>
+          <div id="td-cryptoex-error" class="error"></div>
+          <pre id="td-cryptoex-output">{}</pre>
+        </div>
+      </section>
+
+      <section class="card grid">
+        <div>
+          <h3>INSTRUMENT TYPES</h3>
+          <div class="form-row">
+            <button id="td-btn-insttype">Listar</button>
+          </div>
+          <div id="td-insttype-error" class="error"></div>
+          <pre id="td-insttype-output">{}</pre>
+        </div>
+        <div>
+          <h3>SYMBOL SEARCH</h3>
+          <div class="form-row">
+            <input id="td-search-keywords" placeholder="Texto (ej. apple, tesla)" />
+            <button id="td-btn-search">Buscar</button>
+          </div>
+          <div id="td-search-error" class="error"></div>
+          <pre id="td-search-output">{}</pre>
+        </div>
+      </section>
+
+      <section class="card grid">
+        <div>
+          <h3>FOREX PAIRS</h3>
+          <div class="form-row">
+            <button id="td-btn-forex">Listar</button>
+          </div>
+          <div id="td-forex-error" class="error"></div>
+          <pre id="td-forex-output">{}</pre>
+        </div>
+        <div>
+          <h3>CRYPTOCURRENCIES</h3>
+          <div class="form-row">
+            <button id="td-btn-cryptos">Listar</button>
+          </div>
+          <div id="td-cryptos-error" class="error"></div>
+          <pre id="td-cryptos-output">{}</pre>
+        </div>
+      </section>
+
+      <section class="card grid">
+        <div>
+          <h3>EARLIEST TIMESTAMP</h3>
+          <div class="form-row">
+            <input id="td-earliest-symbol" placeholder="Símbolo" />
+            <input id="td-earliest-exchange" placeholder="Exchange (opcional)" />
+            <select id="td-earliest-interval">
+              <option value="1min">1min</option>
+              <option value="5min">5min</option>
+              <option value="15min">15min</option>
+              <option value="30min">30min</option>
+              <option value="45min">45min</option>
+              <option value="1h">1h</option>
+              <option value="2h">2h</option>
+              <option value="4h">4h</option>
+              <option value="8h">8h</option>
+              <option value="1day" selected>1day</option>
+              <option value="1week">1week</option>
+              <option value="1month">1month</option>
+            </select>
+            <button id="td-btn-earliest">Consultar</button>
+          </div>
+          <div id="td-earliest-error" class="error"></div>
+          <pre id="td-earliest-output">{}</pre>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>TECHNICAL INDICATOR</h3>
+        <div class="form-row">
+          <select id="td-ti-function">
+            <option value="sma">sma</option>
+            <option value="ema">ema</option>
+            <option value="wma">wma</option>
+            <option value="dema">dema</option>
+            <option value="tema">tema</option>
+            <option value="trima">trima</option>
+            <option value="kama">kama</option>
+            <option value="mama">mama</option>
+            <option value="t3">t3</option>
+            <option value="macd">macd</option>
+            <option value="stoch">stoch</option>
+            <option value="rsi">rsi</option>
+            <option value="adx">adx</option>
+            <option value="cci">cci</option>
+            <option value="atr">atr</option>
+            <option value="bbands">bbands</option>
+            <option value="sar">sar</option>
+            <option value="stochrsi">stochrsi</option>
+            <option value="willr">willr</option>
+            <option value="adosc">adosc</option>
+            <option value="obv">obv</option>
+            <option value="mom">mom</option>
+            <option value="ppo">ppo</option>
+            <option value="roc">roc</option>
+            <option value="rocr">rocr</option>
+            <option value="mfi">mfi</option>
+            <option value="ht_trendline">ht_trendline</option>
+            <option value="ht_sine">ht_sine</option>
+            <option value="ht_trendmode">ht_trendmode</option>
+            <option value="ht_dcperiod">ht_dcperiod</option>
+            <option value="ht_dcphase">ht_dcphase</option>
+            <option value="ht_phasor">ht_phasor</option>
+          </select>
+          <input id="td-ti-symbol" placeholder="Símbolo" />
+          <select id="td-ti-interval">
+            <option value="1min">1min</option>
+            <option value="5min">5min</option>
+            <option value="15min">15min</option>
+            <option value="30min">30min</option>
+            <option value="60min">60min</option>
+            <option value="1day" selected>1day</option>
+          </select>
+          <input id="td-ti-period" type="number" min="1" placeholder="time_period (opcional)" style="max-width:140px" />
+          <select id="td-ti-series">
+            <option value="">series_type (opcional)</option>
+            <option value="open">open</option>
+            <option value="high">high</option>
+            <option value="low">low</option>
+            <option value="close">close</option>
+          </select>
+          <button id="td-btn-ti">Consultar</button>
+        </div>
+        <div id="td-ti-error" class="error"></div>
+        <pre id="td-ti-output">{}</pre>
+      </section>
+
+      <section class="card grid">
+        <div>
+          <h3>LISTA DE STOCKS</h3>
+          <div class="form-row">
+            <input id="td-stocks-exchange" placeholder="Exchange/MIC (ej. XBUE, NASDAQ)" value="XBUE" />
+            <button id="td-btn-stocks">Listar</button>
+          </div>
+          <div id="td-stocks-error" class="error"></div>
+          <pre id="td-stocks-output">{}</pre>
+        </div>
+        <div>
+          <h3>USO DE API</h3>
+          <div class="form-row">
+            <button id="td-btn-usage">Consultar uso</button>
+          </div>
+          <div id="td-usage-error" class="error"></div>
+          <pre id="td-usage-output">{}</pre>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/Frontend/paginas/twelvedata.js"></script>
+</body>
+</html>

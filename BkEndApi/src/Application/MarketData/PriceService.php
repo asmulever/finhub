@@ -401,6 +401,202 @@ final class PriceService
     }
 
     /**
+     * Quote directo desde Twelve Data (sin fallback).
+     */
+    public function twelveQuote(string $symbol): array
+    {
+        $symbol = strtoupper(trim($symbol));
+        if ($symbol === '') {
+            throw new \RuntimeException('Símbolo requerido', 422);
+        }
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        return $this->fetchTwelveQuoteNormalized($symbol, $symbol);
+    }
+
+    /**
+     * Quotes batch desde Twelve Data.
+     *
+     * @param array<int,string> $symbols
+     * @return array<string,array<string,mixed>>
+     */
+    public function twelveQuotes(array $symbols): array
+    {
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        $map = [];
+        foreach ($symbols as $symbol) {
+            $s = strtoupper(trim((string) $symbol));
+            if ($s === '' || isset($map[$s])) {
+                continue;
+            }
+            $map[$s] = true;
+        }
+        if (empty($map)) {
+            throw new \RuntimeException('Símbolos requeridos', 422);
+        }
+        $raw = $this->twelveClient->fetchQuotes(array_keys($map));
+        $normalized = [];
+        foreach ($raw as $key => $row) {
+            $normalized[$key] = $this->normalizeTwelveDataQuote($row, (string) $key);
+        }
+        return $normalized;
+    }
+
+    /**
+     * Lista de instrumentos desde Twelve Data.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public function twelveStocks(?string $exchange = null): array
+    {
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        $raw = $this->twelveClient->listStocks($exchange);
+        $items = [];
+        foreach ($raw as $row) {
+            $symbol = $row['symbol'] ?? $row['Symbol'] ?? null;
+            if ($symbol === null || trim((string) $symbol) === '') {
+                continue;
+            }
+            $item = StockItem::fromArray([
+                'symbol' => $symbol,
+                'name' => $row['name'] ?? $row['Name'] ?? null,
+                'currency' => $row['currency'] ?? $row['Currency'] ?? null,
+                'exchange' => $row['exchange'] ?? $row['Exchange'] ?? $exchange,
+                'country' => $row['country'] ?? $row['Country'] ?? null,
+                'mic_code' => $row['mic_code'] ?? $row['mic'] ?? $row['micCode'] ?? null,
+                'type' => $row['type'] ?? $row['Type'] ?? null,
+            ]);
+            $items[] = $item->toArray();
+        }
+        return $items;
+    }
+
+    /**
+     * Uso/limites de API Twelve Data.
+     */
+    public function twelveUsage(): array
+    {
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        return $this->twelveClient->fetchUsage();
+    }
+
+    public function twelvePrice(string $symbol): array
+    {
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        return $this->twelveClient->fetchPrice($symbol);
+    }
+
+    public function twelveTimeSeries(string $symbol, array $query): array
+    {
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        return $this->twelveClient->fetchTimeSeries($symbol, $query);
+    }
+
+    public function twelveExchangeRate(string $symbol): array
+    {
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        return $this->twelveClient->fetchExchangeRate($symbol);
+    }
+
+    public function twelveCurrencyConversion(string $symbol, float $amount): array
+    {
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        return $this->twelveClient->fetchCurrencyConversion($symbol, $amount);
+    }
+
+    public function twelveMarketState(): array
+    {
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        return $this->twelveClient->fetchMarketState();
+    }
+
+    public function twelveCryptoExchanges(): array
+    {
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        return $this->twelveClient->fetchCryptocurrencyExchanges();
+    }
+
+    public function twelveInstrumentTypes(): array
+    {
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        return $this->twelveClient->fetchInstrumentTypes();
+    }
+
+    public function twelveSymbolSearch(string $keywords): array
+    {
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        return $this->twelveClient->symbolSearch($keywords);
+    }
+
+    public function twelveForexPairs(): array
+    {
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        return $this->twelveClient->fetchForexPairs();
+    }
+
+    public function twelveCryptocurrencies(): array
+    {
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        return $this->twelveClient->fetchCryptocurrencies();
+    }
+
+    public function twelveStocksByExchange(string $exchange): array
+    {
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        return $this->twelveClient->fetchStocksByExchange($exchange);
+    }
+
+    public function twelveExchangeSchedule(string $exchange): array
+    {
+        throw new \RuntimeException('Endpoint no disponible en plan actual', 403);
+    }
+
+    public function twelveEarliestTimestamp(string $symbol, ?string $exchange = null): array
+    {
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        return $this->twelveClient->fetchEarliestTimestamp($symbol, $exchange);
+    }
+
+    public function twelveTechnicalIndicator(string $function, array $params): array
+    {
+        if ($this->twelveClient === null) {
+            throw new \RuntimeException('Servicio Twelve Data no configurado', 503);
+        }
+        return $this->twelveClient->fetchTechnicalIndicator($function, $params);
+    }
+
+    /**
      * Devuelve snapshot crudo con el proveedor usado (para Data Lake).
      */
     public function fetchSnapshot(string $symbol): array
