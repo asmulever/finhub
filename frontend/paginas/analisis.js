@@ -21,6 +21,26 @@ const setOutput = (id, payload) => {
   if (el) el.textContent = JSON.stringify(payload ?? {}, null, 2);
 };
 
+const PREF_KEY = 'analysis_prefs_v1';
+
+const savePrefs = (prefs) => {
+  try {
+    localStorage.setItem(PREF_KEY, JSON.stringify(prefs));
+  } catch (error) {
+    logError('prefs.save', error);
+  }
+};
+
+const loadPrefs = () => {
+  try {
+    const raw = localStorage.getItem(PREF_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+};
+
 const requireAdmin = () => String(state.profile?.role ?? '').toLowerCase() === 'admin';
 
 const logError = (context, error) => {
@@ -50,14 +70,15 @@ const loadExchanges = async () => {
   const select = document.getElementById('an-exchange');
   if (!select) return;
   try {
-    const resp = await getJson('/eodhd/exchanges-list');
+    const resp = await getJson('/twelvedata/exchanges');
     const list = Array.isArray(resp?.data) ? resp.data : [];
     const options = ['<option value="">Exchange (opcional)</option>'].concat(
       list.map((ex) => {
-        const code = ex.Code ?? ex.code ?? '';
-        const name = ex.Name ?? ex.name ?? '';
+        const code = ex.code ?? ex.name ?? '';
+        const name = ex.title ?? ex.name ?? '';
+        const country = ex.country ?? '';
         if (!code) return '';
-        return `<option value="${code}">${code}${name ? ' - ' + name : ''}</option>`;
+        return `<option value="${code.toUpperCase()}">${code.toUpperCase()}${name ? ' - ' + name : ''}${country ? ' - ' + country : ''}</option>`;
       }).filter(Boolean)
     );
     select.innerHTML = options.join('');
@@ -137,6 +158,36 @@ const fetchHistorical = async (provider, symbol, interval, outputsize) => {
   return overlay.withLoader(() => getJson(`/eodhd/eod?symbol=${encodeURIComponent(symbol)}`));
 };
 
+const renderChart = (series) => {
+  const canvas = document.getElementById('an-chart');
+  if (!canvas || !canvas.getContext) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!series.length) return;
+  const values = series.slice(0, Math.min(series.length, 200));
+  const min = Math.min(...values.map((p) => p.close));
+  const max = Math.max(...values.map((p) => p.close));
+  const range = max - min || 1;
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.beginPath();
+  values.forEach((p, idx) => {
+    const x = (idx / (values.length - 1 || 1)) * (w - 20) + 10;
+    const y = h - ((p.close - min) / range) * (h - 20) - 10;
+    if (idx === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = '#22d3ee';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.lineTo(w - 10, h - 10);
+  ctx.lineTo(10, h - 10);
+  ctx.closePath();
+  ctx.fillStyle = '#22d3ee33';
+  ctx.fill();
+};
+
 const analyze = async () => {
   if (!guardAdmin()) return;
   const symbolRaw = document.getElementById('an-symbol')?.value.trim();
@@ -148,6 +199,8 @@ const analyze = async () => {
   setError('an-error', '');
   if (!symbolRaw) return setError('an-error', 'Ingresa símbolo');
   const symbol = exchange && !symbolRaw.includes('.') ? `${symbolRaw}.${exchange}` : symbolRaw;
+
+  savePrefs({ symbol: symbolRaw, provider, interval, outputsize, exchange, currency: currencyInput });
 
   try {
     const histResp = await fetchHistorical(provider, symbol, interval, outputsize);
@@ -174,6 +227,7 @@ const analyze = async () => {
     const rate = await fetchExchangeRateArs(currency);
     const lastArs = last !== null ? last * rate : null;
     setText('m-ars', lastArs !== null ? `${lastArs.toFixed(2)} ARS` : '-');
+    renderChart(series);
   } catch (error) {
     logError('analizar', error);
     setError('an-error', error?.error?.message ?? error?.message ?? 'Error al analizar');
@@ -206,5 +260,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   highlightToolbar();
   await loadProfile();
   await loadExchanges();
+  const prefs = loadPrefs();
+  if (prefs.symbol) document.getElementById('an-symbol').value = prefs.symbol;
+  if (prefs.provider) document.getElementById('an-provider').value = prefs.provider;
+  if (prefs.interval) document.getElementById('an-interval').value = prefs.interval;
+  if (prefs.outputsize) document.getElementById('an-outputsize').value = prefs.outputsize;
+  if (prefs.currency) document.getElementById('an-currency').value = prefs.currency;
+  if (prefs.exchange && document.getElementById('an-exchange')) {
+    document.getElementById('an-exchange').value = prefs.exchange;
+  }
   bindUi();
 });
