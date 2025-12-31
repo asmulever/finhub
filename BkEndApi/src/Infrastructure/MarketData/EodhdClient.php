@@ -130,6 +130,18 @@ final class EodhdClient
     }
 
     /**
+     * Búsqueda de instrumentos por texto.
+     */
+    public function search(string $query): array
+    {
+        if ($this->apiKey === '') {
+            throw new \RuntimeException('EODHD API key requerida');
+        }
+        $url = sprintf('%s/api/search/%s?api_token=%s&fmt=json', $this->baseUrl, urlencode($query), urlencode($this->apiKey));
+        return $this->doRequest($url);
+    }
+
+    /**
      * Información de cuenta (plan y límites restantes).
      */
     public function fetchUser(): array

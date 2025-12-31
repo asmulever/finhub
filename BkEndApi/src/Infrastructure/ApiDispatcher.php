@@ -129,6 +129,11 @@ final class ApiDispatcher
             $this->handleAlphaVantage($path);
             return;
         }
+        if ($method === 'GET' && str_starts_with($path, '/eodhd/')) {
+            $this->requireAdmin();
+            $this->handleEodhdAdmin($path);
+            return;
+        }
         if ($method === 'GET' && str_starts_with($path, '/twelvedata/')) {
             $this->requireAdmin();
             $this->handleTwelveData($path);
@@ -182,6 +187,12 @@ final class ApiDispatcher
         if ($method === 'GET' && $path === '/eodhd/exchanges-list') {
             $this->requireAdmin();
             $this->handleEodhdExchangesList();
+            return;
+        }
+        if ($method === 'GET' && $path === '/eodhd/user') {
+            $this->requireAdmin();
+            $data = $this->eodhdClient->fetchUser();
+            $this->sendJson(['data' => $data]);
             return;
         }
         if ($method === 'GET' && $path === '/portfolio/instruments') {
@@ -414,6 +425,42 @@ final class ApiDispatcher
     {
         $data = $this->eodhdClient->fetchExchangesList();
         $this->sendJson(['data' => $data]);
+    }
+
+    private function handleEodhdAdmin(string $path): void
+    {
+        if ($path === '/eodhd/eod') {
+            $symbol = trim((string) ($_GET['symbol'] ?? ''));
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $data = $this->eodhdClient->fetchEod($symbol);
+            $this->sendJson(['symbol' => $symbol, 'data' => $data]);
+            return;
+        }
+        if ($path === '/eodhd/search') {
+            $query = trim((string) ($_GET['q'] ?? ($_GET['query'] ?? '')));
+            if ($query === '') {
+                throw new \RuntimeException('q requerido', 422);
+            }
+            $data = $this->eodhdClient->search($query);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/eodhd/exchange-symbols') {
+            $this->handleEodhdExchangeSymbols();
+            return;
+        }
+        if ($path === '/eodhd/exchanges-list') {
+            $this->handleEodhdExchangesList();
+            return;
+        }
+        if ($path === '/eodhd/user') {
+            $data = $this->eodhdClient->fetchUser();
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        throw new \RuntimeException('Ruta no encontrada', 404);
     }
 
     /**
