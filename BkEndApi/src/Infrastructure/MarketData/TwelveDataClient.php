@@ -83,6 +83,17 @@ final class TwelveDataClient
     }
 
     /**
+     * Lista de exchanges disponibles.
+     */
+    public function fetchExchanges(): array
+    {
+        $params = [
+            'apikey' => $this->apiKey,
+        ];
+        return $this->request('exchanges', $params);
+    }
+
+    /**
      * Precio simple (valor único).
      */
     public function fetchPrice(string $symbol): array

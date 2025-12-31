@@ -307,6 +307,7 @@ const bindUi = () => {
   document.getElementById('td-btn-forex')?.addEventListener('click', fetchForexPairs);
   document.getElementById('td-btn-cryptos')?.addEventListener('click', fetchCryptocurrencies);
   document.getElementById('td-btn-earliest')?.addEventListener('click', fetchEarliestTimestamp);
+  document.getElementById('td-btn-exchanges')?.addEventListener('click', fetchExchanges);
   document.getElementById('td-btn-ti')?.addEventListener('click', fetchTechnicalIndicator);
 };
 

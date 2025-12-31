@@ -723,6 +723,12 @@ final class ApiDispatcher
             return;
         }
 
+        if ($path === '/twelvedata/exchanges') {
+            $data = $this->priceService->twelveExchanges();
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+
         if ($path === '/twelvedata/exchange_rate') {
             $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
             if ($symbol === '') {
