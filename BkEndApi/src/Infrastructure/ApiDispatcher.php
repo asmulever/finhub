@@ -443,8 +443,24 @@ final class ApiDispatcher
             if ($query === '') {
                 throw new \RuntimeException('q requerido', 422);
             }
-            $data = $this->eodhdClient->search($query);
-            $this->sendJson(['data' => $data]);
+            $parts = array_values(array_filter(array_map(static fn ($s) => trim((string) $s), explode(',', $query)), static fn ($s) => $s !== ''));
+            $results = [];
+            $errors = [];
+            foreach ($parts as $q) {
+                try {
+                    $data = $this->eodhdClient->search($q);
+                    if (is_array($data)) {
+                        $results = array_merge($results, $data);
+                    }
+                } catch (\Throwable $e) {
+                    $errors[] = ['query' => $q, 'message' => $e->getMessage()];
+                }
+            }
+            if (empty($results) && !empty($errors)) {
+                $first = $errors[0];
+                throw new \RuntimeException(sprintf('No se obtuvieron resultados: %s', $first['message']), 502);
+            }
+            $this->sendJson(['data' => $results]);
             return;
         }
         if ($path === '/eodhd/exchange-symbols') {
