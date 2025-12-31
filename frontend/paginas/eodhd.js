@@ -1,261 +1,132 @@
-import { getJson, postJson } from '../apicliente.js';
+import { getJson } from '../apicliente.js';
 import { authStore } from '../auth/authStore.js';
 import { bindToolbarNavigation, bindUserMenu, highlightToolbar, renderToolbar, setAdminMenuVisibility, setToolbarUserName } from '../components/toolbar.js';
+import { createLoadingOverlay } from '../components/loadingOverlay.js';
 
-const state = {
-  profile: null,
-  eod: null,
-  eodError: '',
-  exchangeSymbols: [],
-  exchangeError: '',
-  exchangesList: [],
-  selectedExchange: '',
-  symbolsLoadedExchange: '',
-  filterTerm: '',
-  fallbackMode: false,
+const state = { profile: null };
+const overlay = createLoadingOverlay();
+
+const setError = (id, message) => {
+  const el = document.getElementById(id);
+  if (el) el.textContent = message || '';
 };
 
-const FALLBACK_EXCHANGES = [
-  { Code: 'US', Name: 'Estados Unidos', Country: 'US' },
-  { Code: 'BA', Name: 'Argentina (BCBA)', Country: 'AR' },
-];
-
-const isAdminProfile = (profile) => String(profile?.role ?? '').toLowerCase() === 'admin';
-const cookieKey = (profile) => {
-  const email = profile?.email ? String(profile.email).toLowerCase().replace(/[^a-z0-9._-]/g, '') : 'default';
-  return `eodhd_exchange_${email}`;
-};
-const setCookie = (name, value) => {
-  document.cookie = `${name}=${encodeURIComponent(value || '')}; path=/; expires=Fri, 31 Dec 9999 23:59:59 GMT`;
-};
-const getCookie = (name) => {
-  const cookies = document.cookie ? document.cookie.split(';') : [];
-  for (const raw of cookies) {
-    const [k, ...rest] = raw.trim().split('=');
-    if (k === name) {
-      return decodeURIComponent(rest.join('='));
-    }
-  }
-  return '';
+const setOutput = (id, payload) => {
+  const el = document.getElementById(id);
+  if (el) el.textContent = JSON.stringify(payload ?? {}, null, 2);
 };
 
-const renderEod = () => {
-  const container = document.getElementById('eod-result');
-  if (!container) return;
-  if (state.eodError) {
-    container.innerHTML = `<p class="price-error">${state.eodError}</p>`;
-    return;
-  }
-  if (!state.eod) {
-    container.innerHTML = '<p class="muted">Ingresa un símbolo y consulta EOD.</p>';
-    return;
-  }
-  const item = Array.isArray(state.eod.data) ? state.eod.data[0] : state.eod.data;
-  if (!item) {
-    container.innerHTML = '<p class="muted">Sin datos.</p>';
-    return;
-  }
-  container.innerHTML = `
-    <article class="tile">
-      <div class="price-badge">${state.eod.symbol}</div>
-      <strong>${item.code ?? state.eod.symbol}</strong>
-      <div>Fecha: ${item.date ?? 'N/D'}</div>
-      <div>Close: ${item.close ?? item.adjusted_close ?? 'N/D'}</div>
-      <div>Open: ${item.open ?? 'N/D'} • High: ${item.high ?? 'N/D'} • Low: ${item.low ?? 'N/D'}</div>
-      <div>Volumen: ${item.volume ?? 'N/D'}</div>
-      <small class="muted">${item.exchange ?? ''}</small>
-    </article>
-  `;
-};
+const requireAdmin = () => String(state.profile?.role ?? '').toLowerCase() === 'admin';
 
-const renderExchange = () => {
-  const container = document.getElementById('exchange-result');
-  if (!container) return;
-  if (state.exchangeError) {
-    container.innerHTML = `<p class="price-error">${state.exchangeError}</p>`;
-    return;
-  }
-  if (!state.exchangeSymbols.length) {
-    container.innerHTML = '<p class="muted">Sin resultados.</p>';
-    return;
-  }
-  const filtered = state.filterTerm
-    ? state.exchangeSymbols.filter((s) => {
-        const code = String(s.Code ?? s.code ?? '').toUpperCase();
-        return code.startsWith(state.filterTerm.toUpperCase());
-      })
-    : state.exchangeSymbols;
-  const rows = filtered.slice(0, 50).map((s) => `
-    <tr>
-      <td data-symbol="${s.Code ?? s.code ?? ''}">${s.Code ?? s.code ?? ''}</td>
-      <td>${s.Name ?? s.name ?? ''}</td>
-      <td>${s.Exchange ?? s.exchange ?? ''}</td>
-      <td>${s.Type ?? s.type ?? ''}</td>
-    </tr>
-  `).join('');
-  container.innerHTML = `
-    <p class="muted">Mostrando ${Math.min(50, filtered.length)} de ${filtered.length} símbolos (doble clic para EOD).</p>
-    <div style="max-height:320px; overflow:auto;">
-      <table id="symbols-table">
-        <thead><tr><th>Code</th><th>Nombre</th><th>Exchange</th><th>Tipo</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-  `;
-};
-
-const fetchExchangeSymbols = async () => {
-  const input = document.getElementById('exchange-input');
-  const exch = state.selectedExchange || input?.value.trim() || '';
-  state.exchangeSymbols = [];
-  state.exchangeError = '';
-  renderExchange();
-  if (!exch) {
-    state.exchangeError = 'Selecciona un exchange.';
-    renderExchange();
-    return;
-  }
-  try {
-    const data = await getJson(`/eodhd/exchange-symbols?exchange=${encodeURIComponent(exch)}`);
-    state.exchangeSymbols = Array.isArray(data?.data) ? data.data : [];
-    state.symbolsLoadedExchange = exch;
-  } catch (error) {
-    const msg = error?.error?.message ?? 'No se pudo obtener la lista';
-    state.exchangeError = msg;
-    if (/402|403|forbidden|payment/i.test(msg)) {
-      state.exchangeError = `${msg} • Verifica plan o API key de EODHD`;
-    }
-  }
-  renderExchange();
-};
-
-const renderExchangeSelect = () => {
-  const select = document.getElementById('exchange-select');
-  if (!select) return;
-  select.innerHTML = ['<option value="">seleccionar</option>'].concat(
-    state.exchangesList.map((ex) => {
-      const code = ex.Code ?? ex.code ?? '';
-      const country = ex.Country ?? ex.country ?? '';
-      const name = ex.Name ?? ex.name ?? '';
-      return `<option value="${code}">${country ? country + ' - ' : ''}${code} | ${name}</option>`;
-    })
-  ).join('');
-};
-
-const renderSymbolSelect = () => {
-  // Eliminado: ya no se usa selector de símbolos independiente
-};
-
-const fetchExchangesList = async () => {
-  try {
-    const data = await getJson('/eodhd/exchanges-list');
-    state.exchangesList = Array.isArray(data?.data) ? data.data : [];
-    state.fallbackMode = false;
-  } catch (error) {
-    const msg = error?.error?.message ?? 'No se pudo obtener exchanges';
-    const isForbidden = /402|403|forbidden|payment/i.test(msg);
-    state.exchangesList = isForbidden ? FALLBACK_EXCHANGES : [];
-    state.fallbackMode = isForbidden;
-    const container = document.getElementById('exchange-result');
-    container?.insertAdjacentHTML(
-      'afterbegin',
-      `<p class="price-error">${msg}${isForbidden ? ' • usando lista básica local (US, BA)' : ''}</p>`
-    );
-  }
-  renderExchangeSelect();
-};
-
-const handleLogout = async () => {
-  try {
-    await postJson('/auth/logout');
-  } finally {
-    authStore.clearToken();
-    window.location.href = '/';
-  }
+const logError = (context, error) => {
+  console.info(`[eodhd] Error en ${context}`, error);
 };
 
 const loadProfile = async () => {
   try {
-    const profile = await getJson('/me');
-    state.profile = profile;
-    setToolbarUserName(profile?.email ?? '');
-    setAdminMenuVisibility(profile);
+    state.profile = await getJson('/me');
+    setToolbarUserName(state.profile?.email ?? '');
+    setAdminMenuVisibility(state.profile);
   } catch {
-    state.profile = null;
-    const cachedProfile = authStore.getProfile();
-    setToolbarUserName(cachedProfile?.email ?? '');
-    setAdminMenuVisibility(cachedProfile);
+    state.profile = authStore.getProfile();
+    setToolbarUserName(state.profile?.email ?? '');
+    setAdminMenuVisibility(state.profile);
   }
 };
 
-const init = async () => {
+const guardAdmin = () => {
+  if (requireAdmin()) return true;
+  document.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+  ['eod','search','ex-symbols','exchanges-list','user'].forEach((prefix) => {
+    setError(`${prefix}-error`, 'Acceso solo admin');
+  });
+  return false;
+};
+
+const fetchEod = async () => {
+  if (!guardAdmin()) return;
+  const symbol = document.getElementById('eod-symbol')?.value.trim().toUpperCase();
+  setError('eod-error', '');
+  if (!symbol) return setError('eod-error', 'Ingresa símbolo (ej. AAPL.US)');
+  try {
+    const resp = await overlay.withLoader(() => getJson(`/eodhd/eod?symbol=${encodeURIComponent(symbol)}`));
+    setOutput('eod-output', resp?.data ?? resp);
+  } catch (error) {
+    logError('eod', error);
+    setError('eod-error', error?.error?.message ?? 'Error en EOD');
+  }
+};
+
+const fetchSearch = async () => {
+  if (!guardAdmin()) return;
+  const query = document.getElementById('search-query')?.value.trim();
+  setError('search-error', '');
+  if (!query) return setError('search-error', 'Ingresa texto a buscar');
+  try {
+    const resp = await overlay.withLoader(() => getJson(`/eodhd/search?q=${encodeURIComponent(query)}`));
+    setOutput('search-output', resp?.data ?? resp);
+  } catch (error) {
+    logError('search', error);
+    setError('search-error', error?.error?.message ?? 'Error en search');
+  }
+};
+
+const fetchExchangeSymbols = async () => {
+  if (!guardAdmin()) return;
+  const exchange = document.getElementById('ex-symbols-exchange')?.value.trim().toUpperCase() || 'US';
+  setError('ex-symbols-error', '');
+  try {
+    const resp = await overlay.withLoader(() => getJson(`/eodhd/exchange-symbols?exchange=${encodeURIComponent(exchange)}`));
+    setOutput('ex-symbols-output', resp?.data ?? resp);
+  } catch (error) {
+    logError('exchange-symbols', error);
+    setError('ex-symbols-error', error?.error?.message ?? 'Error en exchange-symbols');
+  }
+};
+
+const fetchExchangesList = async () => {
+  if (!guardAdmin()) return;
+  setError('exchanges-list-error', '');
+  try {
+    const resp = await overlay.withLoader(() => getJson('/eodhd/exchanges-list'));
+    setOutput('exchanges-list-output', resp?.data ?? resp);
+  } catch (error) {
+    logError('exchanges-list', error);
+    setError('exchanges-list-error', error?.error?.message ?? 'Error en exchanges-list');
+  }
+};
+
+const fetchUser = async () => {
+  if (!guardAdmin()) return;
+  setError('user-error', '');
+  try {
+    const resp = await overlay.withLoader(() => getJson('/eodhd/user'));
+    setOutput('user-output', resp?.data ?? resp);
+  } catch (error) {
+    logError('user', error);
+    setError('user-error', error?.error?.message ?? 'Error en user');
+  }
+};
+
+const bindUi = () => {
+  document.getElementById('btn-eod')?.addEventListener('click', fetchEod);
+  document.getElementById('btn-search')?.addEventListener('click', fetchSearch);
+  document.getElementById('btn-exchange-symbols')?.addEventListener('click', fetchExchangeSymbols);
+  document.getElementById('btn-exchanges-list')?.addEventListener('click', fetchExchangesList);
+  document.getElementById('btn-user')?.addEventListener('click', fetchUser);
+};
+
+document.addEventListener('DOMContentLoaded', async () => {
   renderToolbar();
   setToolbarUserName('');
   bindUserMenu({
-    onLogout: handleLogout,
+    onLogout: async () => {
+      try { await getJson('/auth/logout'); } finally { authStore.clearToken(); window.location.href = '/'; }
+    },
     onAdmin: () => window.location.href = '/Frontend/usuarios.html',
-    profile: authStore.getProfile(),
   });
   bindToolbarNavigation();
   highlightToolbar();
   await loadProfile();
-  if (!isAdminProfile(state.profile ?? authStore.getProfile())) {
-    const eod = document.getElementById('eod-result');
-    if (eod) eod.innerHTML = '<p class="price-error">Acceso restringido: solo Admin.</p>';
-    document.getElementById('exchange-select')?.setAttribute('disabled', 'disabled');
-    return;
-  }
-  await fetchExchangesList();
-  // restaurar selección previa del usuario desde cookie
-  const lastExchange = getCookie(cookieKey(state.profile ?? authStore.getProfile()));
-  if (lastExchange) {
-    state.selectedExchange = lastExchange;
-    const sel = document.getElementById('exchange-select');
-    const input = document.getElementById('exchange-input');
-    if (sel) sel.value = lastExchange;
-    if (input) input.value = lastExchange;
-    await fetchExchangeSymbols();
-  }
-  document.getElementById('exchange-select')?.addEventListener('change', (event) => {
-    const code = event.target.value;
-    state.selectedExchange = code;
-    setCookie(cookieKey(state.profile ?? authStore.getProfile()), code || '');
-    const input = document.getElementById('exchange-input');
-    if (input) input.value = code;
-    if (code) {
-      fetchExchangeSymbols();
-    } else {
-      state.exchangeSymbols = [];
-      state.exchangeError = 'Selecciona un exchange.';
-      renderExchange();
-    }
-  });
-  document.getElementById('exchange-result')?.addEventListener('dblclick', (event) => {
-    const cell = event.target.closest('[data-symbol]');
-    const symbol = cell?.dataset?.symbol;
-    if (!symbol) return;
-    fetchEodWithSymbol(symbol);
-  });
-  document.getElementById('symbol-filter')?.addEventListener('input', (event) => {
-    state.filterTerm = event.target.value.trim();
-    renderExchange();
-  });
-  renderEod();
-  renderExchange();
-};
-
-// Helper to fetch EOD by symbol (used on double click)
-const fetchEodWithSymbol = async (symbol) => {
-  state.eod = null;
-  state.eodError = '';
-  renderEod();
-  try {
-    const data = await getJson(`/eodhd/eod?symbol=${encodeURIComponent(symbol)}`);
-    state.eod = data;
-  } catch (error) {
-    state.eodError = error?.error?.message ?? 'No se pudo obtener el EOD';
-  }
-  renderEod();
-};
-
-document.addEventListener('DOMContentLoaded', init);
+  bindUi();
+});
