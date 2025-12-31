@@ -37,7 +37,7 @@ const loadProfile = async () => {
 const guardAdmin = () => {
   if (requireAdmin()) return true;
   document.querySelectorAll('button').forEach((b) => { b.disabled = true; });
-  ['td-quote','td-batch','td-stocks','td-usage','td-price','td-ts','td-exrate','td-conv','td-market','td-cryptoex','td-insttype','td-search','td-forex','td-cryptos','td-earliest','td-ti'].forEach((prefix) => {
+  ['td-quote','td-batch','td-stocks','td-usage','td-price','td-ts','td-exrate','td-conv','td-market','td-cryptoex','td-insttype','td-search','td-forex','td-cryptos','td-earliest','td-exchanges','td-ti'].forEach((prefix) => {
     setError(`${prefix}-error`, 'Acceso solo admin');
   });
   return false;
@@ -231,6 +231,18 @@ const fetchCryptocurrencies = async () => {
   }
 };
 
+const fetchExchanges = async () => {
+  if (!guardAdmin()) return;
+  setError('td-exchanges-error', '');
+  try {
+    const resp = await overlay.withLoader(() => getJson('/twelvedata/exchanges'));
+    setOutput('td-exchanges-output', resp?.data ?? resp);
+  } catch (error) {
+    logError('exchanges', error);
+    setError('td-exchanges-error', error?.error?.message ?? 'Error en exchanges');
+  }
+};
+
 const fetchEarliestTimestamp = async () => {
   if (!guardAdmin()) return;
   const symbol = document.getElementById('td-earliest-symbol')?.value.trim().toUpperCase();
@@ -253,14 +265,15 @@ const loadExchangeOptions = async () => {
   const select = document.getElementById('td-earliest-exchange');
   if (!select) return;
   try {
-    const resp = await getJson('/eodhd/exchanges-list');
+    const resp = await getJson('/twelvedata/exchanges');
     const list = Array.isArray(resp?.data) ? resp.data : [];
     const options = ['<option value=\"\">Exchange (opcional)</option>'].concat(
       list.map((ex) => {
-        const code = ex.Code ?? ex.code ?? '';
-        const name = ex.Name ?? ex.name ?? '';
+        const code = ex.code ?? ex.name ?? '';
+        const name = ex.title ?? ex.name ?? '';
+        const country = ex.country ?? '';
         if (!code) return '';
-        return `<option value=\"${code}\">${code}${name ? ' - ' + name : ''}</option>`;
+        return `<option value=\"${code.toUpperCase()}\">${code.toUpperCase()}${name ? ' - ' + name : ''}${country ? ' - ' + country : ''}</option>`;
       }).filter(Boolean)
     );
     select.innerHTML = options.join('');
