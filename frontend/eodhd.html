@@ -40,7 +40,7 @@
 
       <section class="card grid">
         <div>
-          <h3>EOD</h3>
+          <h3>EOD <span class="muted">/api/eod/{symbol} • Precios históricos (1 año)</span></h3>
           <div class="form-row">
             <input id="eod-symbol" placeholder="Símbolo (ej. AAPL.US)" />
             <button id="btn-eod">Consultar</button>
@@ -49,7 +49,7 @@
           <pre id="eod-output">{}</pre>
         </div>
         <div>
-          <h3>SEARCH</h3>
+          <h3>SEARCH <span class="muted">/api/search/{query} • Búsqueda de instrumentos</span></h3>
           <div class="form-row">
             <input id="search-query" placeholder="Texto (ej. apple, TSLA)" />
             <button id="btn-search">Buscar</button>
@@ -61,7 +61,7 @@
 
       <section class="card grid">
         <div>
-          <h3>EXCHANGE SYMBOLS</h3>
+          <h3>EXCHANGE SYMBOLS <span class="muted">/api/exchange-symbol-list/{code} • Tickes list por exchange</span></h3>
           <div class="form-row">
             <input id="ex-symbols-exchange" placeholder="Exchange (ej. US, XBUE)" value="US" />
             <button id="btn-exchange-symbols">Listar</button>
@@ -70,7 +70,7 @@
           <pre id="ex-symbols-output">{}</pre>
         </div>
         <div>
-          <h3>EXCHANGES LIST</h3>
+          <h3>EXCHANGES LIST <span class="muted">/api/exchanges-list/ • Lista de mercados/exchanges</span></h3>
           <div class="form-row">
             <button id="btn-exchanges-list">Listar</button>
           </div>
@@ -80,7 +80,7 @@
       </section>
 
       <section class="card">
-        <h3>USER</h3>
+        <h3>USER <span class="muted">/api/user • Datos de tu cuenta y plan</span></h3>
         <div class="form-row">
           <button id="btn-user">Consultar cuenta</button>
         </div>
