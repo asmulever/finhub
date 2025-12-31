@@ -234,7 +234,7 @@ const fetchCryptocurrencies = async () => {
 const fetchEarliestTimestamp = async () => {
   if (!guardAdmin()) return;
   const symbol = document.getElementById('td-earliest-symbol')?.value.trim().toUpperCase();
-  const exchange = document.getElementById('td-earliest-exchange')?.value.trim().toUpperCase();
+  const exchange = document.getElementById('td-earliest-exchange')?.value || '';
   const interval = document.getElementById('td-earliest-interval')?.value || '1day';
   setError('td-earliest-error', '');
   if (!symbol) return setError('td-earliest-error', 'Ingresa símbolo');
@@ -301,5 +301,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindToolbarNavigation();
   highlightToolbar();
   await loadProfile();
+  await loadExchangeOptions();
   bindUi();
 });
