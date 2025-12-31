@@ -73,8 +73,9 @@ const fetchSearch = async () => {
 
 const fetchExchangeSymbols = async () => {
   if (!guardAdmin()) return;
-  const exchange = document.getElementById('ex-symbols-exchange')?.value.trim().toUpperCase() || 'US';
+  const exchange = document.getElementById('ex-symbols-exchange')?.value.trim().toUpperCase() || '';
   setError('ex-symbols-error', '');
+  if (!exchange) return setError('ex-symbols-error', 'Selecciona un exchange');
   try {
     const resp = await overlay.withLoader(() => getJson(`/eodhd/exchange-symbols?exchange=${encodeURIComponent(exchange)}`));
     setOutput('ex-symbols-output', resp?.data ?? resp);
@@ -93,6 +94,27 @@ const fetchExchangesList = async () => {
   } catch (error) {
     logError('exchanges-list', error);
     setError('exchanges-list-error', error?.error?.message ?? 'Error en exchanges-list');
+  }
+};
+
+const loadExchangeOptions = async () => {
+  const select = document.getElementById('ex-symbols-exchange');
+  if (!select) return;
+  try {
+    const resp = await getJson('/eodhd/exchanges-list');
+    const list = Array.isArray(resp?.data) ? resp.data : [];
+    const options = ['<option value=\"\">Selecciona exchange</option>'].concat(
+      list.map((ex) => {
+        const code = ex.Code ?? ex.code ?? '';
+        const name = ex.Name ?? ex.name ?? '';
+        if (!code) return '';
+        return `<option value=\"${code}\">${code}${name ? ' - ' + name : ''}</option>`;
+      }).filter(Boolean)
+    );
+    select.innerHTML = options.join('');
+  } catch (error) {
+    logError('exchanges-list-load', error);
+    setError('ex-symbols-error', 'No se pudo cargar exchanges');
   }
 };
 
@@ -128,5 +150,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindToolbarNavigation();
   highlightToolbar();
   await loadProfile();
+  await loadExchangeOptions();
   bindUi();
 });

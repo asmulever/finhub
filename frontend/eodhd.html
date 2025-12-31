@@ -63,7 +63,9 @@
         <div>
           <h3>EXCHANGE SYMBOLS <span class="muted">/api/exchange-symbol-list/{code} • Tickes list por exchange</span></h3>
           <div class="form-row">
-            <input id="ex-symbols-exchange" placeholder="Exchange (ej. US, XBUE)" value="US" />
+            <select id="ex-symbols-exchange">
+              <option value="">Selecciona exchange</option>
+            </select>
             <button id="btn-exchange-symbols">Listar</button>
           </div>
           <div id="ex-symbols-error" class="error"></div>
