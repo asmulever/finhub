@@ -66,12 +66,12 @@ const guardAdmin = () => {
   return false;
 };
 
-const loadExchanges = async () => {
-  const select = document.getElementById('an-exchange');
+const loadExchanges = async () => {  
+  const select = document.getElementById('an-exchange');  
   if (!select) return;
   try {
     const resp = await getJson('/twelvedata/exchanges');
-    const list = Array.isArray(resp?.data) ? resp.data : [];
+    const list = Array.isArray(resp?.data?.data) ? resp.data.data : [];
     const options = ['<option value="">Exchange (opcional)</option>'].concat(
       list.map((ex) => {
         const code = ex.code ?? ex.name ?? '';
@@ -84,6 +84,7 @@ const loadExchanges = async () => {
     select.innerHTML = options.join('');
   } catch (error) {
     logError('exchanges', error);
+    setError('an-error', 'No se pudo cargar exchanges');
   }
 };
 
@@ -151,12 +152,23 @@ const fetchExchangeRateArs = async (currency) => {
   }
 };
 
-const fetchHistorical = async (provider, symbol, interval, outputsize) => {
+const fetchHistorical = async (provider, symbol, interval, outputsize, exchange = '') => {
+  debugger;
   if (provider === 'twelvedata') {
-    return overlay.withLoader(() => getJson(`/twelvedata/time_series?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}&outputsize=${encodeURIComponent(outputsize)}`));
+    // Twelve Data: time_series soporta symbol, interval, outputsize y (opcional) exchange para desambiguar.
+    const qs = new URLSearchParams();
+    qs.set('symbol', symbol);
+    qs.set('interval', interval);
+    if (outputsize != null && `${outputsize}`.trim() !== '') qs.set('outputsize', `${outputsize}`);
+    if (exchange) qs.set('exchange', exchange);
+
+    return overlay.withLoader(() => getJson(`/twelvedata/time_series?${qs.toString()}`));
   }
+
+  // EODHD: tu endpoint actual usa solo symbol (si luego necesitás rango, se agrega aquí).
   return overlay.withLoader(() => getJson(`/eodhd/eod?symbol=${encodeURIComponent(symbol)}`));
 };
+
 
 const renderChart = (series) => {
   const canvas = document.getElementById('an-chart');
@@ -258,7 +270,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   bindToolbarNavigation();
   highlightToolbar();
-  await loadProfile();
+  await loadProfile();  
   await loadExchanges();
   const prefs = loadPrefs();
   if (prefs.symbol) document.getElementById('an-symbol').value = prefs.symbol;
