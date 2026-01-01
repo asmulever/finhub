@@ -28,3 +28,12 @@ SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
 # InfinityFree ya inyecta sus propios headers
 # y si agregás otros, Chrome rompe assets y scripts.
 # --------------------------------------------------------------------
+
+<IfModule mod_headers.c>
+    # Evitar cache de vistas HTML en desarrollo
+    <FilesMatch "\.html$">
+        Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+</IfModule>

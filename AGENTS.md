@@ -6,6 +6,13 @@ _siempre espera confirmacion expresa para hacer modificaciones.
 
 Mantener correctamente implementado Patrón: Container / AppFactory y patrón IoC/DI.
 
+## Regla obligatoria: No cache en vistas (DEV)
+Toda vista que se **cree o refactorice** debe **enviar explícitamente** los siguientes headers HTTP en la respuesta **HTML**:
+- `Cache-Control: no-store, no-cache, must-revalidate, max-age=0`
+- `Pragma: no-cache` (legacy)
+- `Expires: 0`
+**Objetivo**: evitar reutilización de HTML/vistas durante desarrollo.  
+
 todas las funciones deben tener un control de error y un log de fallos a nivel informtivo , para no llenar a la aplicacion de logs , las capas profundas deben burbujear errores y la ultima capa los debe loguear antes de controlar el reporte del error
 
 1. Rol del agente
