@@ -9,6 +9,42 @@ const state = {
   metrics: null,
 };
 
+const METRICS_COOKIE = 'metrics_providers_v1';
+
+const todayKey = () => new Date().toISOString().slice(0, 10);
+
+const readCookie = (name) => {
+  const parts = document.cookie.split(';').map((c) => c.trim());
+  const found = parts.find((c) => c.startsWith(`${name}=`));
+  if (!found) return null;
+  return found.substring(name.length + 1);
+};
+
+const writeSessionCookie = (name, value) => {
+  document.cookie = `${name}=${value}; path=/; SameSite=Lax`;
+};
+
+const loadMetricsFromCookie = () => {
+  try {
+    const raw = readCookie(METRICS_COOKIE);
+    if (!raw) return null;
+    const parsed = JSON.parse(decodeURIComponent(raw));
+    if (parsed?.date !== todayKey()) return null;
+    return parsed.payload ?? null;
+  } catch {
+    return null;
+  }
+};
+
+const saveMetricsToCookie = (payload) => {
+  try {
+    const wrapped = { date: todayKey(), payload };
+    writeSessionCookie(METRICS_COOKIE, encodeURIComponent(JSON.stringify(wrapped)));
+  } catch {
+    // ignorar fallos de cookie
+  }
+};
+
 const createCard = (title, body) => `
   <section class="card">
     <h2>${title}</h2>
@@ -118,10 +154,18 @@ const render = async () => {
   } catch (error) {
     state.portfolios = [];
   }
-  try {
-    state.metrics = await getJson('/metrics/providers');
-  } catch {
-    state.metrics = null;
+  const cachedMetrics = loadMetricsFromCookie();
+  if (cachedMetrics) {
+    state.metrics = cachedMetrics;
+  } else {
+    try {
+      state.metrics = await getJson('/metrics/providers');
+      if (state.metrics) {
+        saveMetricsToCookie(state.metrics);
+      }
+    } catch {
+      state.metrics = null;
+    }
   }
   syncUserName();
   renderOverview();

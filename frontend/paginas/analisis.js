@@ -2,6 +2,7 @@ import { getJson } from '../apicliente.js';
 import { authStore } from '../auth/authStore.js';
 import { bindToolbarNavigation, bindUserMenu, highlightToolbar, renderToolbar, setAdminMenuVisibility, setToolbarUserName } from '../components/toolbar.js';
 import { createLoadingOverlay } from '../components/loadingOverlay.js';
+import { marketDataFacade } from '../components/marketDataFacade.js';
 
 const state = { profile: null };
 const overlay = createLoadingOverlay();
@@ -66,11 +67,12 @@ const guardAdmin = () => {
   return false;
 };
 
-const loadExchanges = async () => {  
-  const select = document.getElementById('an-exchange');  
+const loadExchanges = async () => {
+  const select = document.getElementById('an-exchange');
   if (!select) return;
   try {
     const resp = await getJson('/twelvedata/exchanges');
+    console.info('[analisis] exchanges resp', resp);
     const list = Array.isArray(resp?.data?.data) ? resp.data.data : [];
     const options = ['<option value="">Exchange (opcional)</option>'].concat(
       list.map((ex) => {
@@ -152,23 +154,16 @@ const fetchExchangeRateArs = async (currency) => {
   }
 };
 
-const fetchHistorical = async (provider, symbol, interval, outputsize, exchange = '') => {
-  debugger;
-  if (provider === 'twelvedata') {
-    // Twelve Data: time_series soporta symbol, interval, outputsize y (opcional) exchange para desambiguar.
-    const qs = new URLSearchParams();
-    qs.set('symbol', symbol);
-    qs.set('interval', interval);
-    if (outputsize != null && `${outputsize}`.trim() !== '') qs.set('outputsize', `${outputsize}`);
-    if (exchange) qs.set('exchange', exchange);
-
-    return overlay.withLoader(() => getJson(`/twelvedata/time_series?${qs.toString()}`));
-  }
-
-  // EODHD: tu endpoint actual usa solo symbol (si luego necesitás rango, se agrega aquí).
-  return overlay.withLoader(() => getJson(`/eodhd/eod?symbol=${encodeURIComponent(symbol)}`));
+const fetchHistorical = async ({ symbol, exchange, interval, outputsize, preferredProvider }) => {
+  return overlay.withLoader(() => marketDataFacade.timeSeries({
+    symbol,
+    exchange,
+    interval,
+    outputsize,
+    preferred: preferredProvider || undefined,
+    cacheTtlMs: 60000,
+  }));
 };
-
 
 const renderChart = (series) => {
   const canvas = document.getElementById('an-chart');
@@ -203,24 +198,25 @@ const renderChart = (series) => {
 const analyze = async () => {
   if (!guardAdmin()) return;
   const symbolRaw = document.getElementById('an-symbol')?.value.trim();
-  const provider = document.getElementById('an-provider')?.value || 'twelvedata';
   const interval = document.getElementById('an-interval')?.value || '1day';
   const outputsize = document.getElementById('an-outputsize')?.value || '365';
   const exchange = (document.getElementById('an-exchange')?.value || '').toUpperCase();
   const currencyInput = document.getElementById('an-currency')?.value.trim().toUpperCase();
   setError('an-error', '');
   if (!symbolRaw) return setError('an-error', 'Ingresa símbolo');
-  const symbol = exchange && !symbolRaw.includes('.') ? `${symbolRaw}.${exchange}` : symbolRaw;
+  const symbol = symbolRaw; // se usa símbolo base; la fachada traduce a formato de cada proveedor
 
-  savePrefs({ symbol: symbolRaw, provider, interval, outputsize, exchange, currency: currencyInput });
+  savePrefs({ symbol: symbolRaw, interval, outputsize, exchange, currency: currencyInput });
 
   try {
-    const histResp = await fetchHistorical(provider, symbol, interval, outputsize);
-    setOutput('an-hist-output', histResp?.data ?? histResp);
-    const series = normalizeTimeSeries(histResp?.data ?? histResp);
+    const histResult = await fetchHistorical({ symbol, exchange, interval, outputsize });
+    console.info(`[analisis] timeSeries proveedor=${histResult?.provider ?? 'n/a'} cached=${histResult?.cached ? 'si' : 'no'}`);
+    const histData = histResult?.data ?? {};
+    setOutput('an-hist-output', histData?.data ?? histData);
+    const series = normalizeTimeSeries(histData?.data ?? histData);
     if (!series.length) throw new Error('Sin histórico disponible');
 
-    const rsi = provider === 'twelvedata' ? await fetchRsi(symbol, interval) : null;
+    const rsi = histResult?.provider === 'twelvedata' ? await fetchRsi(symbol, interval) : null;
     const smaShort = computeSma(series, 10);
     const smaLong = computeSma(series, 50);
     const last = series[0]?.close ?? null;
@@ -235,7 +231,7 @@ const analyze = async () => {
     setText('m-rec-mid', rec.mid);
     setText('m-rec-long', rec.long);
 
-    const currency = currencyInput || histResp?.data?.meta?.currency || 'USD';
+    const currency = currencyInput || histData?.data?.meta?.currency || histData?.meta?.currency || 'USD';
     const rate = await fetchExchangeRateArs(currency);
     const lastArs = last !== null ? last * rate : null;
     setText('m-ars', lastArs !== null ? `${lastArs.toFixed(2)} ARS` : '-');
@@ -274,7 +270,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadExchanges();
   const prefs = loadPrefs();
   if (prefs.symbol) document.getElementById('an-symbol').value = prefs.symbol;
-  if (prefs.provider) document.getElementById('an-provider').value = prefs.provider;
   if (prefs.interval) document.getElementById('an-interval').value = prefs.interval;
   if (prefs.outputsize) document.getElementById('an-outputsize').value = prefs.outputsize;
   if (prefs.currency) document.getElementById('an-currency').value = prefs.currency;

@@ -25,6 +25,10 @@ $eodhdClient = $container->get('eodhd_client');
 $providerUsage = $container->get('provider_usage');
 $portfolioService = $container->get('portfolio_service');
 $dataLakeService = $container->get('datalake_service');
+$ravaCedearsService = $container->get('rava_cedears_service');
+$ravaAccionesService = $container->get('rava_acciones_service');
+$ravaBonosService = $container->get('rava_bonos_service');
+$ravaHistoricosService = $container->get('rava_historicos_service');
 
 $traceId = generateTraceId();
 set_error_handler(fn ($severity, $message, $file, $line) => handleFatalError($logger, $traceId, $message, $file, $line));
@@ -42,7 +46,11 @@ $dispatcher = new ApiDispatcher(
     $eodhdClient,
     $providerUsage,
     $portfolioService,
-    $dataLakeService
+    $dataLakeService,
+    $ravaCedearsService,
+    $ravaAccionesService,
+    $ravaBonosService,
+    $ravaHistoricosService
 );
 $dispatcher->dispatch($traceId);
 
