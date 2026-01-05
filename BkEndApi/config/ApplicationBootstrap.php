@@ -8,11 +8,20 @@ use FinHub\Infrastructure\Config\Container;
 use FinHub\Infrastructure\Logging\FileLogger;
 use FinHub\Application\MarketData\PriceService;
 use FinHub\Application\MarketData\ProviderUsageService;
+use FinHub\Application\MarketData\RavaBonosService;
+use FinHub\Application\MarketData\RavaAccionesService;
+use FinHub\Application\MarketData\RavaCedearsService;
+use FinHub\Application\MarketData\RavaHistoricosService;
 use FinHub\Application\Portfolio\PortfolioService;
 use FinHub\Application\DataLake\DataLakeService;
 use FinHub\Infrastructure\MarketData\AlphaVantageClient;
 use FinHub\Infrastructure\MarketData\TwelveDataClient;
 use FinHub\Infrastructure\MarketData\EodhdClient;
+use FinHub\Infrastructure\MarketData\RavaBonosClient;
+use FinHub\Infrastructure\MarketData\RavaAccionesClient;
+use FinHub\Infrastructure\MarketData\RavaCedearsClient;
+use FinHub\Infrastructure\MarketData\RavaCedearsCache;
+use FinHub\Infrastructure\MarketData\RavaHistoricosClient;
 use FinHub\Infrastructure\Security\JwtTokenProvider;
 use FinHub\Infrastructure\Security\PasswordHasher;
 use FinHub\Infrastructure\Portfolio\PdoPortfolioRepository;
@@ -73,6 +82,17 @@ final class ApplicationBootstrap
         }
         $eodhdClient = new EodhdClient($config);
         $alphaClient = new AlphaVantageClient($config);
+        $ravaClient = new RavaCedearsClient($config);
+        $ravaCache = new RavaCedearsCache($this->rootDir . '/storage/rava_cache', 'cedears.json');
+        $ravaCedearsService = new RavaCedearsService($ravaClient, $ravaCache, $logger);
+        $ravaAccionesClient = new RavaAccionesClient($config);
+        $ravaAccionesCache = new RavaCedearsCache($this->rootDir . '/storage/rava_cache', 'acciones.json');
+        $ravaAccionesService = new RavaAccionesService($ravaAccionesClient, $ravaAccionesCache, $logger);
+        $ravaBonosClient = new RavaBonosClient($config);
+        $ravaBonosCache = new RavaCedearsCache($this->rootDir . '/storage/rava_cache', 'bonos.json');
+        $ravaBonosService = new RavaBonosService($ravaBonosClient, $ravaBonosCache, $logger);
+        $ravaHistoricosClient = new RavaHistoricosClient($config);
+        $ravaHistoricosService = new RavaHistoricosService($ravaHistoricosClient, $logger);
         $metrics = new \FinHub\Infrastructure\MarketData\ProviderMetrics(
             $this->rootDir . '/storage',
             (int) $config->get('TWELVEDATA_DAILY_LIMIT', 800),
@@ -113,6 +133,10 @@ final class ApplicationBootstrap
             'price_snapshot_repository' => $priceSnapshotRepository,
             'portfolio_service' => $portfolioService,
             'datalake_service' => $dataLakeService,
+            'rava_cedears_service' => $ravaCedearsService,
+            'rava_acciones_service' => $ravaAccionesService,
+            'rava_bonos_service' => $ravaBonosService,
+            'rava_historicos_service' => $ravaHistoricosService,
         ]);
     }
 

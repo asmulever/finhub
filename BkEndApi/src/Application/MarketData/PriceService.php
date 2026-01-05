@@ -47,7 +47,7 @@ final class PriceService
      */
     private function sanitizeProviderOrder(array|string|null $providerOrder): array
     {
-        $default = ['eodhd', 'twelvedata'];
+        $default = ['twelvedata', 'eodhd', 'alphavantage'];
         $list = $default;
         if (is_string($providerOrder)) {
             $parts = preg_split('/,/', $providerOrder, -1, PREG_SPLIT_NO_EMPTY);
@@ -137,6 +137,9 @@ final class PriceService
         $baseSymbol = explode('.', $symbolUpper, 2)[0]; // AAPL.BA -> AAPL
 
         foreach ($order as $provider) {
+            if ($this->shouldSkipProvider($provider, $symbolUpper, $exchangeUpper)) {
+                continue;
+            }
             try {
                 if ($provider === 'eodhd') {
                     $quote = $this->fetchEodhdQuoteNormalized($symbolWithEx, $symbolUpper);
@@ -151,6 +154,9 @@ final class PriceService
                     $result = $quote;
                 }
             } catch (\Throwable $e) {
+                if ($provider === 'eodhd') {
+                    $this->handleEodhdFailure($e, $symbolWithEx, $exchangeUpper);
+                }
                 $providers[] = ['provider' => $provider, 'ok' => false, 'error' => $e->getMessage()];
                 $errors[] = ['provider' => $provider, 'message' => $e->getMessage()];
             }
@@ -166,7 +172,7 @@ final class PriceService
         $result['providers'] = $providers;
 
         if ($this->quoteCache !== null) {
-            $this->quoteCache->set($cacheKey, $result, 86400);
+            $this->quoteCache->set($cacheKey, $result, 600);
         }
 
         return $result;
@@ -181,7 +187,9 @@ final class PriceService
     public function searchQuotes(array $symbols, ?string $exchange, string $preferred, bool $forceRefresh = false): array
     {
         $exchange = $exchange !== null ? strtoupper(trim($exchange)) : null;
-        $preferred = strtolower($preferred) === 'twelvedata' ? 'twelvedata' : 'eodhd';
+        $preferred = in_array(strtolower($preferred), ['twelvedata', 'eodhd', 'alphavantage'], true)
+            ? strtolower($preferred)
+            : 'twelvedata';
 
         $normalized = [];
         foreach ($symbols as $symbol) {
@@ -226,7 +234,7 @@ final class PriceService
                 if ($snapshot !== null) {
                     $quote = $this->buildQuoteFromSnapshot($snapshot, $symbol);
                     if ($this->quoteCache !== null) {
-                        $this->quoteCache->set($cacheKey, $quote, 86400);
+                        $this->quoteCache->set($cacheKey, $quote, 600);
                     }
                     $results[$symbol] = $quote;
                     continue;
@@ -235,7 +243,7 @@ final class PriceService
                     $quote = $this->searchQuote($symbol, $exchange, $preferred, $forceRefresh);
                     $results[$symbol] = $quote;
                     if ($this->quoteCache !== null) {
-                        $this->quoteCache->set($cacheKey, $quote, 86400);
+                        $this->quoteCache->set($cacheKey, $quote, 600);
                     }
                 } catch (\Throwable $e) {
                     $results[$symbol] = [
@@ -617,6 +625,9 @@ final class PriceService
         $order = $this->resolveProviderOrder(null);
 
         foreach ($order as $provider) {
+            if ($this->shouldSkipProvider($provider, $symbol, null)) {
+                continue;
+            }
             if ($provider === 'eodhd') {
                 try {
                     $quote = $this->eodhdClient->fetchLive($symbol);
@@ -624,12 +635,14 @@ final class PriceService
                     return $this->normalizeEodhdQuote($quote, $symbol);
                 } catch (\Throwable $e) {
                     $this->metrics->record('eodhd', false);
+                    $this->handleEodhdFailure($e, $symbol, null);
                     try {
                         $eod = $this->eodhdClient->fetchEod($symbol);
                         $this->metrics->record('eodhd', true);
                         return $this->normalizeEodhdEod($eod, $symbol);
                     } catch (\Throwable $e2) {
                         $this->metrics->record('eodhd', false);
+                        $this->handleEodhdFailure($e2, $symbol, null);
                     }
                 }
                 continue;
@@ -696,6 +709,12 @@ final class PriceService
             if (empty($pending)) {
                 break;
             }
+            $pending = array_filter($pending, function ($upper) use ($provider, $exchangeUpper) {
+                return !$this->shouldSkipProvider($provider, $upper, $exchangeUpper);
+            });
+            if (empty($pending)) {
+                continue;
+            }
             if ($provider === 'twelvedata' && $this->twelveClient !== null) {
                 try {
                     $symbolsForTd = array_unique(array_map(static function (string $sym): string {
@@ -749,6 +768,7 @@ final class PriceService
                         $this->metrics->record('eodhd', false);
                         $errors[$original] = $e->getMessage();
                     }
+                    $this->handleEodhdFailure($e, implode(',', array_values($pending)), $exchangeUpper);
                 }
                 continue;
             }
@@ -867,6 +887,58 @@ final class PriceService
         return (float) $value;
     }
 
+    private function shouldSkipProvider(string $provider, string $symbol, ?string $exchange): bool
+    {
+        if ($this->metrics->isDisabled($provider)) {
+            return true;
+        }
+        if ($provider === 'eodhd') {
+            $sym = strtoupper(trim($symbol));
+            $ex = $exchange !== null ? strtoupper(trim($exchange)) : '';
+            if ($this->metrics->isNoData($provider, $sym, $ex)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function handleEodhdFailure(\Throwable $exception, string $symbol, ?string $exchange): void
+    {
+        $msg = strtolower($exception->getMessage());
+        if ($this->isQuotaError($msg)) {
+            $this->metrics->disable('eodhd', $this->secondsUntilTomorrow(), 'quota_error');
+        }
+        if ($this->isDataAvailabilityError($msg)) {
+            $this->metrics->markNoData('eodhd', $symbol, $exchange, $this->secondsUntilTomorrow());
+        }
+    }
+
+    private function isDataAvailabilityError(string $message): bool
+    {
+        return str_contains($message, 'not found')
+            || str_contains($message, 'no data')
+            || str_contains($message, 'unknown symbol')
+            || str_contains($message, 'invalid api call')
+            || str_contains($message, '404');
+    }
+
+    private function isQuotaError(string $message): bool
+    {
+        return str_contains($message, '402')
+            || str_contains($message, '403')
+            || str_contains($message, 'quota')
+            || str_contains($message, 'payment required')
+            || str_contains($message, 'out of api credits')
+            || str_contains($message, 'rate limit');
+    }
+
+    private function secondsUntilTomorrow(): int
+    {
+        $now = new \DateTimeImmutable('now');
+        $tomorrow = $now->setTime(0, 0)->modify('+1 day');
+        return max(60, (int) ($tomorrow->getTimestamp() - $now->getTimestamp()));
+    }
+
     /**
      * Ordena proveedores según configuración y preferencia solicitada.
      *
@@ -890,6 +962,9 @@ final class PriceService
                 continue;
             }
             if ($p === 'eodhd' && $this->eodhdClient === null) {
+                continue;
+            }
+            if ($this->metrics->isDisabled($p)) {
                 continue;
             }
             if ($p === 'alphavantage' && ($this->alphaClient === null || !$this->alphaClient->hasApiKey())) {

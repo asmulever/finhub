@@ -141,3 +141,8 @@
 [27-Dec-2025 23:14:40 UTC] [2025-12-27 23:14:40] ERROR: php.error {"trace_id":"bc972a96f1c407c69291187596a2374f","message":"mkdir(): Permission denied","file":"/var/www/html/BkEndApi/src/Infrastructure/MarketData/ProviderMetrics.php","line":105}
 [27-Dec-2025 23:14:40 UTC] [2025-12-27 23:14:40] ERROR: php.error {"trace_id":"bc972a96f1c407c69291187596a2374f","message":"file_put_contents(/var/www/html/storage/metrics/providers_20251227.json): Failed to open stream: No such file or directory","file":"/var/www/html/BkEndApi/src/Infrastructure/MarketData/ProviderMetrics.php","line":73}
 [30-Dec-2025 13:35:59 America/New_York] PHP Parse error:  syntax error, unexpected token "private" in BkEndApi/src/Infrastructure/ApiDispatcher.php on line 480
+[05-Jan-2026 01:44:03 America/New_York] PHP Warning:  file_get_contents(https://clasico.rava.com/lib/restapi/v3/publico/cotizaciones/historicos): Failed to open stream: HTTP request failed! HTTP/1.1 401 Unauthorized
+ in Command line code on line 1
+[05-Jan-2026 01:44:03 America/New_York] PHP Stack trace:
+[05-Jan-2026 01:44:03 America/New_York] PHP   1. {main}() Command line code:0
+[05-Jan-2026 01:44:03 America/New_York] PHP   2. file_get_contents($filename = 'https://clasico.rava.com/lib/restapi/v3/publico/cotizaciones/historicos', $use_include_path = FALSE, $context = resource(6) of type (stream-context)) Command line code:1

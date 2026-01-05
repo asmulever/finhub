@@ -37,9 +37,20 @@ final class ProviderUsageService
     {
         $base = $this->metrics->getAll();
         $providers = [
-            'twelvedata' => $this->baseProvider($base['providers']['twelvedata'] ?? []),
-            'eodhd' => $this->baseProvider($base['providers']['eodhd'] ?? []),
+            'twelvedata' => $this->baseProvider($base['providers']['twelvedata'] ?? [], 'twelvedata'),
+            'eodhd' => $this->baseProvider($base['providers']['eodhd'] ?? [], 'eodhd'),
+            'alphavantage' => $this->baseProvider($base['providers']['alphavantage'] ?? [], 'alphavantage'),
         ];
+
+        $today = (new \DateTimeImmutable('now'))->format('Y-m-d');
+        $snapshot = $base['snapshot'] ?? null;
+        $snapshotDate = is_array($snapshot) ? ($snapshot['date'] ?? null) : null;
+        $snapshotProviders = is_array($snapshot) ? ($snapshot['providers'] ?? []) : [];
+
+        if ($snapshotDate === $today && !empty($snapshotProviders)) {
+            $providers = $this->applySnapshot($providers, $snapshotProviders);
+            return ['providers' => $providers];
+        }
 
         $tdUsage = $this->fetchTwelveDataUsage();
         if ($tdUsage !== null) {
@@ -53,12 +64,34 @@ final class ProviderUsageService
             $providers['eodhd']['allowed'] = $eodhdUsage['allowed'];
             $providers['eodhd']['remaining'] = $eodhdUsage['remaining'];
             $providers['eodhd']['used'] = $eodhdUsage['used'];
+            if ($eodhdUsage['remaining'] !== null && $eodhdUsage['remaining'] <= 2) {
+                $this->metrics->disable('eodhd', $this->secondsUntilTomorrow(), 'remaining_low');
+                $providers['eodhd']['disabled_reason'] = 'remaining_low';
+            }
         }
+
+        $this->metrics->storeSnapshot([
+            'twelvedata' => [
+                'allowed' => $providers['twelvedata']['allowed'],
+                'remaining' => $providers['twelvedata']['remaining'],
+                'used' => $providers['twelvedata']['used'],
+            ],
+            'eodhd' => [
+                'allowed' => $providers['eodhd']['allowed'],
+                'remaining' => $providers['eodhd']['remaining'],
+                'used' => $providers['eodhd']['used'],
+            ],
+            'alphavantage' => [
+                'allowed' => $providers['alphavantage']['allowed'],
+                'remaining' => $providers['alphavantage']['remaining'],
+                'used' => $providers['alphavantage']['used'],
+            ],
+        ]);
 
         return ['providers' => $providers];
     }
 
-    private function baseProvider(array $metrics): array
+    private function baseProvider(array $metrics, string $name): array
     {
         $provider = array_merge([
             'allowed' => null,
@@ -71,6 +104,10 @@ final class ProviderUsageService
         $provider['allowed'] = null;
         $provider['used'] = null;
         $provider['remaining'] = null;
+        $disabledInfo = $this->metrics->disabledInfo($name);
+        $provider['disabled'] = $disabledInfo['disabled'];
+        $provider['disabled_until'] = $disabledInfo['until'];
+        $provider['disabled_reason'] = $provider['disabled_reason'] ?? $disabledInfo['reason'];
         return $provider;
     }
 
@@ -115,6 +152,9 @@ final class ProviderUsageService
             $this->logger->warning('provider_usage.eodhd.user_error', [
                 'message' => $exception->getMessage(),
             ]);
+            if ($this->isQuotaError($exception)) {
+                $this->metrics->disable('eodhd', $this->secondsUntilTomorrow(), 'quota_error');
+            }
         }
         $limit = $this->findFirstNumeric($payload ?? [], ['limit', 'requests_limit', 'daily_limit']);
         $remaining = $this->findFirstNumeric($payload ?? [], ['remaining', 'requests_left', 'requests_remaining']);
@@ -164,5 +204,38 @@ final class ProviderUsageService
             }
         }
         return null;
+    }
+
+    /**
+     * @param array<string,array<string,mixed>> $providers
+     * @param array<string,array<string,mixed>> $snapshotProviders
+     * @return array<string,array<string,mixed>>
+     */
+    private function applySnapshot(array $providers, array $snapshotProviders): array
+    {
+        foreach ($snapshotProviders as $name => $data) {
+            if (!isset($providers[$name])) {
+                $providers[$name] = $this->baseProvider([], $name);
+            }
+            foreach (['allowed', 'remaining', 'used'] as $field) {
+                if (isset($data[$field])) {
+                    $providers[$name][$field] = $data[$field];
+                }
+            }
+        }
+        return $providers;
+    }
+
+    private function isQuotaError(\Throwable $exception): bool
+    {
+        $msg = strtolower($exception->getMessage());
+        return str_contains($msg, '402') || str_contains($msg, '403') || str_contains($msg, 'payment required') || str_contains($msg, 'quota');
+    }
+
+    private function secondsUntilTomorrow(): int
+    {
+        $now = new \DateTimeImmutable('now');
+        $tomorrow = $now->setTime(0, 0)->modify('+1 day');
+        return max(60, (int) ($tomorrow->getTimestamp() - $now->getTimestamp()));
     }
 }

@@ -7,6 +7,10 @@ use FinHub\Application\Auth\AuthService;
 use FinHub\Application\MarketData\Dto\PriceRequest;
 use FinHub\Application\MarketData\PriceService;
 use FinHub\Application\MarketData\ProviderUsageService;
+use FinHub\Application\MarketData\RavaCedearsService;
+use FinHub\Application\MarketData\RavaAccionesService;
+use FinHub\Application\MarketData\RavaBonosService;
+use FinHub\Application\MarketData\RavaHistoricosService;
 use FinHub\Application\Portfolio\PortfolioService;
 use FinHub\Application\DataLake\DataLakeService;
 use FinHub\Domain\User\UserRepositoryInterface;
@@ -29,6 +33,10 @@ final class ApiDispatcher
     private ProviderUsageService $providerUsage;
     private PortfolioService $portfolioService;
     private DataLakeService $dataLakeService;
+    private RavaCedearsService $ravaCedearsService;
+    private RavaAccionesService $ravaAccionesService;
+    private RavaBonosService $ravaBonosService;
+    private RavaHistoricosService $ravaHistoricosService;
     /** Rutas base deben terminar sin barra final. */
     private string $apiBase;
 
@@ -43,7 +51,11 @@ final class ApiDispatcher
         EodhdClient $eodhdClient,
         ProviderUsageService $providerUsage,
         PortfolioService $portfolioService,
-        DataLakeService $dataLakeService
+        DataLakeService $dataLakeService,
+        RavaCedearsService $ravaCedearsService,
+        RavaAccionesService $ravaAccionesService,
+        RavaBonosService $ravaBonosService,
+        RavaHistoricosService $ravaHistoricosService
     )
     {
         $this->config = $config;
@@ -58,6 +70,10 @@ final class ApiDispatcher
         $this->providerUsage = $providerUsage;
         $this->portfolioService = $portfolioService;
         $this->dataLakeService = $dataLakeService;
+        $this->ravaCedearsService = $ravaCedearsService;
+        $this->ravaAccionesService = $ravaAccionesService;
+        $this->ravaBonosService = $ravaBonosService;
+        $this->ravaHistoricosService = $ravaHistoricosService;
     }
 
     /**
@@ -96,6 +112,22 @@ final class ApiDispatcher
                 'env' => $this->config->get('APP_ENV', 'production'),
                 'trace_id' => $traceId,
             ]);
+            return;
+        }
+        if ($method === 'GET' && $path === '/rava/cedears') {
+            $this->handleRavaCedears();
+            return;
+        }
+        if ($method === 'GET' && $path === '/rava/acciones') {
+            $this->handleRavaAcciones();
+            return;
+        }
+        if ($method === 'GET' && $path === '/rava/bonos') {
+            $this->handleRavaBonos();
+            return;
+        }
+        if ($method === 'GET' && $path === '/rava/historicos') {
+            $this->handleRavaHistoricos();
             return;
         }
         if ($method === 'GET' && $path === '/stocks') {
@@ -516,6 +548,58 @@ final class ApiDispatcher
     }
 
     /**
+     * Lista CEDEARs obtenidos desde RAVA (cache + stale).
+     */
+    private function handleRavaCedears(): void
+    {
+        $result = $this->ravaCedearsService->listCedears();
+        $this->sendJson([
+            'data' => $result['items'] ?? [],
+            'meta' => $result['meta'] ?? [],
+        ]);
+    }
+
+    /**
+     * Lista Acciones Argentinas desde RAVA (agrupadas/normalizadas).
+     */
+    private function handleRavaAcciones(): void
+    {
+        $result = $this->ravaAccionesService->listAcciones();
+        $this->sendJson([
+            'data' => $result['items'] ?? [],
+            'meta' => $result['meta'] ?? [],
+        ]);
+    }
+
+    /**
+     * Lista Bonos desde RAVA.
+     */
+    private function handleRavaBonos(): void
+    {
+        $result = $this->ravaBonosService->listBonos();
+        $this->sendJson([
+            'data' => $result['items'] ?? [],
+            'meta' => $result['meta'] ?? [],
+        ]);
+    }
+
+    /**
+     * Devuelve histórico diario de una especie desde RAVA.
+     */
+    private function handleRavaHistoricos(): void
+    {
+        $especie = trim((string) ($_GET['especie'] ?? ($_GET['symbol'] ?? '')));
+        if ($especie === '') {
+            throw new \RuntimeException('Parámetro especie requerido', 422);
+        }
+        $result = $this->ravaHistoricosService->historicos($especie);
+        $this->sendJson([
+            'data' => $result['items'] ?? [],
+            'meta' => $result['meta'] ?? [],
+        ]);
+    }
+
+    /**
      * Devuelve la serie temporal para un símbolo en un período.
      */
     private function handlePriceSeries(): void
@@ -560,7 +644,7 @@ final class ApiDispatcher
         }
 
         $exchange = isset($_GET['ex']) ? strtoupper(trim((string) $_GET['ex'])) : null;
-        $preferred = strtolower(trim((string) ($_GET['preferred'] ?? 'eodhd')));
+        $preferred = strtolower(trim((string) ($_GET['preferred'] ?? 'twelvedata')));
         $force = isset($_GET['force']) && (string) $_GET['force'] === '1';
 
         $quotes = $this->priceService->searchQuotes($symbols, $exchange, $preferred, $force);
@@ -832,14 +916,14 @@ final class ApiDispatcher
     {
         $symbol = strtoupper(trim((string) ($_GET['s'] ?? '')));
         $exchange = isset($_GET['ex']) ? strtoupper(trim((string) $_GET['ex'])) : null;
-        $preferred = strtolower(trim((string) ($_GET['preferred'] ?? 'eodhd')));
+        $preferred = strtolower(trim((string) ($_GET['preferred'] ?? 'twelvedata')));
         $force = isset($_GET['force']) && (string) $_GET['force'] === '1';
 
         if ($symbol === '') {
             throw new \RuntimeException('Parámetro s (symbol) requerido', 422);
         }
-        if ($preferred !== 'eodhd' && $preferred !== 'twelvedata') {
-            $preferred = 'eodhd';
+        if ($preferred !== 'eodhd' && $preferred !== 'twelvedata' && $preferred !== 'alphavantage') {
+            $preferred = 'twelvedata';
         }
 
         $quote = $this->priceService->searchQuote($symbol, $exchange, $preferred, $force);

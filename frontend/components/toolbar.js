@@ -14,6 +14,7 @@ const toolbarTemplate = `
       <button type="button" id="eodhd-menu" data-menu="eodhd" data-link="/Frontend/eodhd.html">EODHD</button>
       <button type="button" id="twelvedata-menu" data-menu="twelvedata" data-link="/Frontend/twelvedata.html">TwelveData</button>
       <button type="button" id="alphavantage-menu" data-menu="alphavantage" data-link="/Frontend/alphavantage.html">Alpha Vantage</button>
+      <button type="button" id="rava-menu" data-menu="rava" data-link="/Frontend/rava.php">RAVA</button>
       <button type="button" id="analysis-menu" data-menu="analysis" data-link="/Frontend/analisis.html">Análisis</button>
     </nav>
     <div class="toolbar-user">
