@@ -1,14 +1,19 @@
-import { getJson, postJson } from '../apicliente.js';
+import { getJson, postJson, deleteJson } from '../apicliente.js';
 import { authStore } from '../auth/authStore.js';
 import { bindToolbarNavigation, bindUserMenu, highlightToolbar, renderToolbar, setAdminMenuVisibility, setToolbarUserName } from '../components/toolbar.js';
+import { createLoadingOverlay } from '../components/loadingOverlay.js';
 
 const state = {
   symbols: [],
   selectedSymbols: [],
   period: '1m',
-  chart: null,
   collecting: false,
   profile: null,
+  catalog: [],
+  filteredCatalog: [],
+  selectedCatalog: null,
+  snapshots: {},
+  series: [],
 };
 
 const isAdminProfile = (profile) => String(profile?.role ?? '').toLowerCase() === 'admin';
@@ -55,196 +60,11 @@ const renderStepLog = (steps = []) => {
   });
 };
 
-const colors = [
-  '#0ea5e9', '#22d3ee', '#a78bfa', '#f472b6', '#f59e0b',
-  '#10b981', '#ef4444', '#6366f1', '#14b8a6', '#f97316',
-];
+const overlay = createLoadingOverlay();
 
-const numberOrNull = (value) => {
-  if (value === null || value === undefined || value === '') return null;
-  if (Number.isNaN(Number(value))) return null;
-  return Number(value);
-};
-
-const candlestickPlugin = {
-  id: 'candles',
-  afterDatasetsDraw(chart) {
-    const { ctx, scales } = chart;
-    const xScale = scales.x;
-    const yScale = scales.y;
-    if (!xScale || !yScale) return;
-
-    chart.data.datasets.forEach((dataset) => {
-      const data = dataset.data || [];
-      const upColor = dataset.colorUp || '#10b981';
-      const downColor = dataset.colorDown || '#ef4444';
-      data.forEach((point, idx) => {
-        const { x, o, h, l, c } = point;
-        if ([o, h, l, c].some((v) => v === null || v === undefined)) return;
-        const xPos = xScale.getPixelForValue(x);
-        const next = data[idx + 1];
-        const prev = data[idx - 1];
-        const nextX = next ? xScale.getPixelForValue(next.x) : xPos;
-        const prevX = prev ? xScale.getPixelForValue(prev.x) : xPos;
-        const gap = Math.max(6, Math.min(24, Math.min(Math.abs(nextX - xPos) || 12, Math.abs(xPos - prevX) || 12)));
-        const bodyWidth = Math.max(4, Math.min(18, gap * 0.6));
-
-        const yHigh = yScale.getPixelForValue(h);
-        const yLow = yScale.getPixelForValue(l);
-        const yOpen = yScale.getPixelForValue(o);
-        const yClose = yScale.getPixelForValue(c);
-        const isUp = c >= o;
-        const color = isUp ? upColor : downColor;
-
-        ctx.save();
-        ctx.strokeStyle = color;
-        ctx.fillStyle = color;
-        ctx.lineWidth = 1;
-        // Mecha
-        ctx.beginPath();
-        ctx.moveTo(xPos, yHigh);
-        ctx.lineTo(xPos, yLow);
-        ctx.stroke();
-        // Cuerpo
-        const bodyTop = Math.min(yOpen, yClose);
-        const bodyBottom = Math.max(yOpen, yClose);
-        const bodyHeight = Math.max(1, bodyBottom - bodyTop);
-        ctx.fillRect(xPos - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
-        ctx.restore();
-      });
-    });
-  },
-};
-
-if (typeof Chart !== 'undefined') {
-  Chart.register(candlestickPlugin);
-}
-
-const buildCandles = (serie) => (serie?.points ?? []).map((p) => ({
-  x: new Date(p.t),
-  o: numberOrNull(p.open ?? p.price ?? p.close),
-  h: numberOrNull(p.high ?? p.price ?? p.close),
-  l: numberOrNull(p.low ?? p.price ?? p.close),
-  c: numberOrNull(p.close ?? p.price),
-  y: numberOrNull(p.close ?? p.price),
-})).filter((p) => p.o !== null && p.h !== null && p.l !== null && p.c !== null && p.y !== null);
-
-const getTimeUnit = (period) => {
-  if (period === '1m' || period === '3m' || period === '6m') return 'day';
-  return 'month';
-};
-
-const updateChart = (series) => {
-  const ctx = document.getElementById('prices-chart');
-  if (!ctx) return;
-  const timeUnit = getTimeUnit(state.period);
-  const datasets = series.map((serie, idx) => ({
-    label: serie.symbol,
-    data: buildCandles(serie),
-    borderColor: colors[idx % colors.length],
-    colorUp: '#10b981',
-    colorDown: '#ef4444',
-    showLine: false,
-    pointRadius: 0,
-    type: 'scatter',
-    parsing: { xAxisKey: 'x', yAxisKey: 'y' },
-  }));
-
-  if (state.chart) {
-    state.chart.destroy();
-  }
-
-  state.chart = new Chart(ctx, {
-    type: 'scatter',
-    data: { datasets },
-    options: {
-      maintainAspectRatio: false,
-      scales: {
-        x: {
-          type: 'time',
-          time: { tooltipFormat: 'yyyy-MM-dd', unit: timeUnit },
-          ticks: { color: '#cbd5f5' },
-          grid: { color: 'rgba(148,163,184,0.15)' },
-          title: { display: true, text: 'Fecha', color: '#cbd5f5' },
-        },
-        y: {
-          ticks: { color: '#cbd5f5' },
-          grid: { color: 'rgba(148,163,184,0.15)' },
-          title: { display: true, text: 'Moneda', color: '#cbd5f5' },
-        },
-      },
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: { color: '#cbd5f5', font: { size: 10 }, boxWidth: 10, padding: 6 },
-        },
-        tooltip: {
-          callbacks: {
-            label(context) {
-              const d = context.raw || {};
-              return `O:${d.o ?? '-'} H:${d.h ?? '-'} L:${d.l ?? '-'} C:${d.c ?? '-'}`;
-            },
-          },
-        },
-      },
-      elements: { line: { tension: 0 } },
-      interaction: { intersect: false, mode: 'index' },
-    },
-    plugins: [candlestickPlugin],
-  });
-};
-
-const fetchSymbols = async () => {
-  const response = await getJson('/datalake/prices/symbols');
-  state.symbols = Array.isArray(response?.symbols) ? response.symbols : [];
-  state.selectedSymbols = [...state.symbols];
-};
-
-const fetchSeries = async () => {
-  if (!state.selectedSymbols.length) {
-    updateChart([]);
-    return;
-  }
-  const series = [];
-  for (const symbol of state.selectedSymbols) {
-    // eslint-disable-next-line no-await-in-loop
-    const resp = await getJson(`/datalake/prices/series?symbol=${encodeURIComponent(symbol)}&period=${encodeURIComponent(state.period)}`);
-    series.push(resp);
-  }
-  updateChart(series);
-};
-
-const handleCollect = async () => {
-  if (state.collecting) return;
-  state.collecting = true;
-  const btn = document.getElementById('collect-btn');
-  const result = document.getElementById('collect-result');
-  if (btn) btn.disabled = true;
-  resetLog('Iniciando ingesta de precios...');
-  if (result) result.textContent = 'Recolectando...';
-  try {
-    appendLog('Solicitando ingesta al servidor...');
-    const response = await postJson('/datalake/prices/collect', {});
-    renderStepLog(response?.steps);
-    if (result) {
-      result.textContent = `OK: ${response.ok} | Fallidos: ${response.failed} | Total símbolos: ${response.total_symbols}`;
-    }
-    appendLog(`Resultado final -> OK: ${response.ok} | Fallidos: ${response.failed} | Total: ${response.total_symbols}`);
-    await fetchSeries();
-  } catch (error) {
-    if (result) {
-      result.textContent = `Error al recolectar: ${error?.error?.message ?? 'Desconocido'}`;
-    }
-    appendLog(`Error al recolectar: ${error?.error?.message ?? error?.message ?? 'Desconocido'}`);
-  } finally {
-    state.collecting = false;
-    if (btn) btn.disabled = false;
-  }
-};
-
-const handlePeriodChange = (event) => {
-  state.period = event.target.value;
-  fetchSeries();
+const formatNumber = (value, digits = 2) => {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '–';
+  return new Intl.NumberFormat('es-AR', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(value));
 };
 
 const handleLogout = async () => {
@@ -253,6 +73,237 @@ const handleLogout = async () => {
   } finally {
     authStore.clearToken();
     window.location.href = '/';
+  }
+};
+
+const renderTabs = () => {
+  const tabs = document.querySelectorAll('.tab-btn');
+  tabs.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tab = btn.getAttribute('data-tab');
+      document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
+      btn.classList.add('active');
+      const panel = document.getElementById(`tab-${tab}`);
+      if (panel) panel.classList.add('active');
+    });
+  });
+};
+
+const renderCatalog = () => {
+  const tbody = document.getElementById('catalog-body');
+  if (!tbody) return;
+  if (!state.filteredCatalog.length) {
+    tbody.innerHTML = '<tr><td class="muted" colspan="8">Sin resultados</td></tr>';
+    return;
+  }
+  tbody.innerHTML = state.filteredCatalog.map((row) => `
+    <tr data-symbol="${row.symbol}">
+      <td>${row.symbol}</td>
+      <td>${row.name ?? '—'}</td>
+      <td>${row.tipo ?? '—'}</td>
+      <td>${row.mercado ?? row.panel ?? '—'}</td>
+      <td>${row.currency ?? '—'}</td>
+      <td>${formatNumber(row.price, 2)}</td>
+      <td>${row.as_of ? String(row.as_of).slice(0, 16) : '—'}</td>
+      <td><button type="button" data-edit="${row.symbol}">Editar</button></td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('button[data-edit]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const symbol = btn.getAttribute('data-edit');
+      const item = state.catalog.find((r) => r.symbol === symbol);
+      if (!item) return;
+      state.selectedCatalog = item;
+      document.getElementById('form-symbol').value = item.symbol;
+      document.getElementById('form-name').value = item.name ?? '';
+      document.getElementById('form-type').value = item.tipo ?? '';
+      document.getElementById('form-market').value = item.mercado ?? item.panel ?? '';
+      document.getElementById('form-currency').value = item.currency ?? '';
+      document.getElementById('form-price').value = item.price ?? '';
+      document.getElementById('form-asof').value = item.as_of ?? '';
+    });
+  });
+};
+
+const applyCatalogFilter = () => {
+  const search = (document.getElementById('catalog-search')?.value || '').toLowerCase();
+  const type = document.getElementById('catalog-type')?.value || 'all';
+  state.filteredCatalog = state.catalog.filter((row) => {
+    const okType = type === 'all' ? true : (row.tipo === type);
+    const okSearch = search === '' || row.symbol.toLowerCase().includes(search) || (row.name ?? '').toLowerCase().includes(search);
+    return okType && okSearch;
+  });
+  renderCatalog();
+  const metaSymbols = document.getElementById('meta-symbols');
+  if (metaSymbols) metaSymbols.textContent = `Símbolos: ${state.filteredCatalog.length}`;
+};
+
+const loadCatalog = async () => {
+  const status = document.getElementById('catalog-status');
+  if (status) status.textContent = 'Cargando catálogo...';
+  try {
+    const resp = await overlay.withLoader(() => getJson('/datalake/catalog'));
+    const items = Array.isArray(resp?.data) ? resp.data : [];
+    state.catalog = items;
+    applyCatalogFilter();
+    if (status) status.textContent = `Catálogo cargado (${items.length})`;
+  } catch (error) {
+    if (status) status.textContent = error?.error?.message ?? 'No se pudo cargar catálogo';
+  }
+};
+
+const syncCatalog = async () => {
+  const status = document.getElementById('catalog-status');
+  if (status) status.textContent = 'Sincronizando con RAVA...';
+  try {
+    await overlay.withLoader(() => postJson('/datalake/catalog/sync', {}));
+    await loadCatalog();
+    if (status) status.textContent = 'Sincronización completa';
+  } catch (error) {
+    if (status) status.textContent = error?.error?.message ?? 'Fallo al sincronizar';
+  }
+};
+
+const saveCatalogItem = async () => {
+  const status = document.getElementById('catalog-status');
+  const symbol = (document.getElementById('form-symbol')?.value || '').toUpperCase();
+  if (symbol === '') {
+    if (status) status.textContent = 'Símbolo obligatorio';
+    return;
+  }
+  const payload = {
+    symbol,
+    name: document.getElementById('form-name')?.value || '',
+    tipo: document.getElementById('form-type')?.value || '',
+    mercado: document.getElementById('form-market')?.value || '',
+    currency: document.getElementById('form-currency')?.value || '',
+    price: document.getElementById('form-price')?.value || '',
+    as_of: document.getElementById('form-asof')?.value || '',
+  };
+  if (!window.confirm(`Confirmas guardar ${symbol} en catálogo?`)) {
+    return;
+  }
+  try {
+    await overlay.withLoader(() => postJson('/datalake/catalog/item', payload));
+    await loadCatalog();
+    if (status) status.textContent = `Guardado ${symbol}`;
+  } catch (error) {
+    if (status) status.textContent = error?.error?.message ?? 'No se pudo guardar';
+  }
+};
+
+const deleteCatalogItem = async () => {
+  const status = document.getElementById('catalog-status');
+  const symbol = (document.getElementById('form-symbol')?.value || '').toUpperCase();
+  if (symbol === '') {
+    if (status) status.textContent = 'Símbolo obligatorio para eliminar';
+    return;
+  }
+  if (!window.confirm(`Eliminar ${symbol} del catálogo? Esta acción es irreversible.`)) {
+    return;
+  }
+  try {
+    await overlay.withLoader(() => deleteJson(`/datalake/catalog/item/${encodeURIComponent(symbol)}`));
+    await loadCatalog();
+    if (status) status.textContent = `Eliminado ${symbol}`;
+  } catch (error) {
+    if (status) status.textContent = error?.error?.message ?? 'No se pudo eliminar';
+  }
+};
+
+const resetForm = () => {
+  state.selectedCatalog = null;
+  document.getElementById('form-symbol').value = '';
+  document.getElementById('form-name').value = '';
+  document.getElementById('form-type').value = '';
+  document.getElementById('form-market').value = '';
+  document.getElementById('form-currency').value = '';
+  document.getElementById('form-price').value = '';
+  document.getElementById('form-asof').value = '';
+};
+
+const loadSymbols = async () => {
+  const response = await getJson('/datalake/prices/symbols');
+  state.symbols = Array.isArray(response?.symbols) ? response.symbols : [];
+  const selects = [document.getElementById('snapshot-symbol'), document.getElementById('series-symbol')];
+  selects.forEach((sel) => {
+    if (!sel) return;
+    sel.innerHTML = state.symbols.map((s) => `<option value="${s}">${s}</option>`).join('');
+  });
+};
+
+const loadLatestSnapshot = async () => {
+  const symbol = document.getElementById('snapshot-symbol')?.value || '';
+  if (!symbol) return;
+  const meta = document.getElementById('snapshot-meta');
+  const body = document.getElementById('snapshot-body');
+  if (meta) meta.textContent = 'Cargando...';
+  if (body) body.innerHTML = '<tr><td class="muted">Cargando...</td></tr>';
+  try {
+    const resp = await overlay.withLoader(() => getJson(`/datalake/prices/latest?symbol=${encodeURIComponent(symbol)}`));
+    state.snapshots[symbol] = resp;
+    if (meta) meta.textContent = `Fuente: ${resp?.source ?? 'N/D'} · As of: ${resp?.asOf ?? '--'}`;
+    if (body) {
+      body.innerHTML = `
+        <tr><td>Símbolo</td><td>${resp?.symbol ?? symbol}</td></tr>
+        <tr><td>Precio</td><td>${formatNumber(resp?.close, 4)}</td></tr>
+        <tr><td>Open</td><td>${formatNumber(resp?.open, 4)}</td></tr>
+        <tr><td>High</td><td>${formatNumber(resp?.high, 4)}</td></tr>
+        <tr><td>Low</td><td>${formatNumber(resp?.low, 4)}</td></tr>
+        <tr><td>Prev Close</td><td>${formatNumber(resp?.previous_close, 4)}</td></tr>
+        <tr><td>Moneda</td><td>${resp?.currency ?? 'N/D'}</td></tr>
+      `;
+    }
+  } catch (error) {
+    if (meta) meta.textContent = error?.error?.message ?? 'No se pudo cargar snapshot';
+    if (body) body.innerHTML = '<tr><td class="muted">Error al cargar</td></tr>';
+  }
+};
+
+const loadSeries = async () => {
+  const symbol = document.getElementById('series-symbol')?.value || '';
+  const period = document.getElementById('series-period')?.value || '1m';
+  const body = document.getElementById('series-body');
+  const meta = document.getElementById('series-meta');
+  if (!symbol) return;
+  if (body) body.innerHTML = '<tr><td class="muted" colspan="5">Cargando...</td></tr>';
+  if (meta) meta.textContent = '';
+  try {
+    const resp = await overlay.withLoader(() => getJson(`/datalake/prices/series?symbol=${encodeURIComponent(symbol)}&period=${encodeURIComponent(period)}`));
+    const points = Array.isArray(resp?.points) ? resp.points : [];
+    state.series = points;
+    if (body) {
+      body.innerHTML = points.map((p) => `
+        <tr>
+          <td>${p.t ? String(p.t).slice(0, 16) : '—'}</td>
+          <td>${formatNumber(p.open ?? p.price, 4)}</td>
+          <td>${formatNumber(p.high ?? p.price, 4)}</td>
+          <td>${formatNumber(p.low ?? p.price, 4)}</td>
+          <td>${formatNumber(p.close ?? p.price, 4)}</td>
+        </tr>
+      `).join('') || '<tr><td class="muted" colspan="5">Sin datos</td></tr>';
+    }
+    if (meta) meta.textContent = `${points.length} puntos · Período ${period} · Serie ${symbol}`;
+  } catch (error) {
+    if (body) body.innerHTML = '<tr><td class="muted" colspan="5">Error al cargar</td></tr>';
+    if (meta) meta.textContent = error?.error?.message ?? 'No se pudo cargar serie';
+  }
+};
+
+const handleCollect = async () => {
+  if (state.collecting) return;
+  state.collecting = true;
+  resetLog('Iniciando ingesta de precios...');
+  try {
+    appendLog('Solicitando ingesta al servidor...');
+    const response = await overlay.withLoader(() => postJson('/datalake/prices/collect', {}));
+    renderStepLog(response?.steps);
+    appendLog(`Resultado final -> OK: ${response.ok} | Fallidos: ${response.failed} | Total: ${response.total_symbols}`);
+  } catch (error) {
+    appendLog(`Error al recolectar: ${error?.error?.message ?? error?.message ?? 'Desconocido'}`);
+  } finally {
+    state.collecting = false;
   }
 };
 
@@ -284,16 +335,34 @@ const init = async () => {
   highlightToolbar();
   await loadProfile();
   if (!isAdminProfile(state.profile ?? authStore.getProfile())) {
-    const result = document.getElementById('collect-result');
-    if (result) result.textContent = 'Acceso restringido: solo Admin puede usar DataLake.';
-    document.getElementById('collect-btn')?.setAttribute('disabled', 'disabled');
+    const status = document.getElementById('catalog-status');
+    if (status) status.textContent = 'Acceso restringido: solo Admin.';
+    document.querySelectorAll('button, input, select').forEach((el) => {
+      if (el?.id?.startsWith('form-') || el?.id?.includes('catalog') || el?.id?.includes('collect') || el?.id?.includes('snapshot') || el?.id?.includes('series')) {
+        el.setAttribute('disabled', 'disabled');
+      }
+    });
     return;
   }
-  await fetchSymbols();
-  await fetchSeries();
+  renderTabs();
+  await loadCatalog();
+  await loadSymbols();
+  await loadLatestSnapshot();
+  await loadSeries();
 
-  document.getElementById('collect-btn')?.addEventListener('click', handleCollect);
-  document.getElementById('period-select')?.addEventListener('change', handlePeriodChange);
+  document.getElementById('catalog-search')?.addEventListener('input', applyCatalogFilter);
+  document.getElementById('catalog-type')?.addEventListener('change', applyCatalogFilter);
+  document.getElementById('catalog-sync')?.addEventListener('click', syncCatalog);
+  document.getElementById('form-save')?.addEventListener('click', saveCatalogItem);
+  document.getElementById('form-delete')?.addEventListener('click', deleteCatalogItem);
+  document.getElementById('form-reset')?.addEventListener('click', resetForm);
+  document.getElementById('snapshot-load')?.addEventListener('click', loadLatestSnapshot);
+  document.getElementById('collect-btn')?.addEventListener('click', () => {
+    if (window.confirm('Recolectar precios ahora? Puede tardar varios segundos.')) {
+      handleCollect();
+    }
+  });
+  document.getElementById('series-load')?.addEventListener('click', loadSeries);
   resetLog('Listo para iniciar ingesta.');
 };
 

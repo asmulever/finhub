@@ -146,3 +146,131 @@
 [05-Jan-2026 01:44:03 America/New_York] PHP Stack trace:
 [05-Jan-2026 01:44:03 America/New_York] PHP   1. {main}() Command line code:0
 [05-Jan-2026 01:44:03 America/New_York] PHP   2. file_get_contents($filename = 'https://clasico.rava.com/lib/restapi/v3/publico/cotizaciones/historicos', $use_include_path = FALSE, $context = resource(6) of type (stream-context)) Command line code:1
+[06-Jan-2026 04:13:27 UTC] PHP Warning:  Undefined variable $dataLakeService in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 138
+[06-Jan-2026 04:13:27 UTC] PHP Stack trace:
+[06-Jan-2026 04:13:27 UTC] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 04:13:27 UTC] PHP   2. FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer() /var/www/html/BkEndApi/index.php:14
+[06-Jan-2026 04:13:27 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioSummaryService::__construct(): Argument #2 ($dataLakeService) must be of type FinHub\Application\DataLake\DataLakeService, null given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 138 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioSummaryService.php:21
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(138): FinHub\Application\Portfolio\PortfolioSummaryService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), NULL, Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioSummaryService.php on line 21
+[06-Jan-2026 04:13:32 UTC] PHP Warning:  Undefined variable $dataLakeService in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 138
+[06-Jan-2026 04:13:32 UTC] PHP Warning:  Undefined variable $dataLakeService in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 138
+[06-Jan-2026 04:13:32 UTC] PHP Stack trace:
+[06-Jan-2026 04:13:32 UTC] PHP Stack trace:
+[06-Jan-2026 04:13:32 UTC] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 04:13:32 UTC] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 04:13:32 UTC] PHP   2. FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer() /var/www/html/BkEndApi/index.php:14
+[06-Jan-2026 04:13:32 UTC] PHP   2. FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer() /var/www/html/BkEndApi/index.php:14
+[06-Jan-2026 04:13:32 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioSummaryService::__construct(): Argument #2 ($dataLakeService) must be of type FinHub\Application\DataLake\DataLakeService, null given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 138 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioSummaryService.php:21
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(138): FinHub\Application\Portfolio\PortfolioSummaryService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), NULL, Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioSummaryService.php on line 21
+[06-Jan-2026 04:13:32 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioSummaryService::__construct(): Argument #2 ($dataLakeService) must be of type FinHub\Application\DataLake\DataLakeService, null given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 138 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioSummaryService.php:21
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(138): FinHub\Application\Portfolio\PortfolioSummaryService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), NULL, Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioSummaryService.php on line 21
+[06-Jan-2026 04:13:39 UTC] PHP Warning:  Undefined variable $dataLakeService in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 138
+[06-Jan-2026 04:13:39 UTC] PHP Stack trace:
+[06-Jan-2026 04:13:39 UTC] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 04:13:39 UTC] PHP   2. FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer() /var/www/html/BkEndApi/index.php:14
+[06-Jan-2026 04:13:39 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioSummaryService::__construct(): Argument #2 ($dataLakeService) must be of type FinHub\Application\DataLake\DataLakeService, null given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 138 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioSummaryService.php:21
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(138): FinHub\Application\Portfolio\PortfolioSummaryService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), NULL, Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioSummaryService.php on line 21
+[06-Jan-2026 04:14:20 UTC] PHP Warning:  Undefined variable $dataLakeService in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 138
+[06-Jan-2026 04:14:20 UTC] PHP Stack trace:
+[06-Jan-2026 04:14:20 UTC] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 04:14:20 UTC] PHP   2. FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer() /var/www/html/BkEndApi/index.php:14
+[06-Jan-2026 04:14:20 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioSummaryService::__construct(): Argument #2 ($dataLakeService) must be of type FinHub\Application\DataLake\DataLakeService, null given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 138 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioSummaryService.php:21
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(138): FinHub\Application\Portfolio\PortfolioSummaryService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), NULL, Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioSummaryService.php on line 21
+[06-Jan-2026 04:14:30 UTC] PHP Warning:  Undefined variable $dataLakeService in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 138
+[06-Jan-2026 04:14:30 UTC] PHP Stack trace:
+[06-Jan-2026 04:14:30 UTC] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 04:14:30 UTC] PHP   2. FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer() /var/www/html/BkEndApi/index.php:14
+[06-Jan-2026 04:14:30 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioSummaryService::__construct(): Argument #2 ($dataLakeService) must be of type FinHub\Application\DataLake\DataLakeService, null given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 138 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioSummaryService.php:21
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(138): FinHub\Application\Portfolio\PortfolioSummaryService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), NULL, Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioSummaryService.php on line 21
+[06-Jan-2026 04:14:47 UTC] PHP Warning:  Undefined variable $dataLakeService in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 138
+[06-Jan-2026 04:14:47 UTC] PHP Stack trace:
+[06-Jan-2026 04:14:47 UTC] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 04:14:47 UTC] PHP   2. FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer() /var/www/html/BkEndApi/index.php:14
+[06-Jan-2026 04:14:47 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioSummaryService::__construct(): Argument #2 ($dataLakeService) must be of type FinHub\Application\DataLake\DataLakeService, null given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 138 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioSummaryService.php:21
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(138): FinHub\Application\Portfolio\PortfolioSummaryService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), NULL, Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioSummaryService.php on line 21
+[06-Jan-2026 00:16:11 America/New_York] PHP Parse error:  syntax error, unexpected token ":", expecting "]" in Command line code on line 1
+[06-Jan-2026 22:45:55 UTC] PHP Fatal error:  Class FinHub\Infrastructure\Portfolio\PdoPortfolioRepository contains 1 abstract method and must therefore be declared abstract or implement the remaining methods (FinHub\Application\Portfolio\PortfolioRepositoryInterface::getBaseCurrency) in /var/www/html/BkEndApi/src/Infrastructure/Portfolio/PdoPortfolioRepository.php on line 9
+[06-Jan-2026 22:45:55 UTC] PHP Stack trace:
+[06-Jan-2026 22:45:55 UTC] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 22:45:55 UTC] PHP   2. FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer() /var/www/html/BkEndApi/index.php:14
+[06-Jan-2026 22:45:55 UTC] PHP   3. {closure:/var/www/html/BkEndApi/autoload.php:2-13}($class = 'FinHub\\Infrastructure\\Portfolio\\PdoPortfolioRepository') /var/www/html/BkEndApi/config/ApplicationBootstrap.php:136
+[06-Jan-2026 22:45:55 UTC] PHP   4. require_once() /var/www/html/BkEndApi/autoload.php:11
+[06-Jan-2026 17:52:53 America/New_York] PHP Fatal error:  Cannot use FinHub\Application\Portfolio\PortfolioSectorService as PortfolioSectorService because the name is already in use in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 22
+[06-Jan-2026 17:52:53 America/New_York] PHP Stack trace:
+[06-Jan-2026 17:52:53 America/New_York] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 17:52:53 America/New_York] PHP Fatal error:  Cannot use FinHub\Application\Portfolio\PortfolioSectorService as PortfolioSectorService because the name is already in use in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 22
+[06-Jan-2026 17:52:53 America/New_York] PHP Stack trace:
+[06-Jan-2026 17:52:53 America/New_York] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 17:52:53 America/New_York] PHP Fatal error:  Cannot use FinHub\Application\Portfolio\PortfolioSectorService as PortfolioSectorService because the name is already in use in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 22
+[06-Jan-2026 17:52:53 America/New_York] PHP Stack trace:
+[06-Jan-2026 17:52:53 America/New_York] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 17:52:53 America/New_York] PHP Fatal error:  Cannot use FinHub\Application\Portfolio\PortfolioSectorService as PortfolioSectorService because the name is already in use in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 22
+[06-Jan-2026 17:52:53 America/New_York] PHP Stack trace:
+[06-Jan-2026 17:52:53 America/New_York] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 17:52:53 America/New_York] PHP Fatal error:  Cannot use FinHub\Application\Portfolio\PortfolioSectorService as PortfolioSectorService because the name is already in use in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 22
+[06-Jan-2026 17:52:53 America/New_York] PHP Stack trace:
+[06-Jan-2026 17:52:53 America/New_York] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 17:53:04 America/New_York] PHP Fatal error:  Cannot use FinHub\Application\Portfolio\PortfolioSectorService as PortfolioSectorService because the name is already in use in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 22
+[06-Jan-2026 17:53:04 America/New_York] PHP Stack trace:
+[06-Jan-2026 17:53:04 America/New_York] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 17:53:10 America/New_York] PHP Fatal error:  Cannot use FinHub\Application\Portfolio\PortfolioSectorService as PortfolioSectorService because the name is already in use in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 22
+[06-Jan-2026 17:53:10 America/New_York] PHP Stack trace:
+[06-Jan-2026 17:53:10 America/New_York] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 17:53:10 America/New_York] PHP Fatal error:  Cannot use FinHub\Application\Portfolio\PortfolioSectorService as PortfolioSectorService because the name is already in use in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 22
+[06-Jan-2026 17:53:10 America/New_York] PHP Stack trace:
+[06-Jan-2026 17:53:10 America/New_York] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 17:53:10 America/New_York] PHP Fatal error:  Cannot use FinHub\Application\Portfolio\PortfolioSectorService as PortfolioSectorService because the name is already in use in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 22
+[06-Jan-2026 17:53:10 America/New_York] PHP Stack trace:
+[06-Jan-2026 17:53:10 America/New_York] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 17:53:11 America/New_York] PHP Fatal error:  Cannot use FinHub\Application\Portfolio\PortfolioSectorService as PortfolioSectorService because the name is already in use in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 22
+[06-Jan-2026 17:53:11 America/New_York] PHP Stack trace:
+[06-Jan-2026 17:53:11 America/New_York] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 17:53:11 America/New_York] PHP Fatal error:  Cannot use FinHub\Application\Portfolio\PortfolioSectorService as PortfolioSectorService because the name is already in use in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 22
+[06-Jan-2026 17:53:11 America/New_York] PHP Stack trace:
+[06-Jan-2026 17:53:11 America/New_York] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 17:53:11 America/New_York] PHP Fatal error:  Cannot use FinHub\Application\Portfolio\PortfolioSectorService as PortfolioSectorService because the name is already in use in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 22
+[06-Jan-2026 17:53:11 America/New_York] PHP Stack trace:
+[06-Jan-2026 17:53:11 America/New_York] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 17:53:11 America/New_York] PHP Fatal error:  Cannot use FinHub\Application\Portfolio\PortfolioSectorService as PortfolioSectorService because the name is already in use in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 22
+[06-Jan-2026 17:53:11 America/New_York] PHP Stack trace:
+[06-Jan-2026 17:53:11 America/New_York] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 17:53:11 America/New_York] PHP Fatal error:  Cannot use FinHub\Application\Portfolio\PortfolioSectorService as PortfolioSectorService because the name is already in use in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 22
+[06-Jan-2026 17:53:11 America/New_York] PHP Stack trace:
+[06-Jan-2026 17:53:11 America/New_York] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 17:53:12 America/New_York] PHP Fatal error:  Cannot use FinHub\Application\Portfolio\PortfolioSectorService as PortfolioSectorService because the name is already in use in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 22
+[06-Jan-2026 17:53:12 America/New_York] PHP Stack trace:
+[06-Jan-2026 17:53:12 America/New_York] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 17:53:34 America/New_York] PHP Fatal error:  Cannot use FinHub\Application\Portfolio\PortfolioSectorService as PortfolioSectorService because the name is already in use in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 22
+[06-Jan-2026 17:53:34 America/New_York] PHP Stack trace:
+[06-Jan-2026 17:53:34 America/New_York] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[06-Jan-2026 19:41:47 America/New_York] PHP Fatal error:  Cannot use FinHub\Application\Portfolio\PortfolioSectorService as PortfolioSectorService because the name is already in use in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 22
+[06-Jan-2026 19:41:47 America/New_York] PHP Stack trace:
+[06-Jan-2026 19:41:47 America/New_York] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0

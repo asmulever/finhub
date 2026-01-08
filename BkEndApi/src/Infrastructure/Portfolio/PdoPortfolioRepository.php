@@ -23,8 +23,8 @@ final class PdoPortfolioRepository implements PortfolioRepositoryInterface
         if ($row !== false) {
             return (int) $row['id'];
         }
-        $insert = $this->pdo->prepare('INSERT INTO portfolios (user_id, name) VALUES (:user_id, :name)');
-        $insert->execute(['user_id' => $userId, 'name' => 'default']);
+        $insert = $this->pdo->prepare('INSERT INTO portfolios (user_id, name, base_currency) VALUES (:user_id, :name, :base_currency)');
+        $insert->execute(['user_id' => $userId, 'name' => 'default', 'base_currency' => 'USD']);
         return (int) $this->pdo->lastInsertId();
     }
 
@@ -127,5 +127,15 @@ SQL;
         $stmt = $this->pdo->query($sql);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         return array_values(array_filter(array_map(static fn ($r) => (string) $r['symbol'], $rows ?: [])));
+    }
+
+    public function getBaseCurrency(int $portfolioId): string
+    {
+        $stmt = $this->pdo->prepare('SELECT base_currency FROM portfolios WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $portfolioId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $currency = $row['base_currency'] ?? 'USD';
+        $currency = trim((string) $currency);
+        return $currency === '' ? 'USD' : $currency;
     }
 }

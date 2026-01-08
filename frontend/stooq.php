@@ -1,0 +1,86 @@
+<?php
+declare(strict_types=1);
+
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FinHub | Stooq</title>
+  <link rel="icon" href="/logo/favicon.png" />
+  <script>
+    window.__ENV = window.__ENV ?? {};
+    window.__ENV.API_BASE_URL = '/api';
+  </script>
+  <link rel="preload" href="/logo/full_logoweb.png" as="image" />
+  <style>
+    :root { font-family: 'Inter', system-ui, sans-serif; }
+    body { margin: 0; background: #0b1021; color: #e2e8f0; }
+    .content-shell { padding: 24px 32px; }
+    main { display: grid; gap: 20px; max-width: 1200px; margin: 0 auto; }
+    .card { background: rgba(13, 18, 35, 0.9); border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 14px; padding: 18px 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.35); }
+    h2, h3 { margin: 0 0 8px 0; }
+    .muted { color: #94a3b8; font-size: 0.95rem; }
+    .form-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+    input, select { background: #0f172a; color: #e2e8f0; border: 1px solid rgba(148,163,184,0.4); border-radius: 10px; padding: 10px 12px; min-width: 140px; }
+    button { background: linear-gradient(120deg, #22d3ee, #0ea5e9); border: none; color: #0b1021; padding: 10px 14px; border-radius: 10px; font-weight: 600; cursor: pointer; }
+    pre { background: #0f172a; color: #e2e8f0; border-radius: 10px; padding: 12px; overflow: auto; font-size: 0.9rem; max-height: 260px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+    .error { color: #f87171; font-weight: 600; min-height: 20px; }
+  </style>
+</head>
+<body>
+  <div class="content-shell">
+    <main>
+      <section class="card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+          <div>
+            <h2>Stooq</h2>
+            <p class="muted">Datos públicos (sin API key) por mercado. Incluye quotes y series EOD. Rol admin requerido.</p>
+          </div>
+          <div>
+            <button id="stooq-btn-markets" type="button">Cargar mercados</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card grid">
+        <div>
+          <h3>QUOTES</h3>
+          <div class="form-row">
+            <input id="stooq-quotes-symbols" placeholder="Símbolos (ej. AAPL,MSFT)" />
+            <select id="stooq-quotes-market">
+              <option value="">Mercado</option>
+            </select>
+            <button id="stooq-btn-quotes">Consultar</button>
+          </div>
+          <div id="stooq-quotes-error" class="error"></div>
+          <pre id="stooq-quotes-output">{}</pre>
+        </div>
+        <div>
+          <h3>HISTÓRICO EOD</h3>
+          <div class="form-row">
+            <input id="stooq-history-symbol" placeholder="Símbolo (ej. AAPL)" />
+            <select id="stooq-history-market">
+              <option value="">Mercado</option>
+            </select>
+            <select id="stooq-history-interval">
+              <option value="d" selected>Diario</option>
+              <option value="w">Semanal</option>
+              <option value="m">Mensual</option>
+            </select>
+            <button id="stooq-btn-history">Consultar</button>
+          </div>
+          <div id="stooq-history-error" class="error"></div>
+          <pre id="stooq-history-output">{}</pre>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/Frontend/paginas/stooq.js"></script>
+</body>
+</html>

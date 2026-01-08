@@ -162,6 +162,32 @@ final class DataLakeService
         return $quote;
     }
 
+    /**
+     * Guarda un snapshot de análisis/indicadores en el Data Lake usando el mismo repositorio de snapshots.
+     *
+     * @param array<string,mixed> $payload
+     */
+    public function storeAnalysisSnapshot(string $symbol, array $payload): void
+    {
+        $this->repository->ensureTables();
+        try {
+            $this->repository->storeSnapshot([
+                'symbol' => $symbol,
+                'provider' => 'analysis',
+                'as_of' => new \DateTimeImmutable(),
+                'payload' => $payload,
+                'http_status' => null,
+                'error_code' => null,
+                'error_msg' => null,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->info('datalake.analysis.store_failed', [
+                'symbol' => $symbol,
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
     public function series(string $symbol, string $period): array
     {
         $this->repository->ensureTables();

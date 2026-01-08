@@ -8,14 +8,19 @@ const toolbarTemplate = `
       </a>
     </div>
   <nav class="toolbar-menu">
-      <button type="button" data-menu="portfolios" data-link="/Frontend/Portafolios.html">Portafolios</button>
-      <button type="button" data-menu="prices" data-link="/Frontend/precios.html">Precios</button>
-      <button type="button" id="datalake-menu" data-menu="datalake" data-link="/Frontend/datalake.html">DataLake</button>
-      <button type="button" id="eodhd-menu" data-menu="eodhd" data-link="/Frontend/eodhd.html">EODHD</button>
-      <button type="button" id="twelvedata-menu" data-menu="twelvedata" data-link="/Frontend/twelvedata.html">TwelveData</button>
-      <button type="button" id="alphavantage-menu" data-menu="alphavantage" data-link="/Frontend/alphavantage.html">Alpha Vantage</button>
+      <button type="button" data-menu="portfolios" data-link="/Frontend/Portafolios.php">Portafolios</button>
+      <button type="button" id="datalake-menu" data-menu="datalake" data-link="/Frontend/datalake.php">DataLake</button>
+      <select id="providers-select" aria-label="Proveedores">
+        <option value="">Proveedores</option>
+        <option value="/Frontend/eodhd.html">EODHD</option>
+        <option value="/Frontend/twelvedata.html">TwelveData</option>
+        <option value="/Frontend/alphavantage.html">Alpha Vantage</option>
+        <option value="/Frontend/polygon.php">Polygon</option>
+        <option value="/Frontend/tiingo.php">Tiingo</option>
+        <option value="/Frontend/stooq.php">Stooq</option>
+      </select>
       <button type="button" id="rava-menu" data-menu="rava" data-link="/Frontend/rava.php">RAVA</button>
-      <button type="button" id="analysis-menu" data-menu="analysis" data-link="/Frontend/analisis.php">Análisis</button>
+      <button type="button" id="analysis-menu" data-menu="analysis" data-link="/Frontend/analisis_indicadores.php">Análisis</button>
     </nav>
     <div class="toolbar-user">
       <button id="user-menu-button" type="button">
@@ -36,17 +41,13 @@ const isAdminProfile = (profile) => String(profile?.role ?? '').toLowerCase() ==
 export const setAdminMenuVisibility = (profile) => {
   const adminButton = document.getElementById('admin-users-action');
   const datalakeButton = document.getElementById('datalake-menu');
-  const eodhdButton = document.getElementById('eodhd-menu');
-  const alphaButton = document.getElementById('alphavantage-menu');
-  const twelveButton = document.getElementById('twelvedata-menu');
   const analysisButton = document.getElementById('analysis-menu');
+  const providersSelect = document.getElementById('providers-select');
   const isAdmin = isAdminProfile(profile);
   if (adminButton) adminButton.hidden = !isAdmin;
   if (datalakeButton) datalakeButton.hidden = !isAdmin;
-  if (eodhdButton) eodhdButton.hidden = !isAdmin;
-  if (alphaButton) alphaButton.hidden = !isAdmin;
-  if (twelveButton) twelveButton.hidden = !isAdmin;
   if (analysisButton) analysisButton.hidden = !isAdmin;
+  if (providersSelect) providersSelect.hidden = !isAdmin;
 };
 
 export const renderToolbar = () => {
@@ -66,6 +67,16 @@ export const highlightToolbar = () => {
     const link = button.getAttribute('data-link');
     button.classList.toggle('active', link === path);
   });
+  const providersSelect = document.getElementById('providers-select');
+  if (providersSelect) {
+    let matched = '';
+    Array.from(providersSelect.options).forEach((opt) => {
+      if (opt.value === path) {
+        matched = opt.value;
+      }
+    });
+    providersSelect.value = matched;
+  }
 };
 
 export const bindToolbarNavigation = () => {
@@ -87,6 +98,23 @@ export const bindToolbarNavigation = () => {
       window.location.href = link;
     });
   });
+  const providersSelect = document.getElementById('providers-select');
+  if (providersSelect) {
+    providersSelect.addEventListener('change', (event) => {
+      const link = providersSelect.value;
+      if (!link) return;
+      if (frame) {
+        event.preventDefault();
+        if (frame.src !== link) {
+          frame.src = link;
+        }
+        document.querySelectorAll('.toolbar-menu button').forEach((b) => b.classList.remove('active'));
+        providersSelect.blur();
+        return;
+      }
+      window.location.href = link;
+    });
+  }
 };
 
 export const setToolbarUserName = (name) => {

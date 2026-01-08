@@ -1,267 +1,162 @@
 import { getJson } from '../apicliente.js';
-import { authStore } from '../auth/authStore.js';
-import { bindToolbarNavigation, bindUserMenu, highlightToolbar, renderToolbar, setAdminMenuVisibility, setToolbarUserName } from '../components/toolbar.js';
 import { createLoadingOverlay } from '../components/loadingOverlay.js';
 
 const overlay = createLoadingOverlay();
+
 const state = {
-  profile: null,
-  instruments: [],
-  rava: {},
+  items: [],
+  selectedSymbol: '',
+  baseCurrency: 'USD',
+  asOf: '--',
+  fxSource: null,
+  fxAt: null,
+  rava: {
+    acciones: [],
+    bonos: [],
+    cedears: [],
+    map: {},
+  },
   histories: {},
-  timeframe: '3m',
-  selectedSymbol: 'ALL',
-  lastUpdated: null,
 };
 
-const RANGE_DAYS = { '3m': 90, '6m': 180, '1y': 365 };
-
-const setText = (id, text) => {
-  const el = document.getElementById(id);
-  if (el) el.textContent = text;
+const els = {
+  list: null,
+  analysis: null,
+  details: null,
+  error: null,
+  count: null,
+  updated: null,
+  base: null,
+  meta: null,
+  chartSymbol: null,
+  chartRange: null,
+  chartMeta: null,
+  chartCanvas: null,
+  ravaSelected: null,
+  tablaAcciones: null,
+  tablaBonos: null,
+  tablaCedears: null,
+  metaAcciones: null,
+  metaBonos: null,
+  metaCedears: null,
 };
 
-const setError = (message) => {
-  const el = document.getElementById('an-error');
-  if (el) el.textContent = message || '';
+const formatPct = (v) => (Number.isFinite(v) ? `${v > 0 ? '+' : ''}${v.toFixed(2)}%` : '–');
+const formatNum = (v, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : '–');
+const formatText = (v, fallback = '—') => {
+  const t = (v ?? '').toString().trim();
+  return t === '' ? fallback : t;
 };
 
-const parseNumber = (value) => {
-  const num = Number(String(value ?? '').replace(',', '.'));
-  return Number.isFinite(num) ? num : null;
-};
-
-const normalizeHistory = (items) => {
-  if (!Array.isArray(items)) return [];
-  return items
-    .map((row) => ({
-      fecha: row.fecha ?? row.date ?? null,
-      cierre: parseNumber(row.cierre ?? row.close ?? row.ultimo ?? row.apertura ?? null),
-    }))
-    .filter((r) => r.fecha && r.cierre !== null)
-    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha)); // descendente
-};
-
-const loadProfile = async () => {
+const logInfo = (label, payload) => {
   try {
-    state.profile = await getJson('/me');
+    console.info(`[analisis] ${label}`, payload);
   } catch {
-    state.profile = authStore.getProfile();
-  }
-  setToolbarUserName(state.profile?.email ?? '');
-  setAdminMenuVisibility(state.profile);
-};
-
-const fetchPortfolioInstruments = async () => {
-  const resp = await getJson('/portfolio/instruments');
-  const items = Array.isArray(resp?.data) ? resp.data : [];
-  const seen = new Set();
-  state.instruments = items
-    .map((i) => ({
-      symbol: (i.symbol ?? '').toUpperCase(),
-      name: i.name ?? '',
-      currency: i.currency ?? '',
-      exchange: i.exchange ?? '',
-    }))
-    .filter((i) => i.symbol !== '')
-    .filter((i) => {
-      if (seen.has(i.symbol)) return false;
-      seen.add(i.symbol);
-      return true;
-    });
-};
-
-const fetchRavaSnapshots = async () => {
-  const [cedears, acciones, bonos] = await Promise.all([
-    getJson('/rava/cedears').catch(() => null),
-    getJson('/rava/acciones').catch(() => null),
-    getJson('/rava/bonos').catch(() => null),
-  ]);
-  const map = {};
-  const addItems = (payload) => {
-    const items = Array.isArray(payload?.data) ? payload.data : (payload?.items ?? []);
-    items.forEach((item) => {
-      const symbol = (item.symbol ?? '').toUpperCase();
-      if (!symbol) return;
-      map[symbol] = {
-        ultimo: parseNumber(item.ultimo),
-        variacion: parseNumber(item.variacion),
-        panel: item.panel ?? item.segment ?? '',
-      };
-    });
-  };
-  addItems(cedears);
-  addItems(acciones);
-  addItems(bonos);
-  state.rava = map;
-};
-
-const fetchHistoricos = async () => {
-  const tasks = [];
-  state.instruments.forEach((inst) => {
-    const symbol = inst.symbol;
-    if (state.histories[symbol]) return;
-    tasks.push(symbol);
-  });
-
-  for (const symbol of tasks) {
-    try {
-      const resp = await getJson(`/rava/historicos?especie=${encodeURIComponent(symbol)}`);
-      const items = Array.isArray(resp?.data) ? resp.data : (resp?.items ?? []);
-      state.histories[symbol] = normalizeHistory(items);
-    } catch (error) {
-      console.info('[analisis] historico fallo', symbol, error);
-      state.histories[symbol] = [];
-    }
+    /* noop */
   }
 };
 
-const findPriceAt = (history, daysAgo) => {
-  if (!history.length) return null;
-  const target = new Date(Date.now() - daysAgo * 86400000);
-  for (const row of history) {
-    const date = new Date(row.fecha);
-    if (Number.isNaN(date.getTime())) continue;
-    if (date <= target) {
-      return row.cierre;
-    }
+const setError = (msg) => {
+  if (els.error) els.error.textContent = msg || '';
+  if (msg) console.error('[analisis] error', msg);
+};
+
+const renderList = () => {
+  if (!els.list) return;
+  if (state.items.length === 0) {
+    els.list.innerHTML = '<p class="muted">Sin instrumentos elegibles.</p>';
+    if (els.meta) els.meta.textContent = '0 símbolos';
+    return;
   }
-  return history[history.length - 1]?.cierre ?? null;
-};
-
-const computeReturns = (history) => {
-  if (!history.length) return { r3: null, r6: null, r12: null };
-  const last = history[0]?.cierre ?? null;
-  if (last === null) return { r3: null, r6: null, r12: null };
-  const calc = (days) => {
-    const past = findPriceAt(history, days);
-    if (past === null || past === 0) return null;
-    return ((last - past) / Math.abs(past)) * 100;
-  };
-  return {
-    r3: calc(90),
-    r6: calc(180),
-    r12: calc(365),
-  };
-};
-
-const buildSeries = (history, rangeKey) => {
-  const days = RANGE_DAYS[rangeKey] ?? 90;
-  const cutoff = new Date(Date.now() - days * 86400000);
-  const filtered = history
-    .filter((row) => {
-      const date = new Date(row.fecha);
-      return !Number.isNaN(date.getTime()) && date >= cutoff;
+  els.meta.textContent = `${state.items.length} símbolos`;
+  els.list.innerHTML = state.items
+    .map((item) => {
+      const active = item.symbol === state.selectedSymbol ? 'active' : '';
+      return `<button class="item-btn ${active}" data-symbol="${item.symbol}">${item.symbol} · ${formatText(item.name, 'Sin nombre')}</button>`;
     })
-    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-  if (!filtered.length) return [];
-  const base = filtered[0].cierre || 1;
-  return filtered.map((row) => ({
-    date: row.fecha,
-    normalized: (row.cierre / (base || 1)) * 100,
-  }));
-};
-
-const computeAggregatedSeries = (rangeKey) => {
-  const map = {};
-  state.instruments.forEach((inst) => {
-    const hist = state.histories[inst.symbol] ?? [];
-    const series = buildSeries(hist, rangeKey);
-    series.forEach((p) => {
-      if (!map[p.date]) map[p.date] = { sum: 0, count: 0 };
-      map[p.date].sum += p.normalized;
-      map[p.date].count += 1;
-    });
-  });
-  const dates = Object.keys(map).sort((a, b) => new Date(a) - new Date(b));
-  return dates
-    .map((d) => (map[d].count ? { date: d, normalized: map[d].sum / map[d].count } : null))
-    .filter(Boolean);
-};
-
-const colorForReturn = (value) => {
-  if (value === null || Number.isNaN(value)) return '#1f2937';
-  if (value >= 25) return '#16a34a';
-  if (value >= 10) return '#22c55e';
-  if (value >= 0) return '#10b981';
-  if (value <= -25) return '#b91c1c';
-  if (value <= -10) return '#ef4444';
-  return '#f87171';
-};
-
-const formatNumber = (val, digits = 1) => {
-  if (val === null || val === undefined || Number.isNaN(val)) return '–';
-  return new Intl.NumberFormat('es-AR', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(val);
-};
-
-const renderStatus = () => {
-  setText('badge-count', `Instrumentos: ${state.instruments.length}`);
-  const histOk = Object.values(state.histories).filter((h) => Array.isArray(h) && h.length > 0).length;
-  setText('badge-histos', `Históricos: ${histOk}/${state.instruments.length}`);
-  setText('status-updated', `Actualizado: ${state.lastUpdated ?? '--'}`);
-  setText('status-meta', `Rango: ${state.timeframe.toUpperCase()}`);
-};
-
-const renderHeatmap = () => {
-  const container = document.getElementById('heatmap');
-  if (!container) return;
-  const range = state.timeframe;
-  const tiles = state.instruments.map((inst) => {
-    const hist = state.histories[inst.symbol] ?? [];
-    const returns = computeReturns(hist);
-    const value = range === '3m' ? returns.r3 : (range === '6m' ? returns.r6 : returns.r12);
-    const bg = colorForReturn(value);
-    const textColor = '#0b1021';
-    const rava = state.rava[inst.symbol] ?? {};
-    const panel = rava.panel || inst.exchange || '';
-    return `
-      <div class="tile" style="background:${bg}" data-symbol="${inst.symbol}">
-        <div class="symbol">${inst.symbol}</div>
-        <div class="name">${inst.name || panel || '—'}</div>
-        <div class="value">${value !== null ? `${formatNumber(value)}%` : 'N/D'}</div>
-        <div class="panel" style="color:${textColor};">${panel}</div>
-      </div>
-    `;
-  }).join('');
-  container.innerHTML = tiles || '<div class="muted">Sin instrumentos en portafolio.</div>';
-  container.querySelectorAll('.tile').forEach((tile) => {
-    tile.addEventListener('click', () => {
-      const symbol = tile.getAttribute('data-symbol') || 'ALL';
-      state.selectedSymbol = symbol;
-      const select = document.getElementById('instrument-select');
-      if (select) select.value = symbol;
+    .join('');
+  els.list.querySelectorAll('[data-symbol]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.selectedSymbol = btn.getAttribute('data-symbol') || '';
+      renderList();
+      renderPanels();
       renderChart();
+      renderRavaSelected();
     });
   });
+};
+
+const renderPanels = () => {
+  if (!els.analysis || !els.details) return;
+  const item = state.items.find((i) => i.symbol === state.selectedSymbol);
+  if (!item) {
+    els.analysis.innerHTML = 'Selecciona un instrumento.';
+    els.details.innerHTML = 'Selecciona un instrumento.';
+    return;
+  }
+
+  els.analysis.innerHTML = `
+    <div class="row"><span class="label">Precio</span><span class="value">${formatNum(item.price)}</span></div>
+    <div class="row"><span class="label">Var diaria</span><span class="value">${formatPct(item.change_pct_d)}</span></div>
+    <div class="row"><span class="label">Peso</span><span class="value">${formatPct(item.weight_pct)}</span></div>
+    <div class="row"><span class="label">Market value</span><span class="value">${formatNum(item.market_value)}</span></div>
+    <div class="row"><span class="label">Moneda</span><span class="value">${formatText(item.currency, 'N/D')}</span></div>
+    <div class="row"><span class="label">Precio as_of</span><span class="value">${formatText(item.price_at, '--')}</span></div>
+  `;
+
+  els.details.innerHTML = `
+    <div class="row"><span class="label">Símbolo</span><span class="value">${formatText(item.symbol)}</span></div>
+    <div class="row"><span class="label">Nombre</span><span class="value">${formatText(item.name, 'Sin nombre')}</span></div>
+    <div class="row"><span class="label">Sector</span><span class="value">${formatText(item.sector, 'Sin sector')}</span></div>
+    <div class="row"><span class="label">Industry</span><span class="value">${formatText(item.industry, 'Sin industry')}</span></div>
+    <div class="row"><span class="label">FX source</span><span class="value">${formatText(item.fx_source || state.fxSource || 'N/D')}</span></div>
+    <div class="row"><span class="label">FX at</span><span class="value">${formatText(item.fx_at || state.fxAt || '--')}</span></div>
+    <div class="row"><span class="label">Base currency</span><span class="value">${formatText(item.base_currency || state.baseCurrency, 'N/D')}</span></div>
+  `;
 };
 
 const renderChart = () => {
-  const canvas = document.getElementById('evolution-chart');
+  const canvas = els.chartCanvas;
   if (!canvas || !canvas.getContext) return;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const rangeKey = state.timeframe;
-  const selected = state.selectedSymbol;
-  let series = [];
-  if (selected === 'ALL') {
-    series = computeAggregatedSeries(rangeKey);
-    setText('chart-meta', `Serie: Todos · ${series.length} puntos · ${RANGE_DAYS[rangeKey]}d`);
-  } else {
-    const hist = state.histories[selected] ?? [];
-    series = buildSeries(hist, rangeKey);
-    setText('chart-meta', `Serie: ${selected} · ${series.length} puntos · ${RANGE_DAYS[rangeKey]}d`);
+
+  const symbol = els.chartSymbol?.value || state.selectedSymbol;
+  const days = Number(els.chartRange?.value || 90);
+  if (!symbol) {
+    els.chartMeta.textContent = 'Serie: --';
+    return;
   }
-  if (!series.length) return;
-  const values = series;
-  const min = Math.min(...values.map((p) => p.normalized));
-  const max = Math.max(...values.map((p) => p.normalized));
+  const history = state.histories[symbol] || [];
+  if (!history.length) {
+    els.chartMeta.textContent = `Serie: ${symbol} · sin datos`;
+    return;
+  }
+  const cutoff = new Date(Date.now() - days * 86400000);
+  const filtered = history
+    .filter((row) => {
+      const dt = new Date(row.fecha);
+      return !Number.isNaN(dt.getTime()) && dt >= cutoff;
+    })
+    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+  if (!filtered.length) {
+    els.chartMeta.textContent = `Serie: ${symbol} · sin datos en rango`;
+    return;
+  }
+  const base = filtered[0].cierre || 1;
+  const series = filtered.map((p) => ({
+    date: p.fecha,
+    normalized: (p.cierre / (base || 1)) * 100,
+  }));
+  const min = Math.min(...series.map((p) => p.normalized));
+  const max = Math.max(...series.map((p) => p.normalized));
   const range = (max - min) || 1;
   const w = canvas.width;
   const h = canvas.height;
   ctx.beginPath();
-  values.forEach((p, idx) => {
-    const x = (idx / (values.length - 1 || 1)) * (w - 20) + 10;
+  series.forEach((p, idx) => {
+    const x = (idx / (series.length - 1 || 1)) * (w - 20) + 10;
     const y = h - ((p.normalized - min) / range) * (h - 20) - 10;
     if (idx === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
@@ -274,70 +169,225 @@ const renderChart = () => {
   ctx.closePath();
   ctx.fillStyle = '#22d3ee33';
   ctx.fill();
+  els.chartMeta.textContent = `Serie: ${symbol} · ${series.length} puntos · ${days}d`;
 };
 
-const populateInstrumentSelect = () => {
-  const select = document.getElementById('instrument-select');
-  if (!select) return;
-  const options = ['<option value="ALL">Todos los instrumentos</option>'].concat(
-    state.instruments.map((inst) => `<option value="${inst.symbol}">${inst.symbol} ${inst.name ? `- ${inst.name}` : ''}</option>`)
-  );
-  select.innerHTML = options.join('');
-  select.value = state.selectedSymbol;
-  select.addEventListener('change', () => {
-    state.selectedSymbol = select.value || 'ALL';
-    renderChart();
-  });
+const renderRavaSelected = () => {
+  if (!els.ravaSelected) return;
+  const symbol = state.selectedSymbol;
+  if (!symbol) {
+    els.ravaSelected.textContent = 'Selecciona un instrumento.';
+    return;
+  }
+  const row = state.rava.map[symbol];
+  if (!row) {
+    els.ravaSelected.textContent = `No se encontró ${symbol} en RAVA (AR).`;
+    return;
+  }
+  els.ravaSelected.innerHTML = `
+    <div class="row"><span class="label">Símbolo</span><span class="value">${symbol}</span></div>
+    <div class="row"><span class="label">Último</span><span class="value">${formatNum(row.ultimo)}</span></div>
+    <div class="row"><span class="label">Variación</span><span class="value">${formatPct(row.variacion)}</span></div>
+    <div class="row"><span class="label">Panel</span><span class="value">${formatText(row.panel || row.mercado || '')}</span></div>
+  `;
 };
 
-const bindRangeToggles = () => {
-  document.querySelectorAll('#range-group .toggle').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#range-group .toggle').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      const range = btn.getAttribute('data-range');
-      state.timeframe = range || '3m';
-      renderHeatmap();
-      renderChart();
+const renderTable = (tableEl, metaEl, rows, title) => {
+  if (metaEl) metaEl.textContent = `${rows.length} items`;
+  if (!tableEl) return;
+  if (!rows.length) {
+    tableEl.innerHTML = '<tr><td class="muted">Sin datos</td></tr>';
+    return;
+  }
+  tableEl.innerHTML = `
+    <thead><tr><th>Símbolo</th><th>Último</th><th>Var%</th><th>Panel</th></tr></thead>
+    <tbody>
+      ${rows
+        .map((r) => `<tr><td>${r.symbol}</td><td>${formatNum(r.ultimo)}</td><td>${formatPct(r.variacion)}</td><td>${formatText(r.panel || r.mercado || '')}</td></tr>`)
+        .join('')}
+    </tbody>
+  `;
+  logInfo(`tabla ${title}`, rows.slice(0, 5));
+};
+
+const normalizeHistory = (items) => {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((row) => ({
+      fecha: row.fecha ?? row.date ?? null,
+      cierre: Number(row.cierre ?? row.close ?? row.ultimo ?? row.apertura ?? row.cierre_adj ?? null),
+    }))
+    .filter((r) => r.fecha && Number.isFinite(r.cierre))
+    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+};
+
+const loadHeatmap = async () => {
+  console.info('[analisis] GET /portfolio/heatmap');
+  const resp = await getJson('/portfolio/heatmap');
+  const base = resp?.base_currency ?? 'USD';
+  const groups = Array.isArray(resp?.groups) ? resp.groups : [];
+  const collected = [];
+  groups.forEach((g) => {
+    const sector = g?.sector ?? 'Sin sector';
+    const industry = g?.industry ?? 'Sin industry';
+    (g?.items ?? []).forEach((it) => {
+      collected.push({
+        sector,
+        industry,
+        base_currency: base,
+        fx_source: resp?.fx_source ?? null,
+        fx_at: resp?.fx_at ?? null,
+        ...it,
+      });
     });
   });
+  state.items = collected.sort((a, b) => (b.weight_pct ?? 0) - (a.weight_pct ?? 0));
+  state.selectedSymbol = state.items[0]?.symbol ?? '';
+  state.baseCurrency = base;
+  state.asOf = resp?.as_of ?? '--';
+  state.fxSource = resp?.fx_source ?? null;
+  state.fxAt = resp?.fx_at ?? null;
+  logInfo('heatmap items', state.items.slice(0, 5));
+};
+
+const loadRava = async () => {
+  const fetchList = async (path) => {
+    try {
+      const resp = await getJson(path);
+      return resp?.items ?? resp?.data ?? [];
+    } catch (err) {
+      console.error(`[analisis] fallo ${path}`, err);
+      return [];
+    }
+  };
+  const [cedears, acciones, bonos] = await Promise.all([
+    fetchList('/rava/cedears'),
+    fetchList('/rava/acciones'),
+    fetchList('/rava/bonos'),
+  ]);
+  state.rava.cedears = cedears;
+  state.rava.acciones = acciones;
+  state.rava.bonos = bonos;
+  const map = {};
+  const add = (list) => {
+    list.forEach((row) => {
+      const symbol = (row.symbol ?? '').toUpperCase();
+      if (!symbol) return;
+      map[symbol] = {
+        ultimo: Number(row.ultimo ?? row.close ?? row.cierre ?? null),
+        variacion: Number(row.variacion ?? row.var ?? row.varDia ?? null),
+        panel: row.panel ?? row.segment ?? row.mercado ?? null,
+        mercado: row.mercado ?? null,
+      };
+    });
+  };
+  add(cedears);
+  add(acciones);
+  add(bonos);
+  state.rava.map = map;
+  logInfo('rava map', map);
+};
+
+const loadHistory = async (symbol) => {
+  if (!symbol || state.histories[symbol]) {
+    return;
+  }
+  try {
+    const resp = await getJson(`/rava/historicos?especie=${encodeURIComponent(symbol)}`);
+    const items = resp?.items ?? resp?.data ?? [];
+    state.histories[symbol] = normalizeHistory(items);
+    logInfo(`history ${symbol}`, state.histories[symbol].slice(0, 5));
+  } catch (error) {
+    console.error('[analisis] historico fallo', symbol, error);
+    state.histories[symbol] = [];
+  }
+};
+
+const populateSelectors = () => {
+  if (!els.chartSymbol) return;
+  els.chartSymbol.innerHTML = '<option value="">Selecciona símbolo</option>' +
+    state.items.map((i) => `<option value="${i.symbol}">${i.symbol} ${i.name ? `- ${i.name}` : ''}</option>`).join('');
+  els.chartSymbol.value = state.selectedSymbol || '';
+};
+
+const bindUi = () => {
+  els.chartSymbol?.addEventListener('change', async () => {
+    state.selectedSymbol = els.chartSymbol.value || '';
+    renderList();
+    renderPanels();
+    renderRavaSelected();
+    await loadHistory(state.selectedSymbol);
+    renderChart();
+  });
+  els.chartRange?.addEventListener('change', () => renderChart());
+  document.getElementById('btn-reload')?.addEventListener('click', loadAll);
+};
+
+const renderStatus = () => {
+  if (els.count) els.count.textContent = `Items: ${state.items.length}`;
+  if (els.updated) els.updated.textContent = `As of: ${state.asOf}`;
+  if (els.base) els.base.textContent = `Base: ${state.baseCurrency}`;
+  if (els.chartSymbol && !els.chartSymbol.value) {
+    els.chartSymbol.value = state.selectedSymbol || '';
+  }
+};
+
+const renderRavaTables = () => {
+  renderTable(els.tablaAcciones, els.metaAcciones, state.rava.acciones, 'acciones');
+  renderTable(els.tablaBonos, els.metaBonos, state.rava.bonos, 'bonos');
+  renderTable(els.tablaCedears, els.metaCedears, state.rava.cedears, 'cedears');
 };
 
 const loadAll = async () => {
   setError('');
   await overlay.withLoader(async () => {
-    await fetchPortfolioInstruments();
-    if (state.instruments.length === 0) {
+    await loadHeatmap();
+    if (state.items.length === 0) {
       setError('No hay instrumentos en tus portafolios.');
       return;
     }
-    await fetchRavaSnapshots();
-    await fetchHistoricos();
-    state.lastUpdated = new Date().toISOString();
+    await loadRava();
+    if (state.selectedSymbol) {
+      await loadHistory(state.selectedSymbol);
+    }
+    state.asOf = new Date().toISOString();
   });
-  populateInstrumentSelect();
-  renderStatus();
-  renderHeatmap();
+  populateSelectors();
+  renderList();
+  renderPanels();
   renderChart();
-};
-
-const bindUi = () => {
-  document.getElementById('btn-reload')?.addEventListener('click', loadAll);
-  bindRangeToggles();
-};
-
-document.addEventListener('DOMContentLoaded', async () => {
-  renderToolbar();
-  setToolbarUserName('');
-  bindUserMenu({
-    onLogout: async () => {
-      try { await getJson('/auth/logout'); } finally { authStore.clearToken(); window.location.href = '/'; }
-    },
-    onAdmin: () => window.location.href = '/Frontend/usuarios.html',
+  renderStatus();
+  renderRavaSelected();
+  renderRavaTables();
+  console.info('[analisis] carga completa', {
+    instrumentos: state.items.length,
+    rava_acciones: state.rava.acciones.length,
+    rava_bonos: state.rava.bonos.length,
+    rava_cedears: state.rava.cedears.length,
   });
-  bindToolbarNavigation();
-  highlightToolbar();
-  await loadProfile();
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  els.list = document.getElementById('instrument-list');
+  els.analysis = document.getElementById('analysis-block');
+  els.details = document.getElementById('details-block');
+  els.error = document.getElementById('error-box');
+  els.count = document.getElementById('badge-count');
+  els.updated = document.getElementById('badge-updated');
+  els.base = document.getElementById('badge-base');
+  els.meta = document.getElementById('selected-meta');
+  els.chartSymbol = document.getElementById('chart-symbol');
+  els.chartRange = document.getElementById('chart-range');
+  els.chartMeta = document.getElementById('chart-meta');
+  els.chartCanvas = document.getElementById('history-chart');
+  els.ravaSelected = document.getElementById('rava-selected');
+  els.tablaAcciones = document.getElementById('tabla-acciones');
+  els.tablaBonos = document.getElementById('tabla-bonos');
+  els.tablaCedears = document.getElementById('tabla-cedears');
+  els.metaAcciones = document.getElementById('rava-acciones-meta');
+  els.metaBonos = document.getElementById('rava-bonos-meta');
+  els.metaCedears = document.getElementById('rava-cedears-meta');
+
   bindUi();
   loadAll();
 });

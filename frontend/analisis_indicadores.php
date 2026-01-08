@@ -1,0 +1,108 @@
+<?php
+declare(strict_types=1);
+
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FinHub | Análisis de Indicadores</title>
+  <link rel="icon" href="/logo/favicon.png" />
+  <script>
+    window.__ENV = window.__ENV ?? {};
+    window.__ENV.API_BASE_URL = '/api';
+  </script>
+  <link rel="preload" href="/logo/full_logoweb.png" as="image" />
+  <style>
+    :root { font-family: 'Inter', system-ui, sans-serif; }
+    body { margin: 0; background: #050915; color: #e2e8f0; }
+    .content-shell { padding: 22px 30px; }
+    main { display: grid; gap: 16px; max-width: 1500px; margin: 0 auto; }
+    .card { background: rgba(10, 14, 28, 0.92); border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 16px; padding: 16px 18px; box-shadow: 0 15px 40px rgba(0,0,0,0.35); }
+    h2, h3 { margin: 0 0 8px 0; }
+    .muted { color: #94a3b8; font-size: 0.95rem; }
+    .eyebrow { text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; color: #38bdf8; font-size: 0.78rem; margin: 0 0 6px 0; }
+    .hero { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 6px 12px; font-size: 0.85rem; border: 1px solid rgba(56, 189, 248, 0.35); background: rgba(14, 165, 233, 0.08); color: #e0f2fe; }
+    .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    select, button { background: #0f172a; color: #e2e8f0; border: 1px solid rgba(148,163,184,0.4); border-radius: 10px; padding: 9px 12px; min-width: 150px; }
+    button.action { background: linear-gradient(120deg, #22d3ee, #0ea5e9); border: none; color: #0b1021; min-width: auto; font-weight: 700; }
+    .error { color: #f87171; font-weight: 700; min-height: 20px; }
+    canvas { width: 100%; max-width: 100%; border-radius: 8px; background: #0f172a; }
+    table { width: 100%; border-collapse: collapse; color: #e2e8f0; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid rgba(148,163,184,0.2); }
+    th { color: #94a3b8; font-weight: 700; font-size: 0.9rem; }
+    .signal-buy { color: #22c55e; font-weight: 700; }
+    .signal-sell { color: #f87171; font-weight: 700; }
+    .signal-neutral { color: #eab308; font-weight: 700; }
+    @media (max-width: 768px) {
+      .content-shell { padding: 16px; }
+      select, button { min-width: 130px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="content-shell">
+    <main>
+      <section class="card hero">
+        <div>
+          <p class="eyebrow">Análisis · Indicadores</p>
+          <h2>Señales SMA20/SMA50 por instrumento</h2>
+          <p class="muted">Comparativa temporal de instrumentos en portafolios (sin duplicados). Señales calculadas localmente.</p>
+        </div>
+        <div class="meta">
+          <span class="badge" id="badge-count">Instrumentos: --</span>
+          <span class="badge" id="badge-updated">Actualizado: --</span>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="controls">
+          <select id="instrument-select">
+            <option value="ALL">Todos los instrumentos</option>
+          </select>
+          <select id="range-select">
+            <option value="1m">1 mes</option>
+            <option value="3m" selected>3 meses</option>
+            <option value="6m">6 meses</option>
+            <option value="1y">1 año</option>
+          </select>
+          <button id="btn-reload" class="action" type="button">Recargar</button>
+        </div>
+        <div id="an-error" class="error"></div>
+      </section>
+
+      <section class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div>
+            <h3>Evolución normalizada</h3>
+            <p class="muted">Comparativa de precio normalizado; selección All promedia.</p>
+          </div>
+          <div class="badge" id="chart-meta">Serie: --</div>
+        </div>
+        <canvas id="chart-canvas" width="1000" height="380"></canvas>
+      </section>
+
+      <section class="card">
+        <h3>Señales SMA20/SMA50</h3>
+        <p class="muted">Compra: SMA20 cruza arriba SMA50. Venta: SMA20 cruza abajo SMA50.</p>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr><th>Símbolo</th><th>Nombre</th><th>Último</th><th>SMA20</th><th>SMA50</th><th>Señal</th><th>Fuente</th></tr>
+            </thead>
+            <tbody id="signals-body">
+              <tr><td colspan="7" class="muted">Sin datos aún.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/Frontend/paginas/analisis_indicadores.js"></script>
+</body>
+</html>
