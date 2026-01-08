@@ -12,11 +12,24 @@ use FinHub\Application\MarketData\RavaBonosService;
 use FinHub\Application\MarketData\RavaAccionesService;
 use FinHub\Application\MarketData\RavaCedearsService;
 use FinHub\Application\MarketData\RavaHistoricosService;
+use FinHub\Application\MarketData\PolygonService;
+use FinHub\Application\MarketData\TiingoService;
+use FinHub\Application\MarketData\StooqService;
 use FinHub\Application\Portfolio\PortfolioService;
+use FinHub\Application\Portfolio\PortfolioSummaryService;
+use FinHub\Application\Portfolio\PortfolioSectorService;
+use FinHub\Application\Portfolio\PortfolioHeatmapService;
 use FinHub\Application\DataLake\DataLakeService;
+use FinHub\Application\DataLake\InstrumentCatalogService;
 use FinHub\Infrastructure\MarketData\AlphaVantageClient;
 use FinHub\Infrastructure\MarketData\TwelveDataClient;
 use FinHub\Infrastructure\MarketData\EodhdClient;
+use FinHub\Infrastructure\MarketData\Provider\AlphaVantageProvider;
+use FinHub\Infrastructure\MarketData\Provider\EodhdProvider;
+use FinHub\Infrastructure\MarketData\Provider\TwelveDataProvider;
+use FinHub\Infrastructure\MarketData\PolygonClient;
+use FinHub\Infrastructure\MarketData\TiingoClient;
+use FinHub\Infrastructure\MarketData\StooqClient;
 use FinHub\Infrastructure\MarketData\RavaBonosClient;
 use FinHub\Infrastructure\MarketData\RavaAccionesClient;
 use FinHub\Infrastructure\MarketData\RavaCedearsClient;
@@ -26,6 +39,7 @@ use FinHub\Infrastructure\Security\JwtTokenProvider;
 use FinHub\Infrastructure\Security\PasswordHasher;
 use FinHub\Infrastructure\Portfolio\PdoPortfolioRepository;
 use FinHub\Infrastructure\DataLake\PdoPriceSnapshotRepository;
+use FinHub\Infrastructure\DataLake\PdoInstrumentCatalogRepository;
 
 final class ApplicationBootstrap
 {
@@ -93,6 +107,17 @@ final class ApplicationBootstrap
         $ravaBonosService = new RavaBonosService($ravaBonosClient, $ravaBonosCache, $logger);
         $ravaHistoricosClient = new RavaHistoricosClient($config);
         $ravaHistoricosService = new RavaHistoricosService($ravaHistoricosClient, $logger);
+        $polygonClient = null;
+        $polygonApiKey = trim((string) $config->get('POLYGON_API_KEY', ''));
+        if ($polygonApiKey !== '') {
+            $polygonClient = new PolygonClient($config);
+        }
+        $tiingoClient = null;
+        $tiingoToken = trim((string) $config->get('TIINGO_API_TOKEN', ''));
+        if ($tiingoToken !== '') {
+            $tiingoClient = new TiingoClient($config);
+        }
+        $stooqClient = new StooqClient($config);
         $metrics = new \FinHub\Infrastructure\MarketData\ProviderMetrics(
             $this->rootDir . '/storage',
             (int) $config->get('TWELVEDATA_DAILY_LIMIT', 800),
@@ -109,13 +134,35 @@ final class ApplicationBootstrap
             $quoteCache
         );
         $providerOrder = $config->get('PRICE_PROVIDER_ORDER', 'eodhd,twelvedata,alphavantage');
-        $priceService = new PriceService($twelveDataClient, $eodhdClient, $metrics, $quoteCache, $symbolsAggregator, $providerOrder, $alphaClient);
+        $twelveProvider = new TwelveDataProvider($twelveDataClient);
+        $eodhdProvider = new EodhdProvider($eodhdClient);
+        $alphaProvider = new AlphaVantageProvider($alphaClient);
+        $quoteProviders = [$twelveProvider, $eodhdProvider, $alphaProvider];
+        $priceService = new PriceService(
+            $twelveDataClient,
+            $eodhdClient,
+            $metrics,
+            $quoteCache,
+            $symbolsAggregator,
+            $providerOrder,
+            $alphaClient,
+            $quoteProviders,
+            $twelveProvider
+        );
         $providerUsageService = new ProviderUsageService($twelveDataClient, $eodhdClient, $metrics, $logger);
+        $polygonService = new PolygonService($polygonClient);
+        $tiingoService = new TiingoService($tiingoClient);
+        $stooqService = new StooqService($stooqClient);
         $portfolioRepository = new PdoPortfolioRepository($pdo);
         $priceSnapshotRepository = new PdoPriceSnapshotRepository($pdo, $logger);
+        $instrumentCatalogRepository = new PdoInstrumentCatalogRepository($pdo);
         $portfolioService = new PortfolioService($portfolioRepository);
         $ingestBatchSize = (int) $config->get('DATALAKE_INGEST_BATCH_SIZE', 10);
         $dataLakeService = new DataLakeService($priceSnapshotRepository, $priceService, $logger, $ingestBatchSize);
+        $instrumentCatalogService = new InstrumentCatalogService($ravaCedearsService, $ravaAccionesService, $ravaBonosService, $instrumentCatalogRepository, $logger);
+        $portfolioSummaryService = new PortfolioSummaryService($portfolioService, $dataLakeService, $priceService, $logger);
+        $portfolioSectorService = new PortfolioSectorService($portfolioService, $priceService, $logger);
+        $portfolioHeatmapService = new PortfolioHeatmapService($portfolioService, $portfolioSectorService, $priceService, $tiingoService, $logger);
 
         return new Container([
             'config' => $config,
@@ -129,14 +176,27 @@ final class ApplicationBootstrap
             'quote_cache' => $quoteCache,
             'provider_usage' => $providerUsageService,
             'symbols_aggregator' => $symbolsAggregator,
+            'quote_providers' => $quoteProviders,
+            'fx_provider' => $twelveProvider,
             'portfolio_repository' => $portfolioRepository,
             'price_snapshot_repository' => $priceSnapshotRepository,
+            'instrument_catalog_repository' => $instrumentCatalogRepository,
             'portfolio_service' => $portfolioService,
+            'portfolio_summary_service' => $portfolioSummaryService,
+            'portfolio_sector_service' => $portfolioSectorService,
+            'portfolio_heatmap_service' => $portfolioHeatmapService,
             'datalake_service' => $dataLakeService,
+            'instrument_catalog_service' => $instrumentCatalogService,
             'rava_cedears_service' => $ravaCedearsService,
             'rava_acciones_service' => $ravaAccionesService,
             'rava_bonos_service' => $ravaBonosService,
             'rava_historicos_service' => $ravaHistoricosService,
+            'polygon_service' => $polygonService,
+            'tiingo_service' => $tiingoService,
+            'stooq_service' => $stooqService,
+            'polygon_client' => $polygonClient,
+            'tiingo_client' => $tiingoClient,
+            'stooq_client' => $stooqClient,
         ]);
     }
 

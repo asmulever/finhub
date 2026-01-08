@@ -24,7 +24,14 @@ $priceService = $container->get('price_service');
 $eodhdClient = $container->get('eodhd_client');
 $providerUsage = $container->get('provider_usage');
 $portfolioService = $container->get('portfolio_service');
+$portfolioSummaryService = $container->get('portfolio_summary_service');
+$portfolioSectorService = $container->get('portfolio_sector_service');
+$portfolioHeatmapService = $container->get('portfolio_heatmap_service');
 $dataLakeService = $container->get('datalake_service');
+$instrumentCatalogService = $container->get('instrument_catalog_service');
+$polygonService = $container->get('polygon_service');
+$tiingoService = $container->get('tiingo_service');
+$stooqService = $container->get('stooq_service');
 $ravaCedearsService = $container->get('rava_cedears_service');
 $ravaAccionesService = $container->get('rava_acciones_service');
 $ravaBonosService = $container->get('rava_bonos_service');
@@ -46,7 +53,14 @@ $dispatcher = new ApiDispatcher(
     $eodhdClient,
     $providerUsage,
     $portfolioService,
+    $portfolioSummaryService,
+    $portfolioSectorService,
+    $portfolioHeatmapService,
     $dataLakeService,
+    $instrumentCatalogService,
+    $polygonService,
+    $tiingoService,
+    $stooqService,
     $ravaCedearsService,
     $ravaAccionesService,
     $ravaBonosService,

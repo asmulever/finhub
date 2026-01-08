@@ -7,12 +7,19 @@ use FinHub\Application\Auth\AuthService;
 use FinHub\Application\MarketData\Dto\PriceRequest;
 use FinHub\Application\MarketData\PriceService;
 use FinHub\Application\MarketData\ProviderUsageService;
+use FinHub\Application\MarketData\PolygonService;
+use FinHub\Application\MarketData\TiingoService;
+use FinHub\Application\MarketData\StooqService;
 use FinHub\Application\MarketData\RavaCedearsService;
 use FinHub\Application\MarketData\RavaAccionesService;
 use FinHub\Application\MarketData\RavaBonosService;
 use FinHub\Application\MarketData\RavaHistoricosService;
 use FinHub\Application\Portfolio\PortfolioService;
+use FinHub\Application\Portfolio\PortfolioSummaryService;
+use FinHub\Application\Portfolio\PortfolioSectorService;
+use FinHub\Application\Portfolio\PortfolioHeatmapService;
 use FinHub\Application\DataLake\DataLakeService;
+use FinHub\Application\DataLake\InstrumentCatalogService;
 use FinHub\Domain\User\UserRepositoryInterface;
 use FinHub\Infrastructure\Config\Config;
 use FinHub\Infrastructure\Logging\LoggerInterface;
@@ -32,7 +39,14 @@ final class ApiDispatcher
     private EodhdClient $eodhdClient;
     private ProviderUsageService $providerUsage;
     private PortfolioService $portfolioService;
+    private PortfolioSummaryService $portfolioSummaryService;
+    private PortfolioSectorService $portfolioSectorService;
+    private PortfolioHeatmapService $portfolioHeatmapService;
     private DataLakeService $dataLakeService;
+    private InstrumentCatalogService $instrumentCatalogService;
+    private PolygonService $polygonService;
+    private TiingoService $tiingoService;
+    private StooqService $stooqService;
     private RavaCedearsService $ravaCedearsService;
     private RavaAccionesService $ravaAccionesService;
     private RavaBonosService $ravaBonosService;
@@ -51,7 +65,14 @@ final class ApiDispatcher
         EodhdClient $eodhdClient,
         ProviderUsageService $providerUsage,
         PortfolioService $portfolioService,
+        PortfolioSummaryService $portfolioSummaryService,
+        PortfolioSectorService $portfolioSectorService,
+        PortfolioHeatmapService $portfolioHeatmapService,
         DataLakeService $dataLakeService,
+        InstrumentCatalogService $instrumentCatalogService,
+        PolygonService $polygonService,
+        TiingoService $tiingoService,
+        StooqService $stooqService,
         RavaCedearsService $ravaCedearsService,
         RavaAccionesService $ravaAccionesService,
         RavaBonosService $ravaBonosService,
@@ -69,7 +90,14 @@ final class ApiDispatcher
         $this->eodhdClient = $eodhdClient;
         $this->providerUsage = $providerUsage;
         $this->portfolioService = $portfolioService;
+        $this->portfolioSummaryService = $portfolioSummaryService;
+        $this->portfolioSectorService = $portfolioSectorService;
+        $this->portfolioHeatmapService = $portfolioHeatmapService;
         $this->dataLakeService = $dataLakeService;
+        $this->instrumentCatalogService = $instrumentCatalogService;
+        $this->polygonService = $polygonService;
+        $this->tiingoService = $tiingoService;
+        $this->stooqService = $stooqService;
         $this->ravaCedearsService = $ravaCedearsService;
         $this->ravaAccionesService = $ravaAccionesService;
         $this->ravaBonosService = $ravaBonosService;
@@ -171,6 +199,21 @@ final class ApiDispatcher
             $this->handleTwelveData($path);
             return;
         }
+        if ($method === 'GET' && str_starts_with($path, '/polygon/')) {
+            $this->requireAdmin();
+            $this->handlePolygon($path);
+            return;
+        }
+        if ($method === 'GET' && str_starts_with($path, '/tiingo/')) {
+            $this->requireAdmin();
+            $this->handleTiingo($path);
+            return;
+        }
+        if ($method === 'GET' && str_starts_with($path, '/stooq/')) {
+            $this->requireAdmin();
+            $this->handleStooq($path);
+            return;
+        }
         if ($method === 'GET' && ($path === '/prices' || $path === '/quotes')) {
             $request = PriceRequest::fromArray($_GET ?? []);
             $quote = $this->priceService->getPrice($request);
@@ -191,6 +234,27 @@ final class ApiDispatcher
         }
         if ($method === 'POST' && $path === '/datalake/prices/collect') {
             $this->handleCollectPrices($traceId);
+            return;
+        }
+        if ($method === 'GET' && $path === '/datalake/catalog') {
+            $this->requireUser();
+            $this->handleInstrumentCatalogList();
+            return;
+        }
+        if ($method === 'POST' && $path === '/datalake/catalog/sync') {
+            $this->requireUser();
+            $this->handleInstrumentCatalogSync();
+            return;
+        }
+        if ($method === 'POST' && $path === '/datalake/catalog/item') {
+            $this->requireAdmin();
+            $this->handleInstrumentCatalogSave();
+            return;
+        }
+        if ($method === 'DELETE' && preg_match('#^/datalake/catalog/item/(.+)$#', $path, $matches)) {
+            $this->requireAdmin();
+            $symbol = urldecode((string) ($matches[1] ?? ''));
+            $this->handleInstrumentCatalogDelete($symbol);
             return;
         }
         if ($method === 'GET' && $path === '/datalake/prices/symbols') {
@@ -231,6 +295,24 @@ final class ApiDispatcher
             $user = $this->requireUser();
             $items = $this->portfolioService->listInstruments($user->getId());
             $this->sendJson(['data' => $items]);
+            return;
+        }
+        if ($method === 'GET' && $path === '/portfolio/summary') {
+            $user = $this->requireUser();
+            $data = $this->portfolioSummaryService->summaryForUser($user->getId());
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($method === 'GET' && $path === '/portfolio/heatmap') {
+            $user = $this->requireUser();
+            $data = $this->portfolioHeatmapService->build($user->getId());
+            $this->sendJson($data);
+            return;
+        }
+        if ($method === 'GET' && $path === '/portfolio/sector-industry') {
+            $user = $this->requireUser();
+            $data = $this->portfolioSectorService->listSectorIndustry($user->getId());
+            $this->sendJson(['data' => $data]);
             return;
         }
         if ($method === 'GET' && $path === '/portfolios') {
@@ -545,6 +627,57 @@ final class ApiDispatcher
         ]);
         $status = $results['failed'] === $results['total_symbols'] ? 500 : 200;
         $this->sendJson($results, $status);
+    }
+
+    /**
+     * Devuelve el catálogo de instrumentos persistido en DataLake.
+     */
+    private function handleInstrumentCatalogList(): void
+    {
+        $items = $this->instrumentCatalogService->listCatalog();
+        $this->sendJson([
+            'data' => $items,
+            'meta' => [
+                'count' => count($items),
+                'source' => 'datalake',
+            ],
+        ]);
+    }
+
+    /**
+     * Sincroniza catálogo desde RAVA a DataLake.
+     */
+    private function handleInstrumentCatalogSync(): void
+    {
+        $result = $this->instrumentCatalogService->syncFromRava();
+        $this->sendJson([
+            'result' => 'ok',
+            'data' => $result,
+        ]);
+    }
+
+    /**
+     * Crea/actualiza un instrumento puntual del catálogo (Admin).
+     */
+    private function handleInstrumentCatalogSave(): void
+    {
+        $payload = $this->parseJsonBody();
+        $saved = $this->instrumentCatalogService->save(is_array($payload) ? $payload : []);
+        $this->sendJson([
+            'data' => $saved,
+        ]);
+    }
+
+    /**
+     * Elimina un instrumento del catálogo (Admin).
+     */
+    private function handleInstrumentCatalogDelete(string $symbol): void
+    {
+        $ok = $this->instrumentCatalogService->delete($symbol);
+        $this->sendJson([
+            'result' => $ok ? 'deleted' : 'noop',
+            'symbol' => $symbol,
+        ]);
     }
 
     /**
@@ -909,6 +1042,273 @@ final class ApiDispatcher
         throw new \RuntimeException('Ruta no encontrada', 404);
     }
 
+    private function handlePolygon(string $path): void
+    {
+        if ($path === '/polygon/tickers') {
+            $query = [
+                'ticker' => trim((string) ($_GET['ticker'] ?? '')),
+                'search' => trim((string) ($_GET['search'] ?? '')),
+                'active' => isset($_GET['active']) ? (string) $_GET['active'] : null,
+                'market' => trim((string) ($_GET['market'] ?? '')),
+                'type' => trim((string) ($_GET['type'] ?? '')),
+                'locale' => trim((string) ($_GET['locale'] ?? 'us')),
+                'limit' => (int) ($_GET['limit'] ?? 20),
+                'order' => trim((string) ($_GET['order'] ?? 'asc')),
+                'sort' => trim((string) ($_GET['sort'] ?? 'ticker')),
+            ];
+            $data = $this->polygonService->listTickers($query);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/polygon/ticker-details') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $data = $this->polygonService->tickerDetails($symbol);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/polygon/aggregates') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            $multiplier = (int) ($_GET['multiplier'] ?? 1);
+            $timespan = trim((string) ($_GET['timespan'] ?? 'day'));
+            $from = trim((string) ($_GET['from'] ?? ''));
+            $to = trim((string) ($_GET['to'] ?? ''));
+            $sort = trim((string) ($_GET['sort'] ?? 'desc'));
+            $limit = (int) ($_GET['limit'] ?? 120);
+            $adjusted = !isset($_GET['adjusted']) || (string) $_GET['adjusted'] !== '0';
+            if ($symbol === '' || $from === '' || $to === '') {
+                throw new \RuntimeException('symbol, from y to son requeridos', 422);
+            }
+            $data = $this->polygonService->aggregates($symbol, max(1, $multiplier), $timespan, $from, $to, $adjusted, $sort, $limit);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/polygon/previous-close') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            $adjusted = !isset($_GET['adjusted']) || (string) $_GET['adjusted'] !== '0';
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $data = $this->polygonService->previousClose($symbol, $adjusted);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/polygon/daily-open-close') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            $date = trim((string) ($_GET['date'] ?? ''));
+            $adjusted = !isset($_GET['adjusted']) || (string) $_GET['adjusted'] !== '0';
+            if ($symbol === '' || $date === '') {
+                throw new \RuntimeException('symbol y date requeridos', 422);
+            }
+            $data = $this->polygonService->dailyOpenClose($symbol, $date, $adjusted);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/polygon/grouped-daily') {
+            $date = trim((string) ($_GET['date'] ?? ''));
+            if ($date === '') {
+                throw new \RuntimeException('date requerido', 422);
+            }
+            $market = trim((string) ($_GET['market'] ?? 'stocks'));
+            $locale = trim((string) ($_GET['locale'] ?? 'us'));
+            $adjusted = !isset($_GET['adjusted']) || (string) $_GET['adjusted'] !== '0';
+            $data = $this->polygonService->groupedDaily($date, $market === '' ? 'stocks' : $market, $locale === '' ? 'us' : $locale, $adjusted);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/polygon/last-trade') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $data = $this->polygonService->lastTrade($symbol);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/polygon/last-quote') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $data = $this->polygonService->lastQuote($symbol);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/polygon/snapshot') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $market = trim((string) ($_GET['market'] ?? 'stocks'));
+            $locale = trim((string) ($_GET['locale'] ?? 'us'));
+            $data = $this->polygonService->snapshot($symbol, $market === '' ? 'stocks' : $market, $locale === '' ? 'us' : $locale);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/polygon/news') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            $limit = (int) ($_GET['limit'] ?? 10);
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $data = $this->polygonService->news($symbol, max(1, min($limit, 50)));
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/polygon/dividends') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            $limit = (int) ($_GET['limit'] ?? 50);
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $data = $this->polygonService->dividends($symbol, max(1, min($limit, 100)));
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/polygon/splits') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            $limit = (int) ($_GET['limit'] ?? 50);
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $data = $this->polygonService->splits($symbol, max(1, min($limit, 100)));
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/polygon/exchanges') {
+            $asset = trim((string) ($_GET['asset_class'] ?? ($_GET['asset'] ?? 'stocks')));
+            $locale = trim((string) ($_GET['locale'] ?? ''));
+            $data = $this->polygonService->exchanges($asset === '' ? 'stocks' : $asset, $locale === '' ? null : $locale);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/polygon/market-status') {
+            $data = $this->polygonService->marketStatus();
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        throw new \RuntimeException('Ruta no encontrada', 404);
+    }
+
+    private function handleTiingo(string $path): void
+    {
+        if ($path === '/tiingo/iex/tops') {
+            $tickers = $this->splitSymbols((string) ($_GET['tickers'] ?? ''));
+            $data = $this->tiingoService->iexTops($tickers);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/tiingo/iex/last') {
+            $tickers = $this->splitSymbols((string) ($_GET['tickers'] ?? ''));
+            $data = $this->tiingoService->iexLast($tickers);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/tiingo/daily/prices') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $query = [
+                'startDate' => trim((string) ($_GET['startDate'] ?? '')),
+                'endDate' => trim((string) ($_GET['endDate'] ?? '')),
+                'resampleFreq' => trim((string) ($_GET['resampleFreq'] ?? '')),
+            ];
+            $data = $this->tiingoService->dailyPrices($symbol, $query);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/tiingo/daily/meta') {
+            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $data = $this->tiingoService->dailyMetadata($symbol);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/tiingo/crypto/prices') {
+            $tickers = $this->splitSymbols((string) ($_GET['tickers'] ?? ''));
+            $query = [
+                'startDate' => trim((string) ($_GET['startDate'] ?? '')),
+                'endDate' => trim((string) ($_GET['endDate'] ?? '')),
+                'resampleFreq' => trim((string) ($_GET['resampleFreq'] ?? '')),
+            ];
+            $data = $this->tiingoService->cryptoPrices($tickers, $query);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/tiingo/fx/prices') {
+            $tickers = $this->splitSymbols((string) ($_GET['tickers'] ?? ''));
+            $query = [
+                'startDate' => trim((string) ($_GET['startDate'] ?? '')),
+                'endDate' => trim((string) ($_GET['endDate'] ?? '')),
+                'resampleFreq' => trim((string) ($_GET['resampleFreq'] ?? '')),
+            ];
+            $data = $this->tiingoService->fxPrices($tickers, $query);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/tiingo/search') {
+            $query = trim((string) ($_GET['query'] ?? ''));
+            if ($query === '') {
+                throw new \RuntimeException('query requerido', 422);
+            }
+            $data = $this->tiingoService->search($query);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/tiingo/news') {
+            $tickers = $this->splitSymbols((string) ($_GET['tickers'] ?? ''));
+            if (empty($tickers)) {
+                throw new \RuntimeException('tickers requerido', 422);
+            }
+            $query = [
+                'startDate' => trim((string) ($_GET['startDate'] ?? '')),
+                'endDate' => trim((string) ($_GET['endDate'] ?? '')),
+                'limit' => (int) ($_GET['limit'] ?? 10),
+                'source' => trim((string) ($_GET['source'] ?? '')),
+            ];
+            $data = $this->tiingoService->news($tickers, $query);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        throw new \RuntimeException('Ruta no encontrada', 404);
+    }
+
+    private function handleStooq(string $path): void
+    {
+        if ($path === '/stooq/quotes') {
+            $tickers = $this->splitSymbols((string) ($_GET['symbols'] ?? ($_GET['s'] ?? '')));
+            if (empty($tickers)) {
+                throw new \RuntimeException('symbols requerido', 422);
+            }
+            $data = $this->stooqService->quotes($tickers);
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        if ($path === '/stooq/history') {
+            $symbol = strtolower(trim((string) ($_GET['symbol'] ?? '')));
+            $market = strtolower(trim((string) ($_GET['market'] ?? '')));
+            if ($symbol === '') {
+                throw new \RuntimeException('symbol requerido', 422);
+            }
+            $interval = strtolower(trim((string) ($_GET['interval'] ?? 'd')));
+            $symbolWithMarket = $market !== '' ? sprintf('%s.%s', $symbol, $market) : $symbol;
+            $data = $this->stooqService->history($symbolWithMarket, $interval);
+            $this->sendJson(['data' => $data, 'symbol' => $symbolWithMarket]);
+            return;
+        }
+        if ($path === '/stooq/markets') {
+            $data = $this->stooqService->markets();
+            $this->sendJson(['data' => $data]);
+            return;
+        }
+        throw new \RuntimeException('Ruta no encontrada', 404);
+    }
+
     /**
      * Busca un precio en proveedores externos (EODHD/TwelveData) con fallback y cache.
      */
@@ -1015,6 +1415,23 @@ final class ApiDispatcher
         }
 
         return $decoded;
+    }
+
+    /**
+     * Normaliza símbolos separados por comas.
+     *
+     * @return array<int,string>
+     */
+    private function splitSymbols(string $input): array
+    {
+        $symbols = [];
+        $parts = preg_split('/,/', $input, -1, PREG_SPLIT_NO_EMPTY);
+        if (is_array($parts)) {
+            foreach ($parts as $p) {
+                $symbols[] = strtoupper(trim($p));
+            }
+        }
+        return array_values(array_filter(array_unique($symbols), static fn ($s) => $s !== ''));
     }
 
     private function requireUser(): \FinHub\Domain\User\User

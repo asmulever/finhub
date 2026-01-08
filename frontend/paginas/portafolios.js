@@ -1,444 +1,470 @@
-import { deleteJson, getJson, postJson } from '../apicliente.js';
+import { getJson, postJson, deleteJson } from '../apicliente.js';
 import { authStore } from '../auth/authStore.js';
 import { bindToolbarNavigation, bindUserMenu, highlightToolbar, renderToolbar, setAdminMenuVisibility, setToolbarUserName } from '../components/toolbar.js';
+import { createLoadingOverlay } from '../components/loadingOverlay.js';
 
+const overlay = createLoadingOverlay();
 const state = {
-  stocks: [],
-  filtered: [],
-  loadingStocks: false,
-  errorStocks: '',
   profile: null,
-  category: '',
-  searchTerm: '',
-  selectedSymbols: new Set(),
-  selectedItems: [],
-  loadingSelected: false,
-  errorSelected: '',
-  exchange: '',
-  preferred: 'eodhd',
-  forceRefresh: false,
-  quoteCache: new Map(),
-  page: 1,
-  pageSize: 12,
+  items: [],
+  filtered: [],
+  portfolio: [],
+  catalogIndex: new Map(),
+  counts: { all: 0, cedears: 0, acciones: 0, bonos: 0, portfolio: 0 },
+  historicosCache: {},
+  historicoItems: [],
+  historicoMeta: {},
+  historicoSymbol: '',
 };
 
-const isSelected = (symbol) => state.selectedSymbols.has(String(symbol ?? ''));
-
-const formatCurrency = (value) => {
-  if (!Number.isFinite(value)) return '—';
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value);
+const setError = (msg) => {
+  const el = document.getElementById('rava-error');
+  if (el) el.textContent = msg || '';
 };
 
-const getCookie = (name) => {
-  const cookies = document.cookie ? document.cookie.split(';') : [];
-  for (const raw of cookies) {
-    const [k, ...rest] = raw.trim().split('=');
-    if (k === name) {
-      return decodeURIComponent(rest.join('='));
-    }
-  }
-  return '';
+const setHistoryError = (msg) => {
+  const el = document.getElementById('history-error');
+  if (el) el.textContent = msg || '';
 };
 
-const setCookie = (name, value) => {
-  document.cookie = `${name}=${encodeURIComponent(value || '')}; path=/; expires=Fri, 31 Dec 9999 23:59:59 GMT`;
+const setHistoryStatus = (msg) => {
+  const el = document.getElementById('history-status');
+  if (el) el.textContent = msg || '';
 };
 
-const exchangeCookieKey = (profile) => {
-  const email = profile?.email ? String(profile.email).toLowerCase().replace(/[^a-z0-9._-]/g, '') : 'default';
-  return `eodhd_exchange_${email}`;
+const formatNumber = (value, digits = 2) => {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '–';
+  return new Intl.NumberFormat('es-AR', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(value));
 };
 
-const refreshCookieKey = (profile) => {
-  const email = profile?.email ? String(profile.email).toLowerCase().replace(/[^a-z0-9._-]/g, '') : 'default';
-  return `quote_force_${email}`;
+const formatSignedPercent = (value) => {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return { text: '–', className: '' };
+  const num = Number(value);
+  const className = num > 0 ? 'pos' : (num < 0 ? 'neg' : '');
+  const text = `${num > 0 ? '+' : ''}${formatNumber(num, 2)}%`;
+  return { text, className };
 };
 
-const renderSelected = () => {
-  const container = document.getElementById('selected-container');
-  if (!container) return;
-  if (state.loadingSelected) {
-    container.innerHTML = '<p class="muted">Cargando cartera...</p>';
+const normalizeCatalogItems = (items) => {
+  if (!Array.isArray(items)) return [];
+  return items.map((row) => {
+    const symbol = String(row.symbol ?? '').toUpperCase();
+    const tipo = row.tipo ?? row.type ?? '';
+    return {
+      symbol,
+      name: row.name ?? row.nombre ?? symbol,
+      panel: row.panel ?? '',
+      mercado: row.mercado ?? '',
+      tipo,
+      currency: row.currency ?? '',
+      source: row.source ?? '',
+      price: Number.isFinite(row.price) ? Number(row.price) : null,
+      var_pct: Number.isFinite(row.var_pct) ? Number(row.var_pct) : null,
+      var_mtd: Number.isFinite(row.var_mtd) ? Number(row.var_mtd) : null,
+      var_ytd: Number.isFinite(row.var_ytd) ? Number(row.var_ytd) : null,
+      volume_nominal: row.volume_nominal ?? null,
+      volume_efectivo: row.volume_efectivo ?? null,
+      anterior: row.anterior ?? null,
+      apertura: row.apertura ?? null,
+      maximo: row.maximo ?? null,
+      minimo: row.minimo ?? null,
+      as_of: row.as_of ?? null,
+      operaciones: row.operaciones ?? null,
+    };
+  }).filter((row) => row.symbol);
+};
+
+const renderHistoricosMeta = () => {
+  const meta = state.historicoMeta || {};
+  const extras = [];
+  if (meta.from) extras.push(`desde ${meta.from}`);
+  if (meta.to) extras.push(`hasta ${meta.to}`);
+  if (meta.source) extras.push(meta.source);
+  const metaEl = document.getElementById('history-meta');
+  if (metaEl) metaEl.textContent = extras.join(' · ');
+  const symbolEl = document.getElementById('history-symbol');
+  if (symbolEl) symbolEl.textContent = `Símbolo: ${state.historicoSymbol || '--'}`;
+  const countEl = document.getElementById('history-count');
+  if (countEl) countEl.textContent = `Registros: ${state.historicoItems.length || 0}`;
+};
+
+const renderHistoricosTable = () => {
+  const body = document.getElementById('historicos-body');
+  if (!body) return;
+  if (!state.historicoSymbol) {
+    body.innerHTML = '<tr><td colspan="8" class="muted">Selecciona un instrumento para ver su histórico.</td></tr>';
     return;
   }
-  if (state.errorSelected) {
-    container.innerHTML = `<p class="price-error">${state.errorSelected}</p>`;
-    return;
-  }
-  if (state.selectedItems.length === 0) {
-    container.innerHTML = '<p class="muted">Aún no tienes instrumentos en tu cartera.</p>';
-    return;
-  }
-  const tiles = state.selectedItems.map((item) => {
-    const quote = item.quote ?? {};
-    const price =
-      Number.isFinite(quote?.close) ? quote.close :
-      Number.isFinite(quote?.price) ? quote.price :
-      Number.isFinite(quote?.c) ? quote.c : null;
-    const asOf = quote?.asOf ?? quote?.t ?? quote?.time ?? null;
-    const sources = Array.isArray(quote?.sources) ? quote.sources.join(', ') : (quote?.source ?? '');
-    const cachedFlag = quote?.cached ? ' • cacheado' : '';
-    const priceLine = quote?.error
-      ? `<span class="price-error">${quote.error.message ?? 'Precio no disponible'}</span>`
-      : `<div class="price-meta">
-          <strong class="price-value">${formatCurrency(price)}</strong>
-          <small>${asOf ? new Date(asOf).toLocaleString() : 'Fecha no disponible'}</small>
-          <small class="muted">Fuentes: ${sources || 'N/D'}${cachedFlag}</small>
-        </div>`;
+  const ordered = [...(state.historicoItems || [])].sort((a, b) => (b.fecha ?? '').localeCompare(a.fecha ?? ''));
+  const rows = ordered.map((item) => {
+    const variation = formatSignedPercent(item.variacion);
     return `
-      <article class="stock-tile selected-tile">
-        <div class="stock-symbol">
-          <strong>${item.symbol}</strong>
-          <span class="stock-tag">${item.exchange ?? 'N/D'}</span>
-        </div>
-        <div class="stock-meta">${item.name ?? 'Sin nombre'}</div>
-        ${priceLine}
-        <button type="button" class="remove-btn" data-remove="${item.symbol}">Quitar</button>
-      </article>
+      <tr>
+        <td>${item.fecha ?? '–'}</td>
+        <td>${formatNumber(item.apertura, 2)}</td>
+        <td>${formatNumber(item.maximo, 2)}</td>
+        <td>${formatNumber(item.minimo, 2)}</td>
+        <td>${formatNumber(item.cierre, 2)}</td>
+        <td class="${variation.className}">${variation.text}</td>
+        <td>${formatNumber(item.volumen, 0)}</td>
+        <td>${formatNumber(item.ajuste, 2)}</td>
+      </tr>
     `;
-  });
-  container.innerHTML = tiles.join('');
+  }).join('');
+  body.innerHTML = rows || '<tr><td colspan="8" class="muted">Sin datos</td></tr>';
 };
 
-const renderStocks = () => {
-  const container = document.getElementById('stocks-container');
-  if (!container) return;
-  if (state.loadingStocks) {
-    container.innerHTML = '<p class="muted">Cargando tickers...</p>';
+const loadHistoricos = async (especie) => {
+  const normalized = (especie || '').trim();
+  if (!normalized) return;
+  const cacheKey = normalized.toUpperCase();
+  setHistoryError('');
+  setHistoryStatus(`Cargando histórico para ${normalized}...`);
+  if (state.historicosCache[cacheKey]) {
+    state.historicoSymbol = normalized;
+    state.historicoItems = state.historicosCache[cacheKey].data ?? [];
+    state.historicoMeta = state.historicosCache[cacheKey].meta ?? {};
+    renderHistoricosMeta();
+    renderHistoricosTable();
+    setHistoryStatus(`Histórico en caché para ${normalized}`);
     return;
   }
-  if (state.errorStocks) {
-    container.innerHTML = `<p class="price-error">${state.errorStocks}</p>`;
-    return;
+  try {
+    const resp = await overlay.withLoader(() => getJson(`/rava/historicos?especie=${encodeURIComponent(normalized)}`));
+    const items = Array.isArray(resp?.data) ? resp.data : (resp?.items ?? []);
+    const meta = resp?.meta ?? {};
+    state.historicoSymbol = normalized;
+    state.historicoItems = Array.isArray(items) ? items : [];
+    state.historicoMeta = meta;
+    state.historicosCache[cacheKey] = { data: state.historicoItems, meta };
+    renderHistoricosMeta();
+    renderHistoricosTable();
+    setHistoryStatus(`Histórico cargado para ${normalized}`);
+  } catch (error) {
+    console.info('[portafolios] historicos error', error);
+    setHistoryError(error?.error?.message ?? 'No se pudo obtener histórico');
+    setHistoryStatus(`Fallo al cargar ${normalized}`);
+    renderHistoricosMeta();
+    renderHistoricosTable();
   }
-  if (!state.category) {
-    container.innerHTML = '<p class="muted">Selecciona una categoría para listar instrumentos.</p>';
-    return;
-  }
+};
+
+const normalizeItems = (lists) => {
+  const map = new Map();
+  const push = (arr, type) => {
+    (arr ?? []).forEach((row) => {
+      const symbol = String(row.symbol ?? row.especie ?? '').toUpperCase();
+      if (!symbol) return;
+      if (map.has(symbol)) return;
+      map.set(symbol, {
+        symbol,
+        name: row.nombre ?? row.name ?? row.especie ?? row.symbol ?? symbol,
+        panel: row.panel ?? '',
+        mercado: row.mercado ?? '',
+        tipo: type,
+        currency: row.currency ?? row.moneda ?? '',
+        price: Number(row.ultimo ?? row.close ?? row.price ?? null),
+        var_pct: Number.isFinite(row.variacion) ? Number(row.variacion) : null,
+        var_mtd: Number.isFinite(row.var_mtd) ? Number(row.var_mtd) : null,
+        var_ytd: Number.isFinite(row.var_ytd) ? Number(row.var_ytd) : null,
+        volume_nominal: row.volumen_nominal ?? row.volnominal ?? null,
+        volume_efectivo: row.volumen_efectivo ?? row.volefectivo ?? null,
+        anterior: row.anterior ?? null,
+        apertura: row.apertura ?? null,
+        maximo: row.maximo ?? null,
+        minimo: row.minimo ?? null,
+        as_of: row.as_of ?? row.fecha ?? null,
+        operaciones: row.operaciones ?? null,
+      });
+    });
+  };
+  push(lists.cedears, 'CEDEAR');
+  push(lists.acciones, 'ACCION_AR');
+  push(lists.bonos, 'BONO');
+  return Array.from(map.values());
+};
+
+const rebuildCatalogIndex = () => {
+  const map = new Map();
+  state.items.forEach((item) => {
+    map.set(item.symbol, item);
+  });
+  state.catalogIndex = map;
+};
+
+const syncPortfolioFromCatalog = (list = state.portfolio) => {
+  if (!(state.catalogIndex instanceof Map) || state.catalogIndex.size === 0) return list;
+  return list.map((p) => {
+    const cat = state.catalogIndex.get(p.symbol);
+    if (!cat) return p;
+    return {
+      ...p,
+      name: cat.name || p.name || p.symbol,
+      price: Number.isFinite(cat.price) ? cat.price : p.price,
+      var_pct: Number.isFinite(cat.var_pct) ? cat.var_pct : p.var_pct,
+      var_mtd: Number.isFinite(cat.var_mtd) ? cat.var_mtd : p.var_mtd,
+      var_ytd: Number.isFinite(cat.var_ytd) ? cat.var_ytd : p.var_ytd,
+      volume_nominal: cat.volume_nominal ?? p.volume_nominal,
+      volume_efectivo: cat.volume_efectivo ?? p.volume_efectivo,
+      anterior: cat.anterior ?? p.anterior,
+      apertura: cat.apertura ?? p.apertura,
+      maximo: cat.maximo ?? p.maximo,
+      minimo: cat.minimo ?? p.minimo,
+      as_of: cat.as_of ?? p.as_of,
+      tipo: cat.tipo ?? p.tipo,
+      panel: cat.panel ?? p.panel,
+      mercado: cat.mercado ?? p.mercado,
+      currency: cat.currency ?? p.currency,
+    };
+  });
+};
+
+const renderList = () => {
+  const list = document.getElementById('rava-list');
+  if (!list) return;
   if (state.filtered.length === 0) {
-    container.innerHTML = '<p class="muted">No se encontraron tickers con ese filtro.</p>';
+    list.innerHTML = '<p class="muted">Sin resultados</p>';
     return;
   }
-  const start = (state.page - 1) * state.pageSize;
-  const end = start + state.pageSize;
-  const pageItems = state.filtered.slice(start, end);
-  const rows = pageItems.map((item) => `
-    <tr>
-      <td><strong>${item.symbol}</strong></td>
-      <td>${item.name ?? 'Sin nombre'}</td>
-      <td>${item.exchange ?? 'N/D'}</td>
-      <td>${item.currency ?? 'N/D'}</td>
-      <td>${item.type ?? 'N/D'}</td>
-      <td style="text-align:center;"><input type="checkbox" disabled ${item.in_eodhd ? 'checked' : ''} /></td>
-      <td style="text-align:center;"><input type="checkbox" disabled ${item.in_twelvedata ? 'checked' : ''} /></td>
-      <td><button type="button" class="add-btn" data-symbol="${item.symbol}" ${isSelected(item.symbol) ? 'disabled' : ''}>
-        ${isSelected(item.symbol) ? 'Agregado' : 'Agregar'}
-      </button></td>
-    </tr>
-  `).join('');
-  const totalPages = Math.max(1, Math.ceil(state.filtered.length / state.pageSize));
-  container.innerHTML = `
-    <div class="table-wrapper">
-      <table class="stocks-table">
-        <thead>
-          <tr>
-            <th>Símbolo</th><th>Nombre</th><th>Exchange</th><th>Moneda</th><th>Tipo</th><th>EODHD</th><th>Twelve</th><th></th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-    <div class="pagination">
-      <button type="button" id="prev-page" ${state.page <= 1 ? 'disabled' : ''}>Anterior</button>
-      <span>Página ${state.page} de ${totalPages}</span>
-      <button type="button" id="next-page" ${state.page >= totalPages ? 'disabled' : ''}>Siguiente</button>
-    </div>
-  `;
-  document.getElementById('prev-page')?.addEventListener('click', () => {
-    if (state.page > 1) {
-      state.page -= 1;
-      renderStocks();
-    }
+  const category = document.getElementById('rava-category')?.value || 'all';
+  list.innerHTML = state.filtered.map((item) => {
+    const varPct = item.var_pct !== null && item.var_pct !== undefined ? `${item.var_pct.toFixed(2)}%` : '—';
+    const varMtd = item.var_mtd !== null && item.var_mtd !== undefined ? `${item.var_mtd.toFixed(2)}%` : '—';
+    const varYtd = item.var_ytd !== null && item.var_ytd !== undefined ? `${item.var_ytd.toFixed(2)}%` : '—';
+    const volumeNom = item.volume_nominal ?? item.volumen_nominal ?? null;
+    const volumeEfe = item.volume_efectivo ?? item.volumen_efectivo ?? null;
+    const volLabel = item.volatility_30d !== null && item.volatility_30d !== undefined ? item.volatility_30d.toFixed(3) : '—';
+    const asOf = item.as_of ? String(item.as_of).replace('T', ' ').slice(0, 16) : '—';
+    return `
+      <div class="tile" data-symbol="${item.symbol}">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+          <div>
+            <strong>${item.symbol}</strong>
+            <small style="display:block;">${item.name || 'Sin nombre'}</small>
+            <small class="muted">${item.tipo || item.type || 'N/D'} · ${item.mercado || 'Mercado N/D'} · ${item.currency || 'N/D'}</small>
+          </div>
+          <div>
+            <div style="font-size:1.4rem;font-weight:800;color:#e2e8f0;">${Number.isFinite(item.price) ? formatNumber(item.price, 2) : '—'}</div>
+            <div style="color:${(item.var_pct ?? 0) < 0 ? '#ef4444' : '#22c55e'};">${varPct}</div>
+            <div class="muted">${asOf}</div>
+          </div>
+        </div>
+        <div class="meta-row" style="margin-top:6px;">
+          <span>Anterior: ${formatNumber(item.anterior, 2)}</span>
+          <span>Apertura: ${formatNumber(item.apertura, 2)}</span>
+          <span>Máximo: ${formatNumber(item.maximo, 2)}</span>
+          <span>Mínimo: ${formatNumber(item.minimo, 2)}</span>
+        </div>
+        <div class="meta-row">
+          <span>Vol. Nominal: ${volumeNom ?? '—'}</span>
+          <span>Vol. Efectivo: ${volumeEfe ?? '—'}</span>
+          <span>Vol. Promedio: ${formatNumber(item.volumen_promedio, 2)}</span>
+          <span>Volumen %: ${formatNumber(item.volumen_pct, 2)}</span>
+        </div>
+      <button type="button" class="${category === 'selected' ? 'deselect-btn' : ''}" data-symbol="${item.symbol}">
+          ${category === 'selected' ? 'Quitar de cartera' : 'Agregar a cartera'}
+        </button>
+      </div>
+    `;
+  }).join('');
+  list.querySelectorAll('button[data-symbol]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const symbol = btn.getAttribute('data-symbol');
+      const currentCategory = document.getElementById('rava-category')?.value || '';
+      try {
+        if (currentCategory === 'selected') {
+          await overlay.withLoader(() => deleteJson(`/portfolio/instruments/${encodeURIComponent(symbol)}`));
+          await loadPortfolio();
+        } else {
+          await overlay.withLoader(() => postJson('/portfolio/instruments', { symbol }));
+          await loadPortfolio();
+        }
+        applyFilter();
+      } catch (error) {
+        setError(error?.error?.message ?? 'No se pudo procesar la acción');
+      }
+    });
   });
-  document.getElementById('next-page')?.addEventListener('click', () => {
-    const total = Math.ceil(state.filtered.length / state.pageSize);
-    if (state.page < total) {
-      state.page += 1;
-      renderStocks();
-    }
+  list.querySelectorAll('.tile[data-symbol]').forEach((tile) => {
+    tile.addEventListener('click', (event) => {
+      if (event.target?.closest?.('button[data-symbol]')) return;
+      const symbol = tile.getAttribute('data-symbol') || '';
+      loadHistoricos(symbol);
+    });
   });
-};
-
-const matchesCategory = (item, category) => {
-  const micCode = (item.mic_code ?? '').toUpperCase();
-  const type = (item.type ?? '').toLowerCase();
-  const currency = (item.currency ?? '').toUpperCase();
-  switch (category) {
-    case 'on':
-      return micCode === 'XBUE' && type === 'common stock' && currency === 'ARS';
-    case 'cedear':
-      return micCode === 'XBUE' && type === 'depositary receipt';
-    case 'bond':
-      return type.includes('bond') || type.includes('debenture');
-    case 'etf':
-      return type.includes('etf') || type.includes('trust');
-    default:
-      return true;
-  }
-};
-
-const matchesSearch = (item, term) => {
-  if (!term) return true;
-  const needle = term.toLowerCase();
-  return (
-    (item.symbol ?? '').toLowerCase().includes(needle) ||
-    (item.name ?? '').toLowerCase().includes(needle) ||
-    (item.exchange ?? '').toLowerCase().includes(needle) ||
-    (item.currency ?? '').toLowerCase().includes(needle) ||
-    (item.type ?? '').toLowerCase().includes(needle)
-  );
 };
 
 const applyFilter = () => {
-  if (!state.category) {
-    state.filtered = [];
-    renderStocks();
-    return;
-  }
-  state.filtered = state.stocks.filter((item) =>
-    matchesCategory(item, state.category) && matchesSearch(item, state.searchTerm)
-  );
-  renderStocks();
-};
-
-const fetchQuotesBulk = async (symbols, { force = false } = {}) => {
-  const unique = Array.from(new Set(symbols.map((s) => String(s ?? '').toUpperCase()).filter(Boolean)));
-  if (!unique.length) return {};
-  const params = new URLSearchParams();
-  params.set('s', unique.join(','));
-  if (state.exchange) params.set('ex', state.exchange);
-  params.set('preferred', state.preferred);
-  if (force || state.forceRefresh) params.set('force', '1');
-  try {
-    const resp = await getJson(`/quote/search/bulk?${params.toString()}`);
-    return resp?.data ?? {};
-  } catch (error) {
-    const fallback = {};
-    unique.forEach((symbol) => {
-      fallback[symbol] = { symbol, error: { message: error?.error?.message ?? 'No se pudieron obtener precios' } };
-    });
-    return fallback;
-  }
-};
-
-const fetchSelectedPortfolio = async () => {
-  state.loadingSelected = true;
-  state.errorSelected = '';
-  renderSelected();
-  try {
-    const response = await getJson('/portfolio/instruments');
-    const items = Array.isArray(response?.data) ? response.data : [];
-    state.selectedSymbols = new Set(
-      items.filter((i) => i?.symbol).map((i) => String(i.symbol))
-    );
-    const enriched = [];
-    const symbols = Array.from(state.selectedSymbols);
-    const quotesMap = symbols.length ? await fetchQuotesBulk(symbols) : {};
-    for (const item of items) {
-      const quote = quotesMap[item.symbol] ?? { symbol: item.symbol, error: { message: 'Precio no disponible' } };
-      enriched.push({ ...item, quote });
-    }
-    state.selectedItems = enriched;
-  } catch (error) {
-    state.selectedItems = [];
-    state.selectedSymbols = new Set();
-    state.errorSelected = error?.error?.message ?? 'No se pudo cargar tu cartera';
-  } finally {
-    state.loadingSelected = false;
-    renderSelected();
-  }
-};
-
-const fetchStocks = async () => {
-  state.loadingStocks = true;
-  state.errorStocks = '';
-  state.stocks = [];
-  state.filtered = [];
-  state.page = 1;
-  renderStocks();
-  const filterInput = document.getElementById('filter-input');
-  if (filterInput) filterInput.disabled = true;
-  try {
-    const exch = state.exchange || 'US';
-    const response = await getJson(`/quote/symbols?exchange=${encodeURIComponent(exch)}`);
-    state.stocks = Array.isArray(response?.data) ? response.data : [];
-    applyFilter();
-    if (filterInput) {
-      filterInput.disabled = state.filtered.length === 0;
-    }
-  } catch (error) {
-    state.errorStocks = error?.error?.message ?? 'No se pudo obtener el listado de tickers';
-    state.stocks = [];
-    state.filtered = [];
-    if (filterInput) filterInput.disabled = true;
-  } finally {
-    state.loadingStocks = false;
-    renderStocks();
-  }
-};
-
-const handleAddToPortfolio = async (event) => {
-  const button = event.target.closest('button[data-symbol]');
-  if (!button || button.disabled) return;
-  const symbol = button.dataset.symbol;
-  const instrument = state.stocks.find((item) => item.symbol === symbol);
-  if (!instrument) return;
-  button.disabled = true;
-  try {
-    await postJson('/portfolio/instruments', {
-      symbol: instrument.symbol,
-      name: instrument.name ?? '',
-      exchange: instrument.exchange ?? '',
-      currency: instrument.currency ?? '',
-      country: instrument.country ?? '',
-      type: instrument.type ?? '',
-      mic_code: instrument.mic_code ?? '',
-    });
-    state.selectedSymbols.add(symbol);
-    const quoteMap = await fetchQuotesBulk([symbol]);
-    const quote = quoteMap[symbol] ?? { symbol, error: { message: 'Precio no disponible' } };
-    const exists = state.selectedItems.some((i) => i.symbol === symbol);
-    if (!exists) {
-      state.selectedItems.push({ ...instrument, quote });
-      state.selectedItems.sort((a, b) => a.symbol.localeCompare(b.symbol));
-    }
-    renderSelected();
-    applyFilter();
-  } catch (error) {
-    button.disabled = false;
-    const container = document.getElementById('stocks-container');
-    if (container) {
-      container.insertAdjacentHTML(
-        'afterbegin',
-        `<p class="price-error">No se pudo agregar ${symbol}: ${error?.error?.message ?? 'Error inesperado'}</p>`
-      );
-    }
-  }
-};
-
-const handleRemoveFromPortfolio = async (event) => {
-  const button = event.target.closest('button[data-remove]');
-  if (!button) return;
-  const symbol = button.dataset.remove;
-  button.disabled = true;
-  const originalText = button.textContent;
-  button.textContent = 'Quitando...';
-  try {
-    await deleteJson(`/portfolio/instruments/${encodeURIComponent(symbol)}`);
-    state.selectedSymbols.delete(symbol);
-    state.selectedItems = state.selectedItems.filter((item) => item.symbol !== symbol);
-    renderSelected();
-    applyFilter();
-  } catch (error) {
-    button.disabled = false;
-    button.textContent = originalText;
-    const container = document.getElementById('selected-container');
-    container?.insertAdjacentHTML(
-      'afterbegin',
-      `<p class="price-error">No se pudo quitar ${symbol}: ${error?.error?.message ?? 'Error inesperado'}</p>`
-    );
-  }
-};
-
-const handleLogout = async () => {
-  try {
-    await postJson('/auth/logout');
-  } finally {
-    authStore.clearToken();
-    window.location.href = '/';
-  }
-};
-
-const loadProfile = async () => {
-  try {
-    state.profile = await getJson('/me');
-    setToolbarUserName(state.profile?.email ?? '');
-    setAdminMenuVisibility(state.profile);
-    const exchCookie = getCookie(exchangeCookieKey(state.profile));
-    if (exchCookie) {
-      state.exchange = exchCookie.toUpperCase();
-    } else {
-      state.exchange = 'US';
-    }
-    const forceCookie = getCookie(refreshCookieKey(state.profile));
-    state.forceRefresh = forceCookie === '1';
-  } catch {
-    state.profile = null;
-    const cachedProfile = authStore.getProfile();
-    setToolbarUserName(cachedProfile?.email ?? '');
-    setAdminMenuVisibility(cachedProfile);
-  }
-};
-
-const bindTabs = () => {
-  const tabs = document.querySelectorAll('.tab-btn');
-  const panels = document.querySelectorAll('.tab-panel');
-  tabs.forEach((tab) => {
-    tab.addEventListener('click', () => {
-      const target = tab.dataset.tab;
-      tabs.forEach((btn) => btn.classList.toggle('active', btn === tab));
-      panels.forEach((panel) => {
-        panel.classList.toggle('active', panel.id === `tab-${target}`);
-      });
-    });
+  const category = document.getElementById('rava-category')?.value || 'all';
+  const search = (document.getElementById('rava-search')?.value || '').toLowerCase();
+  const sourceItems = category === 'selected' ? state.portfolio : state.items;
+  state.filtered = sourceItems.filter((i) => {
+    const okCat = category === 'all'
+      ? true
+      : category === 'selected'
+        ? true
+        : (category === 'cedears' && i.tipo === 'CEDEAR') || (category === 'acciones' && i.tipo === 'ACCION_AR') || (category === 'bonos' && i.tipo === 'BONO');
+    const okSearch = search === '' || i.symbol.toLowerCase().includes(search) || (i.name ?? '').toLowerCase().includes(search);
+    return okCat && okSearch;
   });
+  renderList();
+  const bPort = document.getElementById('rava-badge-portfolio');
+  const bCed = document.getElementById('rava-badge-cedears');
+  const bAcc = document.getElementById('rava-badge-acciones');
+  const bBon = document.getElementById('rava-badge-bonos');
+  if (bPort) bPort.textContent = `En cartera: ${state.counts.portfolio}`;
+  if (bCed) bCed.textContent = `CEDEARs: ${state.counts.cedears}`;
+  if (bAcc) bAcc.textContent = `Acciones: ${state.counts.acciones}`;
+  if (bBon) bBon.textContent = `Bonos: ${state.counts.bonos}`;
 };
 
-const init = () => {
+const loadData = async ({ forceSync = false } = {}) => {
+  setError('');
+  let catalogItems = [];
+
+  try {
+    if (forceSync) {
+      await postJson('/datalake/catalog/sync');
+    }
+    const catalogResp = await getJson('/datalake/catalog');
+    catalogItems = Array.isArray(catalogResp?.data) ? catalogResp.data : [];
+    if (catalogItems.length === 0 && !forceSync) {
+      try {
+        await postJson('/datalake/catalog/sync');
+        const retryResp = await getJson('/datalake/catalog');
+        catalogItems = Array.isArray(retryResp?.data) ? retryResp.data : [];
+      } catch (syncError) {
+        console.info('[portafolios] sync catalog opcional falló', syncError);
+      }
+    }
+  } catch (error) {
+    console.info('[portafolios] catalog fetch falló, se intenta fallback', error);
+  }
+
+  if (Array.isArray(catalogItems) && catalogItems.length > 0) {
+    state.items = normalizeCatalogItems(catalogItems);
+  } else {
+    // Fallback a RAVA directo para no dejar la vista vacía.
+    const [cedears, acciones, bonos] = await Promise.all([
+      getJson('/rava/cedears').catch(() => ({ data: [] })),
+      getJson('/rava/acciones').catch(() => ({ data: [] })),
+      getJson('/rava/bonos').catch(() => ({ data: [] })),
+    ]);
+    state.items = normalizeItems({
+      cedears: cedears?.data ?? [],
+      acciones: acciones?.data ?? [],
+      bonos: bonos?.data ?? [],
+    });
+    state.counts.cedears = (cedears?.data ?? []).length;
+    state.counts.acciones = (acciones?.data ?? []).length;
+    state.counts.bonos = (bonos?.data ?? []).length;
+  }
+
+  rebuildCatalogIndex();
+  state.counts.all = state.items.length;
+  if (state.counts.cedears === 0 || state.counts.acciones === 0 || state.counts.bonos === 0) {
+    state.counts.cedears = state.items.filter((i) => i.tipo === 'CEDEAR').length;
+    state.counts.acciones = state.items.filter((i) => i.tipo === 'ACCION_AR').length;
+    state.counts.bonos = state.items.filter((i) => i.tipo === 'BONO').length;
+  }
+  state.portfolio = syncPortfolioFromCatalog(state.portfolio).map((p) => ({
+    ...p,
+    name: p.name || p.symbol,
+  }));
+  if (state.items.length === 0) {
+    setError('No se pudo cargar el catálogo de instrumentos');
+  }
+};
+
+const bindUi = () => {
+  document.getElementById('rava-btn-reload')?.addEventListener('click', () => overlay.withLoader(async () => {
+    await loadData({ forceSync: true });
+    applyFilter();
+  }));
+  document.getElementById('rava-category')?.addEventListener('change', applyFilter);
+  document.getElementById('rava-search')?.addEventListener('input', applyFilter);
+};
+
+const loadPortfolio = async () => {
+  setError('');
+  try {
+    const resp = await getJson('/portfolio/instruments');
+    const items = Array.isArray(resp?.data) ? resp.data : [];
+    const portfolio = items.map((row) => ({
+      symbol: String(row.symbol ?? '').toUpperCase(),
+      name: row.name ?? row.nombre ?? row.symbol ?? '',
+      panel: row.panel ?? '',
+      mercado: row.exchange ?? '',
+      tipo: row.type ?? 'PORTFOLIO',
+      currency: row.currency ?? '',
+    })).filter((i) => i.symbol);
+
+    try {
+      const summaryResp = await getJson('/portfolio/summary');
+      const summaryItems = Array.isArray(summaryResp?.data) ? summaryResp.data : [];
+      const summaryMap = new Map(summaryItems.map((row) => [String(row.symbol ?? '').toUpperCase(), row]));
+      portfolio.forEach((p) => {
+        const s = summaryMap.get(p.symbol);
+        if (!s) return;
+        p.price = Number.isFinite(s.price) ? s.price : p.price;
+        p.var_pct = Number.isFinite(s.var_pct) ? s.var_pct : p.var_pct;
+        p.var_mtd = Number.isFinite(s.var_mtd) ? s.var_mtd : p.var_mtd;
+        p.var_ytd = Number.isFinite(s.var_ytd) ? s.var_ytd : p.var_ytd;
+        p.signal = s.signal ?? p.signal;
+        p.sma20 = Number.isFinite(s.sma20) ? s.sma20 : p.sma20;
+        p.sma50 = Number.isFinite(s.sma50) ? s.sma50 : p.sma50;
+        p.volatility_30d = Number.isFinite(s.volatility_30d) ? s.volatility_30d : p.volatility_30d;
+        p.volume_nominal = s.volume_nominal ?? p.volume_nominal;
+        p.volume_efectivo = s.volume_efectivo ?? p.volume_efectivo;
+      });
+    } catch (summaryError) {
+      console.info('[portafolios] summary opcional no disponible', summaryError);
+    }
+
+    const enriched = syncPortfolioFromCatalog(portfolio);
+    state.portfolio = enriched.map((p) => ({
+      ...p,
+      name: p.name || p.symbol,
+    }));
+    state.counts.portfolio = state.portfolio.length;
+    console.info('[portafolios] cartera cargada', state.portfolio.length);
+  } catch (error) {
+    setError(error?.error?.message ?? 'No se pudo cargar tu portafolio');
+    state.portfolio = [];
+    state.counts.portfolio = 0;
+  }
+};
+
+const init = async () => {
   renderToolbar();
   bindToolbarNavigation();
-  highlightToolbar();
-  bindUserMenu({
-    onLogout: handleLogout,
-    onAdmin: () => {
-      window.location.href = '/Frontend/usuarios.html';
-    },
-  });
   setToolbarUserName('');
-  loadProfile();
-  fetchSelectedPortfolio();
-  bindTabs();
-
-  const filterInput = document.getElementById('filter-input');
-  const categoryFilter = document.getElementById('category-filter');
-  const container = document.getElementById('stocks-container');
-  const selectedContainer = document.getElementById('selected-container');
-  const exchangeSelect = document.getElementById('exchange-select');
-  filterInput?.addEventListener('input', (event) => {
-    state.searchTerm = event.target.value.trim();
+  bindUserMenu({
+    onLogout: async () => {
+      try { await getJson('/auth/logout'); } finally { authStore.clearToken(); window.location.href = '/'; }
+    },
+    onAdmin: () => window.location.href = '/Frontend/usuarios.html',
+  });
+  highlightToolbar();
+  try {
+    state.profile = await getJson('/me');
+  } catch {
+    state.profile = authStore.getProfile();
+  }
+  setAdminMenuVisibility(state.profile);
+  await overlay.withLoader(async () => {
+    await loadPortfolio();
+    await loadData();
+    const categorySelect = document.getElementById('rava-category');
+    if (categorySelect) {
+      categorySelect.value = state.portfolio.length > 0 ? 'selected' : 'all';
+    }
     applyFilter();
   });
-  categoryFilter?.addEventListener('change', (event) => {
-    state.category = event.target.value;
-    state.searchTerm = '';
-    if (filterInput) {
-      filterInput.value = '';
-    }
-    if (!state.category) {
-      state.filtered = [];
-      if (filterInput) filterInput.disabled = true;
-      renderStocks();
-      return;
-    }
-    fetchStocks();
-  });
-  exchangeSelect?.addEventListener('change', (event) => {
-    state.exchange = event.target.value.toUpperCase();
-    setCookie(exchangeCookieKey(state.profile), state.exchange);
-    fetchStocks();
-  });
-  container?.addEventListener('click', handleAddToPortfolio);
-  selectedContainer?.addEventListener('click', handleRemoveFromPortfolio);
+  setHistoryStatus('Selecciona un instrumento para ver su histórico.');
+  renderHistoricosMeta();
+  renderHistoricosTable();
+  bindUi();
 };
 
 document.addEventListener('DOMContentLoaded', init);

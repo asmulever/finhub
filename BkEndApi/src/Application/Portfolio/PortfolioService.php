@@ -39,6 +39,12 @@ final class PortfolioService
         return $this->repository->listPortfolios($userId);
     }
 
+    public function getBaseCurrency(int $userId): string
+    {
+        $portfolioId = $this->repository->ensureUserPortfolio($userId);
+        return $this->repository->getBaseCurrency($portfolioId);
+    }
+
     public function listSymbols(): array
     {
         return $this->repository->listSymbols();
