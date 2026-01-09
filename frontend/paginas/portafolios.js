@@ -387,47 +387,21 @@ const fetchFxRate = async () => {
   }
 };
 
-const loadData = async ({ forceSync = false } = {}) => {
+const loadData = async () => {
   setError('');
-  let catalogItems = [];
-
-  try {
-    if (forceSync) {
-      await postJson('/datalake/catalog/sync');
-    }
-    const catalogResp = await getJson('/datalake/catalog');
-    catalogItems = Array.isArray(catalogResp?.data) ? catalogResp.data : [];
-    if (catalogItems.length === 0 && !forceSync) {
-      try {
-        await postJson('/datalake/catalog/sync');
-        const retryResp = await getJson('/datalake/catalog');
-        catalogItems = Array.isArray(retryResp?.data) ? retryResp.data : [];
-      } catch (syncError) {
-        console.info('[portafolios] sync catalog opcional falló', syncError);
-      }
-    }
-  } catch (error) {
-    console.info('[portafolios] catalog fetch falló, se intenta fallback', error);
-  }
-
-  if (Array.isArray(catalogItems) && catalogItems.length > 0) {
-    state.items = normalizeCatalogItems(catalogItems);
-  } else {
-    // Fallback a RAVA directo para no dejar la vista vacía.
-    const [cedears, acciones, bonos] = await Promise.all([
-      getJson('/rava/cedears').catch(() => ({ data: [] })),
-      getJson('/rava/acciones').catch(() => ({ data: [] })),
-      getJson('/rava/bonos').catch(() => ({ data: [] })),
-    ]);
-    state.items = normalizeItems({
-      cedears: cedears?.data ?? [],
-      acciones: acciones?.data ?? [],
-      bonos: bonos?.data ?? [],
-    });
-    state.counts.cedears = (cedears?.data ?? []).length;
-    state.counts.acciones = (acciones?.data ?? []).length;
-    state.counts.bonos = (bonos?.data ?? []).length;
-  }
+  const [cedears, acciones, bonos] = await Promise.all([
+    getJson('/rava/cedears').catch(() => ({ data: [] })),
+    getJson('/rava/acciones').catch(() => ({ data: [] })),
+    getJson('/rava/bonos').catch(() => ({ data: [] })),
+  ]);
+  state.items = normalizeItems({
+    cedears: cedears?.data ?? [],
+    acciones: acciones?.data ?? [],
+    bonos: bonos?.data ?? [],
+  });
+  state.counts.cedears = (cedears?.data ?? []).length;
+  state.counts.acciones = (acciones?.data ?? []).length;
+  state.counts.bonos = (bonos?.data ?? []).length;
 
   rebuildCatalogIndex();
   state.counts.all = state.items.length;
