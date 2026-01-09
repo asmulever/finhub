@@ -14,6 +14,9 @@ const state = {
   selectedCatalog: null,
   snapshots: {},
   series: [],
+  history: [],
+  targetCurrency: 'ARS',
+  fx: { rate: null, asOf: null, fetchedAt: 0 },
 };
 
 const isAdminProfile = (profile) => String(profile?.role ?? '').toLowerCase() === 'admin';
@@ -65,6 +68,19 @@ const overlay = createLoadingOverlay();
 const formatNumber = (value, digits = 2) => {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '–';
   return new Intl.NumberFormat('es-AR', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(value));
+};
+
+const convertPrice = (value, currency = 'ARS') => {
+  const target = (state.targetCurrency || 'ARS').toUpperCase();
+  const from = (currency || '').toUpperCase() || 'ARS';
+  if (!Number.isFinite(Number(value))) return null;
+  const num = Number(value);
+  if (target === from) return num;
+  const rate = state.fx.rate;
+  if (!Number.isFinite(rate)) return num;
+  if (from === 'USD' && target === 'ARS') return num * rate;
+  if (from === 'ARS' && target === 'USD') return num / rate;
+  return num;
 };
 
 const handleLogout = async () => {
@@ -223,6 +239,120 @@ const resetForm = () => {
   document.getElementById('form-asof').value = '';
 };
 
+const fetchFxRate = async () => {
+  const now = Date.now();
+  if (state.fx.fetchedAt && (now - state.fx.fetchedAt) < 10000 && Number.isFinite(state.fx.rate)) {
+    return;
+  }
+  try {
+    const resp = await overlay.withLoader(() => getJson('/alphavantage/fx-daily?from=USD&to=ARS'));
+    const payload = resp?.data ?? resp ?? {};
+    const ts = payload['Time Series FX (Daily)'] ?? payload['time series fx (daily)'] ?? null;
+    const meta = payload['Meta Data'] ?? payload['meta data'] ?? {};
+    let asOf = meta['5. Last Refreshed'] ?? meta['6. Last Refreshed'] ?? '';
+    let rate = null;
+    if (ts && typeof ts === 'object') {
+      const dates = Object.keys(ts);
+      const latest = asOf !== '' ? asOf : (dates.sort((a, b) => b.localeCompare(a))[0] ?? '');
+      const row = ts[latest] ?? {};
+      rate = Number(row['4. close'] ?? row['1. open'] ?? row['2. high'] ?? row['3. low'] ?? null);
+      asOf = latest || asOf;
+    }
+    if (Number.isFinite(rate)) {
+      state.fx.rate = Number(rate);
+      state.fx.asOf = asOf || null;
+      state.fx.fetchedAt = Date.now();
+    }
+  } catch {
+    // ignore
+  }
+};
+
+const loadHistory = async () => {
+  const status = document.getElementById('history-status');
+  const symbol = document.getElementById('history-symbol')?.value || '';
+  const capture = document.getElementById('capture-select')?.value || '';
+  const type = document.getElementById('history-type')?.value || 'all';
+  if (status) status.textContent = 'Cargando histórico...';
+  try {
+    const params = new URLSearchParams();
+    if (symbol) params.append('symbol', symbol);
+    if (capture) params.append('captured_at', capture);
+    const resp = await overlay.withLoader(() => getJson(`/datalake/catalog/history?${params.toString()}`));
+    let rows = Array.isArray(resp?.data) ? resp.data : [];
+    if (type !== 'all') {
+      rows = rows.filter((r) => r.tipo === type);
+    }
+    state.history = rows;
+    renderHistory();
+    if (status) status.textContent = `Histórico: ${rows.length} filas`;
+  } catch (error) {
+    if (status) status.textContent = error?.error?.message ?? 'No se pudo cargar histórico';
+  }
+};
+
+const renderHistory = () => {
+  const tbody = document.getElementById('history-body');
+  if (!tbody) return;
+  if (!state.history.length) {
+    tbody.innerHTML = '<tr><td class="muted" colspan="7">Sin datos</td></tr>';
+    return;
+  }
+  const target = (state.targetCurrency || 'ARS').toUpperCase();
+  tbody.innerHTML = state.history.map((row) => {
+    const price = convertPrice(row.price, row.currency ?? 'ARS');
+    return `
+      <tr>
+        <td>${row.captured_at ? String(row.captured_at).replace('T', ' ').slice(0, 16) : '—'}</td>
+        <td>${row.symbol}</td>
+        <td>${Number.isFinite(price) ? formatNumber(price, 2) : '—'}</td>
+        <td>${target}</td>
+        <td>${row.tipo ?? '—'}</td>
+        <td>${row.mercado ?? row.panel ?? '—'}</td>
+        <td>${row.source ?? '—'}</td>
+      </tr>
+    `;
+  }).join('');
+};
+
+const captureHistory = async () => {
+  const status = document.getElementById('history-status');
+  if (!window.confirm('Capturar snapshots para símbolos de portafolios?')) return;
+  if (status) status.textContent = 'Capturando...';
+  try {
+    await overlay.withLoader(() => postJson('/datalake/catalog/capture', {}));
+    await loadHistory();
+    if (status) status.textContent = 'Captura completa';
+  } catch (error) {
+    if (status) status.textContent = error?.error?.message ?? 'No se pudo capturar';
+  }
+};
+
+const saveHistoryItem = async () => {
+  const status = document.getElementById('hist-form-status');
+  const symbol = (document.getElementById('hist-form-symbol')?.value || '').toUpperCase();
+  const tipo = document.getElementById('hist-form-type')?.value || '';
+  if (!symbol || !tipo) {
+    if (status) status.textContent = 'Símbolo y tipo son obligatorios';
+    return;
+  }
+  const payload = {
+    symbol,
+    tipo,
+    price: document.getElementById('hist-form-price')?.value || '',
+    currency: document.getElementById('hist-form-currency')?.value || '',
+    mercado: document.getElementById('hist-form-market')?.value || '',
+  };
+  if (!window.confirm(`Agregar ${symbol} al histórico?`)) return;
+  try {
+    await overlay.withLoader(() => postJson('/datalake/catalog/item', payload));
+    if (status) status.textContent = `Agregado ${symbol}`;
+    await loadHistory();
+  } catch (error) {
+    if (status) status.textContent = error?.error?.message ?? 'No se pudo agregar';
+  }
+};
+
 const loadSymbols = async () => {
   const response = await getJson('/datalake/prices/symbols');
   state.symbols = Array.isArray(response?.symbols) ? response.symbols : [];
@@ -231,6 +361,26 @@ const loadSymbols = async () => {
     if (!sel) return;
     sel.innerHTML = state.symbols.map((s) => `<option value="${s}">${s}</option>`).join('');
   });
+};
+
+const loadCaptures = async () => {
+  const sel = document.getElementById('capture-select');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Cargando...</option>';
+  try {
+    const resp = await overlay.withLoader(() => getJson('/datalake/catalog/captures'));
+    const rows = Array.isArray(resp?.data) ? resp.data : [];
+    if (!rows.length) {
+      sel.innerHTML = '<option value="">Sin capturas</option>';
+      return;
+    }
+    sel.innerHTML = rows.map((r) => `<option value="${r.captured_at}">${r.captured_at} · ${r.count} símbolos</option>`).join('');
+  } catch (error) {
+    const status = document.getElementById('history-status');
+    if (status) status.textContent = error?.error?.message ?? 'Error al cargar capturas (verifica schema/catalogo)';
+    console.error('[datalake] loadCaptures error', error);
+    sel.innerHTML = '<option value="">Error al cargar</option>';
+  }
 };
 
 const loadLatestSnapshot = async () => {
@@ -346,9 +496,11 @@ const init = async () => {
   }
   renderTabs();
   await loadCatalog();
+  await loadCaptures();
   await loadSymbols();
   await loadLatestSnapshot();
   await loadSeries();
+  await loadHistory();
 
   document.getElementById('catalog-search')?.addEventListener('input', applyCatalogFilter);
   document.getElementById('catalog-type')?.addEventListener('change', applyCatalogFilter);
@@ -363,6 +515,17 @@ const init = async () => {
     }
   });
   document.getElementById('series-load')?.addEventListener('click', loadSeries);
+  document.getElementById('history-load')?.addEventListener('click', loadHistory);
+  document.getElementById('catalog-capture')?.addEventListener('click', captureHistory);
+  document.getElementById('history-currency')?.addEventListener('change', async (event) => {
+    state.targetCurrency = (event.target?.value || 'ARS').toUpperCase();
+    if (state.targetCurrency === 'USD') {
+      await fetchFxRate();
+    }
+    renderHistory();
+  });
+  document.getElementById('capture-select')?.addEventListener('change', loadHistory);
+  document.getElementById('hist-form-save')?.addEventListener('click', saveHistoryItem);
   resetLog('Listo para iniciar ingesta.');
 };
 

@@ -26,30 +26,9 @@ final class PdoInstrumentCatalogRepository implements InstrumentCatalogRepositor
 
         $sql = <<<'SQL'
 INSERT INTO dl_instrument_catalog
-    (symbol, name, tipo, panel, mercado, currency, source, as_of, price, var_pct, var_mtd, var_ytd, volume_nominal, volume_efectivo, anterior, apertura, maximo, minimo, operaciones, meta_json)
+    (symbol, name, tipo, panel, mercado, currency, source, as_of, price, var_pct, var_mtd, var_ytd, volume_nominal, volume_efectivo, anterior, apertura, maximo, minimo, operaciones, meta_json, captured_at)
 VALUES
-    (:symbol, :name, :tipo, :panel, :mercado, :currency, :source, :as_of, :price, :var_pct, :var_mtd, :var_ytd, :volume_nominal, :volume_efectivo, :anterior, :apertura, :maximo, :minimo, :operaciones, :meta_json)
-ON DUPLICATE KEY UPDATE
-    name = VALUES(name),
-    tipo = VALUES(tipo),
-    panel = VALUES(panel),
-    mercado = VALUES(mercado),
-    currency = VALUES(currency),
-    source = VALUES(source),
-    as_of = VALUES(as_of),
-    price = VALUES(price),
-    var_pct = VALUES(var_pct),
-    var_mtd = VALUES(var_mtd),
-    var_ytd = VALUES(var_ytd),
-    volume_nominal = VALUES(volume_nominal),
-    volume_efectivo = VALUES(volume_efectivo),
-    anterior = VALUES(anterior),
-    apertura = VALUES(apertura),
-    maximo = VALUES(maximo),
-    minimo = VALUES(minimo),
-    operaciones = VALUES(operaciones),
-    meta_json = VALUES(meta_json),
-    updated_at = CURRENT_TIMESTAMP(6)
+    (:symbol, :name, :tipo, :panel, :mercado, :currency, :source, :as_of, :price, :var_pct, :var_mtd, :var_ytd, :volume_nominal, :volume_efectivo, :anterior, :apertura, :maximo, :minimo, :operaciones, :meta_json, :captured_at)
 SQL;
 
         $stmt = $this->pdo->prepare($sql);
@@ -61,6 +40,7 @@ SQL;
             }
             $asOf = $this->normalizeDateTime($item['as_of'] ?? null);
             $meta = $item['meta'] ?? [];
+            $capturedAt = $this->normalizeDateTime($item['captured_at'] ?? new \DateTimeImmutable());
             $stmt->execute([
                 'symbol' => strtoupper((string) ($item['symbol'] ?? '')),
                 'name' => $item['name'] ?? null,
@@ -82,6 +62,7 @@ SQL;
                 'minimo' => $this->floatOrNull($item['minimo'] ?? null),
                 'operaciones' => isset($item['operaciones']) && is_numeric($item['operaciones']) ? (int) $item['operaciones'] : null,
                 'meta_json' => !empty($meta) ? json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null,
+                'captured_at' => $capturedAt,
             ]);
             $count += $stmt->rowCount() > 0 ? 1 : 0;
         }
@@ -93,34 +74,14 @@ SQL;
     {
         $sql = <<<'SQL'
 INSERT INTO dl_instrument_catalog
-    (symbol, name, tipo, panel, mercado, currency, source, as_of, price, var_pct, var_mtd, var_ytd, volume_nominal, volume_efectivo, anterior, apertura, maximo, minimo, operaciones, meta_json)
+    (symbol, name, tipo, panel, mercado, currency, source, as_of, price, var_pct, var_mtd, var_ytd, volume_nominal, volume_efectivo, anterior, apertura, maximo, minimo, operaciones, meta_json, captured_at)
 VALUES
-    (:symbol, :name, :tipo, :panel, :mercado, :currency, :source, :as_of, :price, :var_pct, :var_mtd, :var_ytd, :volume_nominal, :volume_efectivo, :anterior, :apertura, :maximo, :minimo, :operaciones, :meta_json)
-ON DUPLICATE KEY UPDATE
-    name = VALUES(name),
-    tipo = VALUES(tipo),
-    panel = VALUES(panel),
-    mercado = VALUES(mercado),
-    currency = VALUES(currency),
-    source = VALUES(source),
-    as_of = VALUES(as_of),
-    price = VALUES(price),
-    var_pct = VALUES(var_pct),
-    var_mtd = VALUES(var_mtd),
-    var_ytd = VALUES(var_ytd),
-    volume_nominal = VALUES(volume_nominal),
-    volume_efectivo = VALUES(volume_efectivo),
-    anterior = VALUES(anterior),
-    apertura = VALUES(apertura),
-    maximo = VALUES(maximo),
-    minimo = VALUES(minimo),
-    operaciones = VALUES(operaciones),
-    meta_json = VALUES(meta_json),
-    updated_at = CURRENT_TIMESTAMP(6)
+    (:symbol, :name, :tipo, :panel, :mercado, :currency, :source, :as_of, :price, :var_pct, :var_mtd, :var_ytd, :volume_nominal, :volume_efectivo, :anterior, :apertura, :maximo, :minimo, :operaciones, :meta_json, :captured_at)
 SQL;
         $stmt = $this->pdo->prepare($sql);
         $asOf = $this->normalizeDateTime($item['as_of'] ?? null);
         $meta = $item['meta'] ?? [];
+        $capturedAt = $this->normalizeDateTime($item['captured_at'] ?? new \DateTimeImmutable());
         $stmt->execute([
             'symbol' => strtoupper((string) ($item['symbol'] ?? '')),
             'name' => $item['name'] ?? null,
@@ -142,13 +103,23 @@ SQL;
             'minimo' => $this->floatOrNull($item['minimo'] ?? null),
             'operaciones' => isset($item['operaciones']) && is_numeric($item['operaciones']) ? (int) $item['operaciones'] : null,
             'meta_json' => !empty($meta) ? json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null,
+            'captured_at' => $capturedAt,
         ]);
         return true;
     }
 
     public function listAll(): array
     {
-        $sql = 'SELECT symbol, name, tipo, panel, mercado, currency, source, as_of, price, var_pct, var_mtd, var_ytd, volume_nominal, volume_efectivo, anterior, apertura, maximo, minimo, operaciones, meta_json, updated_at FROM dl_instrument_catalog ORDER BY symbol ASC';
+        $sql = <<<'SQL'
+SELECT c.*
+FROM dl_instrument_catalog c
+JOIN (
+    SELECT symbol, MAX(captured_at) AS max_captured
+    FROM dl_instrument_catalog
+    GROUP BY symbol
+) latest ON c.symbol = latest.symbol AND c.captured_at = latest.max_captured
+ORDER BY c.symbol ASC
+SQL;
         $stmt = $this->pdo->query($sql);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
         return array_map(function (array $row): array {
@@ -158,7 +129,7 @@ SQL;
 
     public function findBySymbol(string $symbol): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT symbol, name, tipo, panel, mercado, currency, source, as_of, price, var_pct, var_mtd, var_ytd, volume_nominal, volume_efectivo, anterior, apertura, maximo, minimo, operaciones, meta_json, updated_at FROM dl_instrument_catalog WHERE symbol = :symbol LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT symbol, name, tipo, panel, mercado, currency, source, as_of, price, var_pct, var_mtd, var_ytd, volume_nominal, volume_efectivo, anterior, apertura, maximo, minimo, operaciones, meta_json, captured_at, updated_at FROM dl_instrument_catalog WHERE symbol = :symbol ORDER BY captured_at DESC LIMIT 1');
         $stmt->execute(['symbol' => strtoupper($symbol)]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($row === false) {
@@ -171,6 +142,62 @@ SQL;
     {
         $stmt = $this->pdo->prepare('DELETE FROM dl_instrument_catalog WHERE symbol = :symbol');
         return $stmt->execute(['symbol' => strtoupper($symbol)]);
+    }
+
+    public function history(?string $symbol = null, ?\DateTimeImmutable $from = null, ?\DateTimeImmutable $to = null, ?\DateTimeImmutable $capturedAt = null): array
+    {
+        $where = [];
+        $params = [];
+        if ($symbol !== null && $symbol !== '') {
+            $where[] = 'symbol = :symbol';
+            $params[':symbol'] = strtoupper($symbol);
+        }
+        if ($from !== null) {
+            $where[] = 'captured_at >= :from';
+            $params[':from'] = $from->format('Y-m-d H:i:s');
+        }
+        if ($to !== null) {
+            $where[] = 'captured_at <= :to';
+            $params[':to'] = $to->format('Y-m-d H:i:s');
+        }
+        if ($capturedAt !== null) {
+            $where[] = 'captured_at >= :captured_from AND captured_at < :captured_to';
+            $params[':captured_from'] = $capturedAt->format('Y-m-d H:i:00');
+            $params[':captured_to'] = $capturedAt->modify('+1 minute')->format('Y-m-d H:i:00');
+        }
+        $whereSql = empty($where) ? '' : 'WHERE ' . implode(' AND ', $where);
+        $baseSelect = 'SELECT symbol, name, tipo, panel, mercado, currency, source, as_of, price, var_pct, var_mtd, var_ytd, volume_nominal, volume_efectivo, anterior, apertura, maximo, minimo, operaciones, meta_json, captured_at, updated_at FROM dl_instrument_catalog %s ORDER BY captured_at DESC';
+        $sql = sprintf($baseSelect, $whereSql);
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            return array_map(fn ($row) => $this->hydrate($row), $rows);
+        } catch (\Throwable $e) {
+            // Fallback por si la columna captured_at no existe (schema antiguo)
+            $fallbackSelect = 'SELECT symbol, name, tipo, panel, mercado, currency, source, as_of, price, var_pct, var_mtd, var_ytd, volume_nominal, volume_efectivo, anterior, apertura, maximo, minimo, operaciones, meta_json, updated_at AS captured_at, updated_at FROM dl_instrument_catalog %s ORDER BY updated_at DESC';
+            $fbSql = sprintf($fallbackSelect, $whereSql);
+            $stmt = $this->pdo->prepare($fbSql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            return array_map(fn ($row) => $this->hydrate($row), $rows);
+        }
+    }
+
+    public function listCaptures(): array
+    {
+        $query = 'SELECT captured_at, COUNT(*) AS count FROM (SELECT DATE_FORMAT(captured_at, "%Y-%m-%d %H:%i:00") AS captured_at FROM dl_instrument_catalog) t GROUP BY captured_at ORDER BY captured_at DESC';
+        try {
+            $stmt = $this->pdo->query($query);
+        } catch (\Throwable $e) {
+            // Fallback si no existe captured_at (schema antiguo)
+            $stmt = $this->pdo->query('SELECT captured_at, COUNT(*) AS count FROM (SELECT DATE_FORMAT(updated_at, "%Y-%m-%d %H:%i:00") AS captured_at FROM dl_instrument_catalog) t GROUP BY captured_at ORDER BY captured_at DESC');
+        }
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return array_map(static fn ($row) => [
+            'captured_at' => (string) ($row['captured_at'] ?? ''),
+            'count' => (int) ($row['count'] ?? 0),
+        ], $rows);
     }
 
     /**
@@ -205,6 +232,7 @@ SQL;
             'minimo' => $row['minimo'] !== null ? (float) $row['minimo'] : null,
             'operaciones' => $row['operaciones'] !== null ? (int) $row['operaciones'] : null,
             'meta' => $meta,
+            'captured_at' => $row['captured_at'] ?? null,
             'updated_at' => $row['updated_at'] ?? null,
         ];
     }

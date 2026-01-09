@@ -65,6 +65,7 @@ header('Expires: 0');
             <span class="pill" id="rava-badge-cedears">CEDEARs: --</span>
             <span class="pill" id="rava-badge-acciones">Acciones: --</span>
             <span class="pill" id="rava-badge-bonos">Bonos: --</span>
+            <span class="pill" id="rava-badge-fx">FX USD/ARS: --</span>
           </div>
         </div>
         <div class="actions" style="margin-top:12px;">
@@ -74,6 +75,10 @@ header('Expires: 0');
             <option value="cedears">CEDEARs</option>
             <option value="acciones">Acciones AR</option>
             <option value="bonos">Bonos</option>
+          </select>
+          <select id="rava-currency">
+            <option value="ARS" selected>Mostrar en ARS</option>
+            <option value="USD">Mostrar en USD</option>
           </select>
           <input id="rava-search" placeholder="Filtrar por símbolo o nombre..." />
           <button id="rava-btn-reload" type="button">Recargar</button>

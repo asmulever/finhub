@@ -67,6 +67,7 @@ header('Expires: 0');
           <button class="tab-btn active" data-tab="catalog">Catálogo</button>
           <button class="tab-btn" data-tab="snapshots">Snapshots</button>
           <button class="tab-btn" data-tab="series">Series</button>
+          <button class="tab-btn" data-tab="history">Histórico</button>
         </div>
 
         <div class="tab-panel active" id="tab-catalog" style="margin-top:12px;">
@@ -127,6 +128,68 @@ header('Expires: 0');
                 <button id="form-reset" type="button">Limpiar</button>
               </div>
               <div id="catalog-status" class="muted" style="margin-top:10px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="tab-history" style="margin-top:12px;">
+          <div class="section-grid">
+            <div class="block">
+              <h3>Capturas de catálogo</h3>
+              <div class="actions" style="margin:8px 0;">
+                <select id="capture-select" style="min-width:200px;"></select>
+                <input id="history-symbol" placeholder="Símbolo opcional" style="min-width:120px;" />
+                <select id="history-type" style="min-width:140px;">
+                  <option value="all">Todos</option>
+                  <option value="CEDEAR">CEDEAR</option>
+                  <option value="ACCION_AR">Acciones</option>
+                  <option value="BONO">Bonos</option>
+                </select>
+                <select id="history-currency">
+                  <option value="ARS">ARS</option>
+                  <option value="USD">USD</option>
+                </select>
+                <button id="history-load" type="button">Ver captura</button>
+                <button id="catalog-capture" class="primary" type="button">Capturar portafolios</button>
+              </div>
+              <div class="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Captured</th>
+                      <th>Símbolo</th>
+                      <th>Precio</th>
+                      <th>Moneda</th>
+                      <th>Tipo</th>
+                      <th>Mercado</th>
+                      <th>Fuente</th>
+                    </tr>
+                  </thead>
+                  <tbody id="history-body">
+                    <tr><td class="muted" colspan="7">Sin datos</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div id="history-status" class="muted" style="margin-top:8px;"></div>
+            </div>
+            <div class="block">
+              <h3>Ingresar símbolo al histórico</h3>
+              <p class="muted">Ingresa un ticker y tipo para agregar snapshot manual.</p>
+              <div class="form-grid" style="margin-top:8px;">
+                <input id="hist-form-symbol" placeholder="Símbolo" />
+                <select id="hist-form-type">
+                  <option value="CEDEAR">CEDEAR</option>
+                  <option value="ACCION_AR">Acción AR</option>
+                  <option value="BONO">Bono</option>
+                </select>
+                <input id="hist-form-price" placeholder="Precio" />
+                <input id="hist-form-currency" placeholder="Moneda (ej. ARS)" />
+                <input id="hist-form-market" placeholder="Mercado/Panel" />
+              </div>
+              <div class="actions" style="margin-top:10px;">
+                <button id="hist-form-save" class="primary" type="button">Agregar al histórico</button>
+              </div>
+              <div id="hist-form-status" class="muted" style="margin-top:8px;"></div>
             </div>
           </div>
         </div>
