@@ -82,22 +82,6 @@ SQL;
                 'error_msg' => $snapshot['error_msg'] ?? null,
             ]);
 
-            $upsert = <<<'SQL'
-INSERT INTO dl_price_latest (symbol, provider, as_of, payload_json)
-VALUES (:symbol, :provider, :as_of, :payload_json)
-ON DUPLICATE KEY UPDATE
-    as_of = IF(VALUES(as_of) > as_of, VALUES(as_of), as_of),
-    payload_json = IF(VALUES(as_of) > as_of, VALUES(payload_json), payload_json),
-    updated_at = NOW(6)
-SQL;
-            $uStmt = $this->pdo->prepare($upsert);
-            $uStmt->execute([
-                'symbol' => $snapshot['symbol'],
-                'provider' => $snapshot['provider'],
-                'as_of' => $asOf,
-                'payload_json' => $payloadJson,
-            ]);
-
             return ['success' => true];
         } catch (\Throwable $e) {
             $this->logger->error('datalake.store.error', [
@@ -110,7 +94,7 @@ SQL;
 
     public function fetchLatest(string $symbol): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT symbol, provider, as_of, payload_json FROM dl_price_latest WHERE symbol = :symbol LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT symbol, provider, as_of, payload_json FROM dl_price_snapshots WHERE symbol = :symbol ORDER BY as_of DESC LIMIT 1');
         $stmt->execute([':symbol' => $symbol]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($row === false) {
