@@ -241,6 +241,11 @@ final class ApiDispatcher
             $this->handleInstrumentCatalogList();
             return;
         }
+        if ($method === 'GET' && $path === '/datalake/catalog/captures') {
+            $this->requireAdmin();
+            $this->handleInstrumentCatalogCaptures();
+            return;
+        }
         if ($method === 'POST' && $path === '/datalake/catalog/sync') {
             $this->requireUser();
             $this->handleInstrumentCatalogSync();
@@ -251,10 +256,20 @@ final class ApiDispatcher
             $this->handleInstrumentCatalogSave();
             return;
         }
+        if ($method === 'GET' && $path === '/datalake/catalog/history') {
+            $this->requireAdmin();
+            $this->handleInstrumentCatalogHistory();
+            return;
+        }
         if ($method === 'DELETE' && preg_match('#^/datalake/catalog/item/(.+)$#', $path, $matches)) {
             $this->requireAdmin();
             $symbol = urldecode((string) ($matches[1] ?? ''));
             $this->handleInstrumentCatalogDelete($symbol);
+            return;
+        }
+        if ($method === 'POST' && $path === '/datalake/catalog/capture') {
+            $this->requireAdmin();
+            $this->handleInstrumentCatalogCapture();
             return;
         }
         if ($method === 'GET' && $path === '/datalake/prices/symbols') {
@@ -681,6 +696,51 @@ final class ApiDispatcher
     }
 
     /**
+     * Devuelve histórico del catálogo.
+     */
+    private function handleInstrumentCatalogHistory(): void
+    {
+        $symbol = trim((string) ($_GET['symbol'] ?? ''));
+        $from = trim((string) ($_GET['from'] ?? ''));
+        $to = trim((string) ($_GET['to'] ?? ''));
+        $captured = trim((string) ($_GET['captured_at'] ?? ''));
+        $fromDt = $from !== '' ? new \DateTimeImmutable($from) : null;
+        $toDt = $to !== '' ? new \DateTimeImmutable($to) : null;
+        $capturedDt = $captured !== '' ? new \DateTimeImmutable($captured) : null;
+        $data = $this->instrumentCatalogService->history($symbol === '' ? null : $symbol, $fromDt, $toDt, $capturedDt);
+        $this->sendJson([
+            'data' => $data,
+            'meta' => [
+                'count' => count($data),
+                'symbol' => $symbol ?: null,
+                'from' => $from ?: null,
+                'to' => $to ?: null,
+                'captured_at' => $captured ?: null,
+            ],
+        ]);
+    }
+
+    /**
+     * Captura snapshots históricos para símbolos de portafolios (Admin).
+     */
+    private function handleInstrumentCatalogCapture(): void
+    {
+        $result = $this->instrumentCatalogService->capturePortfolioSymbols();
+        $this->sendJson([
+            'data' => $result,
+        ]);
+    }
+
+    /**
+     * Devuelve lista de capturas disponibles.
+     */
+    private function handleInstrumentCatalogCaptures(): void
+    {
+        $data = $this->instrumentCatalogService->captures();
+        $this->sendJson(['data' => $data]);
+    }
+
+    /**
      * Lista CEDEARs obtenidos desde RAVA (cache + stale).
      */
     private function handleRavaCedears(): void
@@ -742,6 +802,24 @@ final class ApiDispatcher
         if ($symbol === '') {
             throw new \RuntimeException('symbol requerido', 422);
         }
+        // Intentar histórico de RAVA como fuente principal
+        try {
+            $result = $this->ravaHistoricosService->historicos($symbol);
+            $items = $result['items'] ?? $result['data'] ?? [];
+            $this->sendJson([
+                'symbol' => $symbol,
+                'period' => $period,
+                'points' => $items,
+                'source' => 'rava',
+            ]);
+            return;
+        } catch (\Throwable $e) {
+            $this->logger->info('datalake.series.rava_failed', [
+                'symbol' => $symbol,
+                'message' => $e->getMessage(),
+            ]);
+        }
+        // Fallback: proveedor directo
         $series = $this->dataLakeService->series($symbol, $period);
         $this->sendJson($series);
     }
@@ -1344,7 +1422,7 @@ final class ApiDispatcher
     }
 
     /**
-     * Devuelve el último precio almacenado en dl_price_latest para un símbolo.
+     * Devuelve el último precio disponible para un símbolo (catálogo fresco o proveedor).
      */
     private function handleLatestPrice(): void
     {
@@ -1352,8 +1430,42 @@ final class ApiDispatcher
         if ($symbol === '') {
             throw new \RuntimeException('symbol requerido', 422);
         }
-        $quote = $this->dataLakeService->latestQuote($symbol);
-        $this->sendJson($quote);
+
+        $latest = $this->instrumentCatalogService->find($symbol);
+        $now = new \DateTimeImmutable();
+        $fresh = false;
+        if ($latest !== null && isset($latest['as_of'])) {
+            try {
+                $asOf = new \DateTimeImmutable((string) $latest['as_of']);
+                $fresh = ($now->getTimestamp() - $asOf->getTimestamp()) <= 600;
+            } catch (\Throwable $e) {
+                $fresh = false;
+            }
+        }
+        if ($latest !== null && $fresh && isset($latest['price'])) {
+            $this->sendJson([
+                'symbol' => $symbol,
+                'close' => $latest['price'],
+                'open' => $latest['apertura'] ?? null,
+                'high' => $latest['maximo'] ?? null,
+                'low' => $latest['minimo'] ?? null,
+                'currency' => $latest['currency'] ?? null,
+                'asOf' => $latest['as_of'] ?? null,
+                'source' => $latest['source'] ?? 'catalog',
+            ]);
+            return;
+        }
+
+        try {
+            $price = $this->priceService->getPrice(new PriceRequest($symbol));
+            $this->sendJson($price);
+        } catch (\Throwable $e) {
+            $this->logger->info('datalake.latest.provider_failed', [
+                'symbol' => $symbol,
+                'message' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
     }
 
     /**

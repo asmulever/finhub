@@ -19,19 +19,25 @@ final class InstrumentCatalogService
     private RavaBonosService $ravaBonosService;
     private InstrumentCatalogRepositoryInterface $repository;
     private LoggerInterface $logger;
+    private ?\FinHub\Application\Portfolio\PortfolioService $portfolioService = null;
+    private \FinHub\Application\MarketData\PriceService $priceService;
 
     public function __construct(
         RavaCedearsService $ravaCedearsService,
         RavaAccionesService $ravaAccionesService,
         RavaBonosService $ravaBonosService,
         InstrumentCatalogRepositoryInterface $repository,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        ?\FinHub\Application\Portfolio\PortfolioService $portfolioService = null,
+        ?\FinHub\Application\MarketData\PriceService $priceService = null
     ) {
         $this->ravaCedearsService = $ravaCedearsService;
         $this->ravaAccionesService = $ravaAccionesService;
         $this->ravaBonosService = $ravaBonosService;
         $this->repository = $repository;
         $this->logger = $logger;
+        $this->portfolioService = $portfolioService;
+        $this->priceService = $priceService ?? new \FinHub\Application\MarketData\PriceService(null, null, new \FinHub\Infrastructure\MarketData\ProviderMetrics('/tmp', 0, 0, 0));
     }
 
     /**
@@ -52,10 +58,20 @@ final class InstrumentCatalogService
             throw new \RuntimeException('No se pudo obtener listas RAVA para catálogo', 502, $e);
         }
 
+        $symbolsFilter = [];
+        if ($this->portfolioService !== null) {
+            $symbols = $this->portfolioService->listSymbols();
+            $symbolsFilter = array_unique(array_map(static fn ($s) => strtoupper(trim((string) $s)), $symbols));
+        }
+
         $map = [];
         $this->normalizeItems((array) ($cedears['items'] ?? []), 'CEDEAR', $map);
         $this->normalizeItems((array) ($acciones['items'] ?? []), 'ACCION_AR', $map);
         $this->normalizeItems((array) ($bonos['items'] ?? []), 'BONO', $map);
+
+        if (!empty($symbolsFilter)) {
+            $map = array_filter($map, static fn ($item) => in_array($item['symbol'], $symbolsFilter, true));
+        }
 
         $stored = 0;
         try {
@@ -71,6 +87,7 @@ final class InstrumentCatalogService
             'stored' => $stored,
             'total' => count($map),
             'source' => 'rava',
+            'filtered' => !empty($symbolsFilter),
         ];
     }
 
@@ -144,6 +161,59 @@ final class InstrumentCatalogService
             ]);
             throw new \RuntimeException('No se pudo eliminar el instrumento del DataLake', 500, $e);
         }
+    }
+
+    /**
+     * Captura snapshot histórico para símbolos presentes en portafolios (deduplicados).
+     */
+    public function capturePortfolioSymbols(): array
+    {
+        if ($this->portfolioService === null) {
+            throw new \RuntimeException('Servicio de portafolios no disponible', 500);
+        }
+        $symbols = $this->portfolioService->listSymbols();
+        $unique = array_values(array_unique(array_map(
+            static fn ($s) => strtoupper(trim((string) $s)),
+            $symbols
+        )));
+        $captured = 0;
+        $failed = [];
+        foreach ($unique as $symbol) {
+            try {
+                $data = $this->resolveSymbolData($symbol);
+                $this->repository->upsertOne($data);
+                $captured++;
+            } catch (\Throwable $e) {
+                $failed[] = ['symbol' => $symbol, 'reason' => $e->getMessage()];
+                $this->logger->info('datalake.catalog.capture_failed', [
+                    'symbol' => $symbol,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
+        return [
+            'captured' => $captured,
+            'failed' => $failed,
+            'total' => count($unique),
+        ];
+    }
+
+    /**
+     * Lista histórico de snapshots.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public function history(?string $symbol = null, ?\DateTimeImmutable $from = null, ?\DateTimeImmutable $to = null, ?\DateTimeImmutable $capturedAt = null): array
+    {
+        return $this->repository->history($symbol, $from, $to, $capturedAt);
+    }
+
+    /**
+     * @return array<int,array{captured_at:string,count:int}>
+     */
+    public function captures(): array
+    {
+        return $this->repository->listCaptures();
     }
 
     /**
@@ -252,6 +322,8 @@ final class InstrumentCatalogService
     private function normalizeSingle(array $row): array
     {
         $symbol = strtoupper((string) ($row['symbol'] ?? $row['especie'] ?? ''));
+        $now = new \DateTimeImmutable();
+        $capturedAt = $row['captured_at'] ?? $now;
         return [
             'symbol' => $symbol,
             'name' => $row['name'] ?? $row['nombre'] ?? $symbol,
@@ -273,6 +345,46 @@ final class InstrumentCatalogService
             'minimo' => $this->floatOrNull($row['minimo'] ?? null),
             'operaciones' => isset($row['operaciones']) && is_numeric($row['operaciones']) ? (int) $row['operaciones'] : null,
             'meta' => $row['meta'] ?? null,
+            'captured_at' => $capturedAt instanceof \DateTimeInterface ? $capturedAt : $now,
         ];
+    }
+
+    /**
+     * Resuelve datos de un símbolo usando catálogo fresco (<10 min) o proveedor.
+     *
+     * @return array<string,mixed>
+     */
+    private function resolveSymbolData(string $symbol): array
+    {
+        $latest = $this->find($symbol);
+        $now = new \DateTimeImmutable();
+        $fresh = false;
+        if ($latest !== null) {
+            $ts = $latest['as_of'] ?? $latest['captured_at'] ?? null;
+            if (is_string($ts)) {
+                $dt = new \DateTimeImmutable($ts);
+                $fresh = ($now->getTimestamp() - $dt->getTimestamp()) <= 600;
+            }
+        }
+        if ($latest !== null && $fresh && isset($latest['price'])) {
+            $latest['captured_at'] = $now;
+            return $latest;
+        }
+        // fallback proveedor
+        $quote = null;
+        if ($this->priceService !== null) {
+            $quote = $this->priceService->getPrice(new \FinHub\Application\MarketData\Dto\PriceRequest($symbol));
+        }
+        return $this->normalizeSingle([
+            'symbol' => $symbol,
+            'name' => $quote['name'] ?? $latest['name'] ?? $symbol,
+            'price' => $quote['close'] ?? $quote['price'] ?? $quote['c'] ?? null,
+            'currency' => $quote['currency'] ?? $latest['currency'] ?? null,
+            'as_of' => $quote['asOf'] ?? $quote['as_of'] ?? $latest['as_of'] ?? null,
+            'provider' => $quote['source'] ?? $quote['provider'] ?? ($latest['source'] ?? 'provider'),
+            'var_pct' => $quote['var_pct'] ?? null,
+            'var_mtd' => $quote['var_mtd'] ?? null,
+            'var_ytd' => $quote['var_ytd'] ?? null,
+        ]);
     }
 }

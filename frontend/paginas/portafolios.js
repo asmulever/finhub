@@ -15,6 +15,9 @@ const state = {
   historicoItems: [],
   historicoMeta: {},
   historicoSymbol: '',
+  historicoCurrency: 'ARS',
+  targetCurrency: 'ARS',
+  fx: { rate: null, asOf: null, source: 'AlphaVantage', fetchedAt: 0 },
 };
 
 const setError = (msg) => {
@@ -43,6 +46,30 @@ const formatSignedPercent = (value) => {
   const className = num > 0 ? 'pos' : (num < 0 ? 'neg' : '');
   const text = `${num > 0 ? '+' : ''}${formatNumber(num, 2)}%`;
   return { text, className };
+};
+
+const setFxBadge = () => {
+  const badge = document.getElementById('rava-badge-fx');
+  if (!badge) return;
+  if (state.fx.rate && state.fx.asOf) {
+    badge.textContent = `FX USD/ARS: ${formatNumber(state.fx.rate, 4)} · ${String(state.fx.asOf).slice(0, 16)}`;
+  } else {
+    badge.textContent = 'FX USD/ARS: --';
+  }
+};
+
+const convertPrice = (value, currency = 'ARS') => {
+  const target = (state.targetCurrency || 'ARS').toUpperCase();
+  const from = (currency || '').toUpperCase() || 'ARS';
+  if (!Number.isFinite(Number(value))) return null;
+  const num = Number(value);
+  if (target === from || target === '' || from === '') return num;
+  const rate = state.fx.rate;
+  if (!Number.isFinite(rate)) return null;
+  // rate = ARS por USD
+  if (from === 'USD' && target === 'ARS') return num * rate;
+  if (from === 'ARS' && target === 'USD') return num / rate;
+  return num; // no conversión para otros pares
 };
 
 const normalizeCatalogItems = (items) => {
@@ -80,10 +107,13 @@ const renderHistoricosMeta = () => {
   if (meta.from) extras.push(`desde ${meta.from}`);
   if (meta.to) extras.push(`hasta ${meta.to}`);
   if (meta.source) extras.push(meta.source);
+  if (state.targetCurrency && state.targetCurrency !== 'ARS') {
+    extras.push(`FX USD/ARS: ${state.fx.rate ? formatNumber(state.fx.rate, 4) : 'N/D'}`);
+  }
   const metaEl = document.getElementById('history-meta');
   if (metaEl) metaEl.textContent = extras.join(' · ');
   const symbolEl = document.getElementById('history-symbol');
-  if (symbolEl) symbolEl.textContent = `Símbolo: ${state.historicoSymbol || '--'}`;
+  if (symbolEl) symbolEl.textContent = `Símbolo: ${state.historicoSymbol || '--'} · ${state.targetCurrency || 'ARS'}`;
   const countEl = document.getElementById('history-count');
   if (countEl) countEl.textContent = `Registros: ${state.historicoItems.length || 0}`;
 };
@@ -98,16 +128,17 @@ const renderHistoricosTable = () => {
   const ordered = [...(state.historicoItems || [])].sort((a, b) => (b.fecha ?? '').localeCompare(a.fecha ?? ''));
   const rows = ordered.map((item) => {
     const variation = formatSignedPercent(item.variacion);
+    const currency = state.historicoCurrency || 'ARS';
     return `
       <tr>
         <td>${item.fecha ?? '–'}</td>
-        <td>${formatNumber(item.apertura, 2)}</td>
-        <td>${formatNumber(item.maximo, 2)}</td>
-        <td>${formatNumber(item.minimo, 2)}</td>
-        <td>${formatNumber(item.cierre, 2)}</td>
+        <td>${formatNumber(convertPrice(item.apertura, currency), 2)}</td>
+        <td>${formatNumber(convertPrice(item.maximo, currency), 2)}</td>
+        <td>${formatNumber(convertPrice(item.minimo, currency), 2)}</td>
+        <td>${formatNumber(convertPrice(item.cierre, currency), 2)}</td>
         <td class="${variation.className}">${variation.text}</td>
         <td>${formatNumber(item.volumen, 0)}</td>
-        <td>${formatNumber(item.ajuste, 2)}</td>
+        <td>${formatNumber(convertPrice(item.ajuste, currency), 2)}</td>
       </tr>
     `;
   }).join('');
@@ -117,6 +148,8 @@ const renderHistoricosTable = () => {
 const loadHistoricos = async (especie) => {
   const normalized = (especie || '').trim();
   if (!normalized) return;
+  const found = state.items.find((i) => i.symbol === normalized.toUpperCase()) || state.portfolio.find((i) => i.symbol === normalized.toUpperCase());
+  state.historicoCurrency = (found?.currency || 'ARS').toUpperCase();
   const cacheKey = normalized.toUpperCase();
   setHistoryError('');
   setHistoryStatus(`Cargando histórico para ${normalized}...`);
@@ -228,11 +261,12 @@ const renderList = () => {
   }
   const category = document.getElementById('rava-category')?.value || 'all';
   list.innerHTML = state.filtered.map((item) => {
+    const displayPrice = convertPrice(item.price, item.currency ?? 'ARS');
     const varPct = item.var_pct !== null && item.var_pct !== undefined ? `${item.var_pct.toFixed(2)}%` : '—';
     const varMtd = item.var_mtd !== null && item.var_mtd !== undefined ? `${item.var_mtd.toFixed(2)}%` : '—';
     const varYtd = item.var_ytd !== null && item.var_ytd !== undefined ? `${item.var_ytd.toFixed(2)}%` : '—';
     const volumeNom = item.volume_nominal ?? item.volumen_nominal ?? null;
-    const volumeEfe = item.volume_efectivo ?? item.volumen_efectivo ?? null;
+    const volumeEfe = convertPrice(item.volume_efectivo ?? item.volumen_efectivo ?? null, item.currency ?? 'ARS');
     const volLabel = item.volatility_30d !== null && item.volatility_30d !== undefined ? item.volatility_30d.toFixed(3) : '—';
     const asOf = item.as_of ? String(item.as_of).replace('T', ' ').slice(0, 16) : '—';
     return `
@@ -241,23 +275,23 @@ const renderList = () => {
           <div>
             <strong>${item.symbol}</strong>
             <small style="display:block;">${item.name || 'Sin nombre'}</small>
-            <small class="muted">${item.tipo || item.type || 'N/D'} · ${item.mercado || 'Mercado N/D'} · ${item.currency || 'N/D'}</small>
+            <small class="muted">${item.tipo || item.type || 'N/D'} · ${item.mercado || 'Mercado N/D'} · ${state.targetCurrency || item.currency || 'N/D'}</small>
           </div>
           <div>
-            <div style="font-size:1.4rem;font-weight:800;color:#e2e8f0;">${Number.isFinite(item.price) ? formatNumber(item.price, 2) : '—'}</div>
+            <div style="font-size:1.4rem;font-weight:800;color:#e2e8f0;">${Number.isFinite(displayPrice) ? formatNumber(displayPrice, 2) : '—'}</div>
             <div style="color:${(item.var_pct ?? 0) < 0 ? '#ef4444' : '#22c55e'};">${varPct}</div>
             <div class="muted">${asOf}</div>
           </div>
         </div>
         <div class="meta-row" style="margin-top:6px;">
-          <span>Anterior: ${formatNumber(item.anterior, 2)}</span>
-          <span>Apertura: ${formatNumber(item.apertura, 2)}</span>
-          <span>Máximo: ${formatNumber(item.maximo, 2)}</span>
-          <span>Mínimo: ${formatNumber(item.minimo, 2)}</span>
+          <span>Anterior: ${formatNumber(convertPrice(item.anterior, item.currency ?? 'ARS'), 2)}</span>
+          <span>Apertura: ${formatNumber(convertPrice(item.apertura, item.currency ?? 'ARS'), 2)}</span>
+          <span>Máximo: ${formatNumber(convertPrice(item.maximo, item.currency ?? 'ARS'), 2)}</span>
+          <span>Mínimo: ${formatNumber(convertPrice(item.minimo, item.currency ?? 'ARS'), 2)}</span>
         </div>
         <div class="meta-row">
           <span>Vol. Nominal: ${volumeNom ?? '—'}</span>
-          <span>Vol. Efectivo: ${volumeEfe ?? '—'}</span>
+          <span>Vol. Efectivo: ${volumeEfe !== null && volumeEfe !== undefined ? formatNumber(volumeEfe, 2) : '—'}</span>
           <span>Vol. Promedio: ${formatNumber(item.volumen_promedio, 2)}</span>
           <span>Volumen %: ${formatNumber(item.volumen_pct, 2)}</span>
         </div>
@@ -316,6 +350,41 @@ const applyFilter = () => {
   if (bCed) bCed.textContent = `CEDEARs: ${state.counts.cedears}`;
   if (bAcc) bAcc.textContent = `Acciones: ${state.counts.acciones}`;
   if (bBon) bBon.textContent = `Bonos: ${state.counts.bonos}`;
+  setFxBadge();
+};
+
+const fetchFxRate = async () => {
+  const now = Date.now();
+  if (state.fx.fetchedAt && (now - state.fx.fetchedAt) < 10000 && Number.isFinite(state.fx.rate)) {
+    return;
+  }
+  try {
+    const resp = await overlay.withLoader(() => getJson('/alphavantage/fx-daily?from=USD&to=ARS'));
+    const payload = resp?.data ?? resp ?? {};
+    const ts = payload['Time Series FX (Daily)'] ?? payload['Time Series FX (Daily)'] ?? payload['time series fx (daily)'];
+    const meta = payload['Meta Data'] ?? payload['meta data'] ?? {};
+    let asOf = meta['5. Last Refreshed'] ?? meta['6. Last Refreshed'] ?? '';
+    let rate = null;
+    if (ts && typeof ts === 'object') {
+      const dates = Object.keys(ts);
+      const latest = asOf !== '' ? asOf : (dates.sort((a, b) => b.localeCompare(a))[0] ?? '');
+      const row = ts[latest] ?? {};
+      rate = Number(row['4. close'] ?? row['1. open'] ?? row['2. high'] ?? row['3. low'] ?? null);
+      asOf = latest || asOf;
+    }
+    if (Number.isFinite(rate)) {
+      state.fx.rate = Number(rate);
+      state.fx.asOf = asOf || null;
+      state.fx.fetchedAt = Date.now();
+      state.fx.source = 'AlphaVantage';
+    } else {
+      setError('No se pudo obtener FX (AlphaVantage)');
+    }
+  } catch (error) {
+    setError(error?.error?.message ?? 'No se pudo obtener FX');
+  } finally {
+    setFxBadge();
+  }
 };
 
 const loadData = async ({ forceSync = false } = {}) => {
@@ -383,6 +452,14 @@ const bindUi = () => {
   }));
   document.getElementById('rava-category')?.addEventListener('change', applyFilter);
   document.getElementById('rava-search')?.addEventListener('input', applyFilter);
+  document.getElementById('rava-currency')?.addEventListener('change', async (event) => {
+    state.targetCurrency = (event.target?.value || 'ARS').toUpperCase();
+    if (state.targetCurrency === 'USD') {
+      await fetchFxRate();
+    }
+    applyFilter();
+    renderHistoricosTable();
+  });
 };
 
 const loadPortfolio = async () => {
@@ -455,6 +532,7 @@ const init = async () => {
   await overlay.withLoader(async () => {
     await loadPortfolio();
     await loadData();
+    await fetchFxRate();
     const categorySelect = document.getElementById('rava-category');
     if (categorySelect) {
       categorySelect.value = state.portfolio.length > 0 ? 'selected' : 'all';

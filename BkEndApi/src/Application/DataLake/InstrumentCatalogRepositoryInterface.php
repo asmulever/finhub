@@ -13,17 +13,22 @@ interface InstrumentCatalogRepositoryInterface
      *
      * @param array<int,array<string,mixed>> $items
      */
+    /**
+     * Inserta (no sobrescribe) múltiples snapshots de catálogo con timestamp.
+     *
+     * @param array<int,array<string,mixed>> $items
+     */
     public function upsertMany(array $items): int;
 
     /**
-     * Upsert de un instrumento individual.
+     * Inserta un snapshot individual.
      *
      * @param array<string,mixed> $item
      */
     public function upsertOne(array $item): bool;
 
     /**
-     * Devuelve el catálogo completo.
+     * Devuelve el último snapshot por símbolo (vista actual).
      *
      * @return array<int,array<string,mixed>>
      */
@@ -37,7 +42,21 @@ interface InstrumentCatalogRepositoryInterface
     public function findBySymbol(string $symbol): ?array;
 
     /**
-     * Elimina un instrumento del catálogo.
+     * Elimina snapshots de un símbolo.
      */
     public function delete(string $symbol): bool;
+
+    /**
+     * Lista histórico de snapshots opcionalmente filtrado por símbolo/rango.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public function history(?string $symbol = null, ?\DateTimeImmutable $from = null, ?\DateTimeImmutable $to = null, ?\DateTimeImmutable $capturedAt = null): array;
+
+    /**
+     * Devuelve lista de capturas (timestamp) con conteo de símbolos.
+     *
+     * @return array<int,array{captured_at:string,count:int}>
+     */
+    public function listCaptures(): array;
 }

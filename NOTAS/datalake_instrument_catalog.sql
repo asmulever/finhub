@@ -1,7 +1,10 @@
--- Catálogo de instrumentos RAVA en DataLake (SERVING).
--- Ejecutar manualmente antes de habilitar el catálogo vía API. No se crea en runtime.
+-- Reemplazo del catálogo: histórico por snapshot con timestamp completo.
+-- Ejecutar manualmente (drop + create); no se crea en runtime.
 
-CREATE TABLE IF NOT EXISTS dl_instrument_catalog (
+DROP TABLE IF EXISTS dl_instrument_catalog;
+
+CREATE TABLE dl_instrument_catalog (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   symbol VARCHAR(32) NOT NULL,
   name VARCHAR(128) NULL,
   tipo VARCHAR(32) NULL,
@@ -22,10 +25,11 @@ CREATE TABLE IF NOT EXISTS dl_instrument_catalog (
   minimo DECIMAL(18,4) NULL,
   operaciones INT NULL,
   meta_json JSON NULL,
+  captured_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  PRIMARY KEY (symbol),
-  INDEX idx_asof (as_of),
-  INDEX idx_tipo (tipo),
-  INDEX idx_panel (panel)
+  INDEX idx_symbol_captured (symbol, captured_at),
+  INDEX idx_captured (captured_at),
+  INDEX idx_asof (as_of)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
