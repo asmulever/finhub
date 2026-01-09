@@ -4,6 +4,9 @@ declare(strict_types=1);
 namespace FinHub\Application\DataLake;
 
 use FinHub\Application\MarketData\PriceService;
+use FinHub\Application\MarketData\RavaAccionesService;
+use FinHub\Application\MarketData\RavaBonosService;
+use FinHub\Application\MarketData\RavaCedearsService;
 use FinHub\Infrastructure\Logging\LoggerInterface;
 
 /**
@@ -15,17 +18,26 @@ final class DataLakeService
     private PriceService $priceService;
     private LoggerInterface $logger;
     private int $batchSize;
+    private ?RavaCedearsService $ravaCedearsService;
+    private ?RavaAccionesService $ravaAccionesService;
+    private ?RavaBonosService $ravaBonosService;
 
     public function __construct(
         PriceSnapshotRepositoryInterface $repository,
         PriceService $priceService,
         LoggerInterface $logger,
-        int $batchSize = 10
+        int $batchSize = 10,
+        ?RavaCedearsService $ravaCedearsService = null,
+        ?RavaAccionesService $ravaAccionesService = null,
+        ?RavaBonosService $ravaBonosService = null
     ) {
         $this->repository = $repository;
         $this->priceService = $priceService;
         $this->logger = $logger;
         $this->batchSize = $batchSize > 0 ? $batchSize : 10;
+        $this->ravaCedearsService = $ravaCedearsService;
+        $this->ravaAccionesService = $ravaAccionesService;
+        $this->ravaBonosService = $ravaBonosService;
     }
 
     public function collect(array $symbols): array
@@ -51,6 +63,8 @@ final class DataLakeService
         $processed = 0;
         $batchSize = max(1, $this->batchSize);
 
+        $ravaMap = $this->buildRavaMap();
+
         foreach (array_chunk($symbols, $batchSize) as $chunkIndex => $chunk) {
             $batchSnapshots = [];
             try {
@@ -69,6 +83,9 @@ final class DataLakeService
                 $this->appendStep($results['steps'], $symbol, 'start', 'running', 'Iniciando ingesta de símbolo', $progress);
 
                 $snapshot = $batchSnapshots[$symbol] ?? null;
+                if ($snapshot === null && isset($ravaMap[$symbol])) {
+                    $snapshot = $ravaMap[$symbol];
+                }
                 if ($snapshot === null) {
                     try {
                         $snapshot = $this->priceService->fetchSnapshot($symbol);
@@ -229,6 +246,7 @@ final class DataLakeService
             $payload['close'] ?? null,
             $payload['price'] ?? null,
             $payload['c'] ?? null,
+            $payload['ultimo'] ?? null,
         ];
         foreach ($candidates as $value) {
             if (is_numeric($value)) {
@@ -292,6 +310,81 @@ final class DataLakeService
             'status' => $status,
             'message' => $message,
             'progress' => $progress,
+        ];
+    }
+
+    /**
+     * Construye un map símbolo => snapshot a partir de RAVA (cedears/acciones/bonos).
+     *
+     * @return array<string,array<string,mixed>>
+     */
+    private function buildRavaMap(): array
+    {
+        $map = [];
+        try {
+            if ($this->ravaCedearsService !== null) {
+                $ced = $this->ravaCedearsService->listCedears();
+                foreach (($ced['items'] ?? []) as $item) {
+                    $snap = $this->ravaToSnapshot($item, 'rava');
+                    if ($snap !== null) {
+                        $map[$snap['symbol']] = $snap;
+                    }
+                }
+            }
+            if ($this->ravaAccionesService !== null) {
+                $acc = $this->ravaAccionesService->listAcciones();
+                foreach (($acc['items'] ?? []) as $item) {
+                    $snap = $this->ravaToSnapshot($item, 'rava');
+                    if ($snap !== null) {
+                        $map[$snap['symbol']] = $snap;
+                    }
+                }
+            }
+            if ($this->ravaBonosService !== null) {
+                $bon = $this->ravaBonosService->listBonos();
+                foreach (($bon['items'] ?? []) as $item) {
+                    $snap = $this->ravaToSnapshot($item, 'rava');
+                    if ($snap !== null) {
+                        $map[$snap['symbol']] = $snap;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            $this->logger->info('datalake.rava_map.failed', ['message' => $e->getMessage()]);
+        }
+        return $map;
+    }
+
+    /**
+     * Normaliza item de RAVA a snapshot esperado por repositorio.
+     *
+     * @param array<string,mixed> $item
+     */
+    private function ravaToSnapshot(array $item, string $provider): ?array
+    {
+        $symbol = strtoupper((string) ($item['symbol'] ?? $item['especie'] ?? ''));
+        if ($symbol === '') {
+            return null;
+        }
+        $payload = [
+            'symbol' => $symbol,
+            'close' => $item['ultimo'] ?? $item['price'] ?? null,
+            'open' => $item['apertura'] ?? null,
+            'high' => $item['maximo'] ?? null,
+            'low' => $item['minimo'] ?? null,
+            'currency' => $item['currency'] ?? $item['moneda'] ?? null,
+            'previous_close' => $item['anterior'] ?? null,
+        ];
+        $asOf = $item['as_of'] ?? $item['fecha'] ?? null;
+        $dt = $asOf ? new \DateTimeImmutable((string) $asOf) : new \DateTimeImmutable();
+        return [
+            'symbol' => $symbol,
+            'provider' => $provider,
+            'as_of' => $dt,
+            'payload' => $payload,
+            'http_status' => 200,
+            'error_code' => null,
+            'error_msg' => null,
         ];
     }
 }
