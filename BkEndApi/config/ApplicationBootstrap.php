@@ -158,7 +158,15 @@ final class ApplicationBootstrap
         $instrumentCatalogRepository = new PdoInstrumentCatalogRepository($pdo);
         $portfolioService = new PortfolioService($portfolioRepository);
         $ingestBatchSize = (int) $config->get('DATALAKE_INGEST_BATCH_SIZE', 10);
-        $dataLakeService = new DataLakeService($priceSnapshotRepository, $priceService, $logger, $ingestBatchSize);
+        $dataLakeService = new DataLakeService(
+            $priceSnapshotRepository,
+            $priceService,
+            $logger,
+            $ingestBatchSize,
+            $ravaCedearsService,
+            $ravaAccionesService,
+            $ravaBonosService
+        );
         $instrumentCatalogService = new InstrumentCatalogService($ravaCedearsService, $ravaAccionesService, $ravaBonosService, $instrumentCatalogRepository, $logger, $portfolioService, $priceService);
         $portfolioSummaryService = new PortfolioSummaryService($portfolioService, $dataLakeService, $priceService, $logger);
         $portfolioSectorService = new PortfolioSectorService($portfolioService, $priceService, $logger);
