@@ -67,12 +67,27 @@ final class DataLakeService
 
         foreach (array_chunk($symbols, $batchSize) as $chunkIndex => $chunk) {
             $batchSnapshots = [];
+            $symbolsToFetch = [];
+            foreach ($chunk as $symbol) {
+                $key = strtoupper($symbol);
+                if (isset($ravaMap[$key])) {
+                    $batchSnapshots[$symbol] = $ravaMap[$key];
+                    continue;
+                }
+                $symbolsToFetch[] = $symbol;
+            }
+
             try {
-                $batchSnapshots = $this->priceService->fetchSnapshotsBulk($chunk);
+                if (!empty($symbolsToFetch)) {
+                    $fetched = $this->priceService->fetchSnapshotsBulk($symbolsToFetch);
+                    foreach ($fetched as $sym => $snapshot) {
+                        $batchSnapshots[$sym] = $snapshot;
+                    }
+                }
             } catch (\Throwable $e) {
                 $this->logger->info('datalake.collect.batch_failed', [
                     'batch_index' => $chunkIndex,
-                    'count' => count($chunk),
+                    'count' => count($symbolsToFetch),
                     'message' => $e->getMessage(),
                 ]);
             }
@@ -82,9 +97,11 @@ final class DataLakeService
                 $progress = ['current' => $processed, 'total' => $total];
                 $this->appendStep($results['steps'], $symbol, 'start', 'running', 'Iniciando ingesta de símbolo', $progress);
 
+                $key = strtoupper($symbol);
                 $snapshot = $batchSnapshots[$symbol] ?? null;
-                if ($snapshot === null && isset($ravaMap[$symbol])) {
-                    $snapshot = $ravaMap[$symbol];
+                $usedRava = false;
+                if ($snapshot === null && isset($ravaMap[$key])) {
+                    $snapshot = $ravaMap[$key];
                 }
                 if ($snapshot === null) {
                     try {
@@ -99,15 +116,30 @@ final class DataLakeService
                         ]);
                         continue;
                     }
+                } else {
+                    $usedRava = ($snapshot['provider'] ?? '') === 'rava';
                 }
 
                 if (!isset($snapshot['provider']) || $snapshot['provider'] === null || $snapshot['provider'] === '') {
                     $snapshot['provider'] = $snapshot['source'] ?? 'unknown';
                 }
-                $this->appendStep($results['steps'], $symbol, 'fetch', 'ok', 'Snapshot obtenido del proveedor', $progress);
+                $this->appendStep($results['steps'], $symbol, 'fetch', 'ok', $usedRava ? 'Snapshot obtenido desde RAVA' : 'Snapshot obtenido del proveedor', $progress);
 
                 // Validar que el payload contenga precio antes de persistir
                 $price = $this->extractPrice($snapshot['payload'] ?? []);
+                if ($price === null && $usedRava) {
+                    try {
+                        $fallback = $this->priceService->fetchSnapshot($symbol);
+                        $snapshot = $fallback;
+                        $this->appendStep($results['steps'], $symbol, 'fetch_fallback', 'ok', 'Snapshot obtenido por proveedores alternativos', $progress);
+                        $price = $this->extractPrice($snapshot['payload'] ?? []);
+                    } catch (\Throwable $e) {
+                        $results['failed']++;
+                        $results['errors'][] = ['symbol' => $symbol, 'reason' => $e->getMessage()];
+                        $this->appendStep($results['steps'], $symbol, 'fetch_fallback', 'error', $e->getMessage(), $progress);
+                        continue;
+                    }
+                }
                 if ($price === null) {
                     $results['failed']++;
                     $results['errors'][] = ['symbol' => $symbol, 'reason' => 'Precio no disponible en payload'];
@@ -237,6 +269,18 @@ final class DataLakeService
         ];
     }
 
+    public function captureGroups(string $group = 'minute'): array
+    {
+        $this->repository->ensureTables();
+        return $this->repository->fetchCaptureGroups($group);
+    }
+
+    public function capturesByBucket(string $bucket, string $group = 'minute', ?string $symbol = null): array
+    {
+        $this->repository->ensureTables();
+        return $this->repository->fetchCaptures($bucket, $group, $symbol);
+    }
+
     private function extractPrice(array $payload): ?float
     {
         if (isset($payload[0]) && is_array($payload[0])) {
@@ -325,28 +369,22 @@ final class DataLakeService
             if ($this->ravaCedearsService !== null) {
                 $ced = $this->ravaCedearsService->listCedears();
                 foreach (($ced['items'] ?? []) as $item) {
-                    $snap = $this->ravaToSnapshot($item, 'rava');
-                    if ($snap !== null) {
-                        $map[$snap['symbol']] = $snap;
-                    }
+                    $snap = $this->ravaToSnapshot($item, 'rava', 'cedear');
+                    $this->registerRavaSnapshot($map, $snap, $item);
                 }
             }
             if ($this->ravaAccionesService !== null) {
                 $acc = $this->ravaAccionesService->listAcciones();
                 foreach (($acc['items'] ?? []) as $item) {
-                    $snap = $this->ravaToSnapshot($item, 'rava');
-                    if ($snap !== null) {
-                        $map[$snap['symbol']] = $snap;
-                    }
+                    $snap = $this->ravaToSnapshot($item, 'rava', 'accion');
+                    $this->registerRavaSnapshot($map, $snap, $item);
                 }
             }
             if ($this->ravaBonosService !== null) {
                 $bon = $this->ravaBonosService->listBonos();
                 foreach (($bon['items'] ?? []) as $item) {
-                    $snap = $this->ravaToSnapshot($item, 'rava');
-                    if ($snap !== null) {
-                        $map[$snap['symbol']] = $snap;
-                    }
+                    $snap = $this->ravaToSnapshot($item, 'rava', 'bono');
+                    $this->registerRavaSnapshot($map, $snap, $item);
                 }
             }
         } catch (\Throwable $e) {
@@ -356,27 +394,63 @@ final class DataLakeService
     }
 
     /**
+     * Registra un snapshot de RAVA usando múltiples claves (símbolo y especie) sin sobrescribir existentes.
+     *
+     * @param array<string,array<string,mixed>> $map
+     * @param array<string,mixed>|null $snapshot
+     * @param array<string,mixed> $item
+     */
+    private function registerRavaSnapshot(array &$map, ?array $snapshot, array $item): void
+    {
+        if ($snapshot === null) {
+            return;
+        }
+        $symbolKey = strtoupper((string) ($snapshot['symbol'] ?? ''));
+        if ($symbolKey !== '' && !isset($map[$symbolKey])) {
+            $map[$symbolKey] = $snapshot;
+        }
+        $especieKey = isset($item['especie']) ? strtoupper((string) $item['especie']) : null;
+        if ($especieKey !== null && $especieKey !== '' && !isset($map[$especieKey])) {
+            $map[$especieKey] = $snapshot;
+        }
+    }
+
+    /**
      * Normaliza item de RAVA a snapshot esperado por repositorio.
      *
      * @param array<string,mixed> $item
      */
-    private function ravaToSnapshot(array $item, string $provider): ?array
+    private function ravaToSnapshot(array $item, string $provider, string $category): ?array
     {
         $symbol = strtoupper((string) ($item['symbol'] ?? $item['especie'] ?? ''));
         if ($symbol === '') {
             return null;
         }
+        $especie = strtoupper((string) ($item['especie'] ?? ''));
         $payload = [
             'symbol' => $symbol,
+            'especie' => $especie !== '' ? $especie : null,
             'close' => $item['ultimo'] ?? $item['price'] ?? null,
             'open' => $item['apertura'] ?? null,
             'high' => $item['maximo'] ?? null,
             'low' => $item['minimo'] ?? null,
             'currency' => $item['currency'] ?? $item['moneda'] ?? null,
             'previous_close' => $item['anterior'] ?? null,
+            'type' => $category,
+            'panel' => $item['panel'] ?? null,
+            'mercado' => $item['mercado'] ?? null,
+            'source' => $item['source'] ?? 'rava',
         ];
         $asOf = $item['as_of'] ?? $item['fecha'] ?? null;
-        $dt = $asOf ? new \DateTimeImmutable((string) $asOf) : new \DateTimeImmutable();
+        $dt = null;
+        if ($asOf !== null) {
+            try {
+                $dt = new \DateTimeImmutable((string) $asOf);
+            } catch (\Throwable $e) {
+                $this->logger->info('datalake.rava_map.as_of_parse_failed', ['value' => $asOf, 'message' => $e->getMessage()]);
+            }
+        }
+        $dt = $dt ?? new \DateTimeImmutable();
         return [
             'symbol' => $symbol,
             'provider' => $provider,

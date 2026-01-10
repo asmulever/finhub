@@ -16,7 +16,6 @@ header('Expires: 0');
     window.__ENV = window.__ENV ?? {};
     window.__ENV.API_BASE_URL = '/api';
   </script>
-  <link rel="preload" href="/logo/full_logoweb.png" as="image" />
   <style>
     :root { font-family: 'Inter', system-ui, sans-serif; }
     body { margin: 0; background: radial-gradient(circle at 15% 20%, #111a3a 0%, #0b1224 45%, #0a0f1f 100%); color: #cbd5f5; }

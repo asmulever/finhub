@@ -13,9 +13,15 @@ interface PortfolioRepositoryInterface
 
     public function removeInstrument(int $portfolioId, string $symbol): bool;
 
-    public function listPortfolios(int $userId): array;
+    /**
+     * Lista símbolos del/los portafolios. Si se indica userId, filtra por ese usuario.
+     *
+     * @param int|null $userId
+     * @return array<int,string>
+     */
+    public function listSymbols(?int $userId = null): array;
 
-    public function listSymbols(): array;
+    public function listPortfolios(int $userId): array;
 
     public function getBaseCurrency(int $portfolioId): string;
 }

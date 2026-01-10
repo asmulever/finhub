@@ -236,8 +236,13 @@ final class ApiDispatcher
             $this->handleCollectPrices($traceId);
             return;
         }
+        if ($method === 'GET' && $path === '/datalake/prices/captures') {
+            $this->handleCaptureList();
+            return;
+        }
         if ($method === 'GET' && $path === '/datalake/prices/symbols') {
-            $symbols = $this->portfolioService->listSymbols();
+            $user = $this->requireUser();
+            $symbols = $this->portfolioService->listSymbols($user->getId());
             $this->sendJson(['symbols' => $symbols]);
             return;
         }
@@ -606,6 +611,36 @@ final class ApiDispatcher
         ]);
         $status = $results['failed'] === $results['total_symbols'] ? 500 : 200;
         $this->sendJson($results, $status);
+    }
+
+    /**
+     * Lista grupos de capturas o devuelve las capturas de un bucket específico.
+     */
+    private function handleCaptureList(): void
+    {
+        $group = strtolower(trim((string) ($_GET['group'] ?? 'minute')));
+        if (!in_array($group, ['minute', 'hour', 'date'], true)) {
+            $group = 'minute';
+        }
+        $bucket = isset($_GET['bucket']) ? trim((string) $_GET['bucket']) : null;
+        $symbol = isset($_GET['symbol']) ? strtoupper(trim((string) $_GET['symbol'])) : null;
+
+        if ($bucket === null || $bucket === '') {
+            $groups = $this->dataLakeService->captureGroups($group);
+            $this->sendJson([
+                'group' => $group,
+                'groups' => $groups,
+            ]);
+            return;
+        }
+
+        $items = $this->dataLakeService->capturesByBucket($bucket, $group, $symbol ?: null);
+        $this->sendJson([
+            'group' => $group,
+            'bucket' => $bucket,
+            'count' => count($items),
+            'items' => $items,
+        ]);
     }
 
     /**
@@ -1299,31 +1334,29 @@ final class ApiDispatcher
             throw new \RuntimeException('symbol requerido', 422);
         }
 
-        $latest = $this->instrumentCatalogService->find($symbol);
-        $now = new \DateTimeImmutable();
-        $fresh = false;
-        if ($latest !== null && isset($latest['as_of'])) {
-            try {
-                $asOf = new \DateTimeImmutable((string) $latest['as_of']);
-                $fresh = ($now->getTimestamp() - $asOf->getTimestamp()) <= 600;
-            } catch (\Throwable $e) {
-                $fresh = false;
-            }
-        }
-        if ($latest !== null && $fresh && isset($latest['price'])) {
+        // 1) Intentar Data Lake primero (snapshot más reciente).
+        try {
+            $quote = $this->dataLakeService->latestQuote($symbol);
             $this->sendJson([
-                'symbol' => $symbol,
-                'close' => $latest['price'],
-                'open' => $latest['apertura'] ?? null,
-                'high' => $latest['maximo'] ?? null,
-                'low' => $latest['minimo'] ?? null,
-                'currency' => $latest['currency'] ?? null,
-                'asOf' => $latest['as_of'] ?? null,
-                'source' => $latest['source'] ?? 'catalog',
+                'symbol' => $quote['symbol'] ?? $symbol,
+                'close' => $quote['close'] ?? null,
+                'open' => $quote['open'] ?? null,
+                'high' => $quote['high'] ?? null,
+                'low' => $quote['low'] ?? null,
+                'previous_close' => $quote['previous_close'] ?? $quote['previousClose'] ?? null,
+                'currency' => $quote['currency'] ?? null,
+                'asOf' => $quote['asOf'] ?? $quote['as_of'] ?? null,
+                'source' => $quote['source'] ?? $quote['provider'] ?? 'datalake',
             ]);
             return;
+        } catch (\Throwable $e) {
+            $this->logger->info('datalake.latest.dl_failed', [
+                'symbol' => $symbol,
+                'message' => $e->getMessage(),
+            ]);
         }
 
+        // 2) Último recurso: proveedor directo.
         try {
             $price = $this->priceService->getPrice(new PriceRequest($symbol));
             $this->sendJson($price);

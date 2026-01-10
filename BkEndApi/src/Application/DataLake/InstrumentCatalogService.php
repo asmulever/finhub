@@ -166,12 +166,12 @@ final class InstrumentCatalogService
     /**
      * Captura snapshot histórico para símbolos presentes en portafolios (deduplicados).
      */
-    public function capturePortfolioSymbols(): array
+    public function capturePortfolioSymbols(int $userId): array
     {
         if ($this->portfolioService === null) {
             throw new \RuntimeException('Servicio de portafolios no disponible', 500);
         }
-        $symbols = $this->portfolioService->listSymbols();
+        $symbols = $this->portfolioService->listSymbols($userId);
         $unique = array_values(array_unique(array_map(
             static fn ($s) => strtoupper(trim((string) $s)),
             $symbols

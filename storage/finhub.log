@@ -274,3 +274,12 @@ Stack trace:
 [06-Jan-2026 19:41:47 America/New_York] PHP Fatal error:  Cannot use FinHub\Application\Portfolio\PortfolioSectorService as PortfolioSectorService because the name is already in use in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 22
 [06-Jan-2026 19:41:47 America/New_York] PHP Stack trace:
 [06-Jan-2026 19:41:47 America/New_York] PHP   1. {main}() /var/www/html/BkEndApi/index.php:0
+[09-Jan-2026 10:48:25 America/New_York] PHP Fatal error:  Uncaught Error: Class "FinHub\Infrastructure\Config\ApplicationBootstrap" not found in Command line code:1
+Stack trace:
+#0 {main}
+  thrown in Command line code on line 1
+[09-Jan-2026 15:49:20 UTC] PHP Fatal error:  Uncaught RuntimeException: Precio no disponible para el símbolo solicitado in /var/www/html/BkEndApi/src/Application/MarketData/PriceService.php:102
+Stack trace:
+#0 Command line code(1): FinHub\Application\MarketData\PriceService->getPrice(Object(FinHub\Application\MarketData\Dto\PriceRequest))
+#1 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/MarketData/PriceService.php on line 102

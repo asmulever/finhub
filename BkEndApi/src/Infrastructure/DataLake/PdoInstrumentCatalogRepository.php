@@ -129,13 +129,18 @@ SQL;
 
     public function findBySymbol(string $symbol): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT symbol, name, tipo, panel, mercado, currency, source, as_of, price, var_pct, var_mtd, var_ytd, volume_nominal, volume_efectivo, anterior, apertura, maximo, minimo, operaciones, meta_json, captured_at, updated_at FROM dl_instrument_catalog WHERE symbol = :symbol ORDER BY captured_at DESC LIMIT 1');
-        $stmt->execute(['symbol' => strtoupper($symbol)]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($row === false) {
+        try {
+            $stmt = $this->pdo->prepare('SELECT symbol, name, tipo, panel, mercado, currency, source, as_of, price, var_pct, var_mtd, var_ytd, volume_nominal, volume_efectivo, anterior, apertura, maximo, minimo, operaciones, meta_json, captured_at, updated_at FROM dl_instrument_catalog WHERE symbol = :symbol ORDER BY captured_at DESC LIMIT 1');
+            $stmt->execute(['symbol' => strtoupper($symbol)]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($row === false) {
+                return null;
+            }
+            return $this->hydrate($row);
+        } catch (\Throwable) {
+            // Si la tabla no existe o hay error de esquema, devolver null para permitir fallback a proveedores.
             return null;
         }
-        return $this->hydrate($row);
     }
 
     public function delete(string $symbol): bool

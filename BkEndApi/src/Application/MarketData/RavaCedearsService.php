@@ -216,7 +216,19 @@ final class RavaCedearsService
         if (is_float($value) || is_int($value)) {
             return (float) $value;
         }
-        $normalized = str_replace(',', '.', (string) $value);
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return null;
+        }
+        $normalized = $raw;
+        $hasComma = str_contains($raw, ',');
+        $hasDot = str_contains($raw, '.');
+        if ($hasComma && $hasDot) {
+            $normalized = str_replace('.', '', $raw);
+            $normalized = str_replace(',', '.', $normalized);
+        } elseif ($hasComma) {
+            $normalized = str_replace(',', '.', $raw);
+        }
         return is_numeric($normalized) ? (float) $normalized : null;
     }
 

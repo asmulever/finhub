@@ -16,7 +16,6 @@ header('Expires: 0');
     window.__ENV = window.__ENV ?? {};
     window.__ENV.API_BASE_URL = '/api';
   </script>
-  <link rel="preload" href="/logo/full_logoweb.png" as="image" />
   <style>
     :root { font-family: 'Inter', system-ui, sans-serif; }
     body { margin: 0; background: radial-gradient(circle at 15% 20%, #0b1021 0%, #050915 45%, #030712 100%); color: #e2e8f0; min-height: 100vh; }
@@ -66,9 +65,10 @@ header('Expires: 0');
         <div class="tabs" style="margin-top:12px;">
           <button class="tab-btn active" data-tab="snapshots">Snapshots</button>
           <button class="tab-btn" data-tab="series">Series</button>
+          <button class="tab-btn" data-tab="history">Histórico</button>
         </div>
 
-        <div class="tab-panel" id="tab-snapshots" style="margin-top:12px;">
+        <div class="tab-panel active" id="tab-snapshots" style="margin-top:12px;">
           <div class="section-grid">
             <div class="block">
               <h3>Snapshots</h3>
@@ -129,6 +129,43 @@ header('Expires: 0');
             <div class="block">
               <div class="alert">Eliminar/editar series puede afectar integridad histórica. Operaciones de borrado no expuestas.</div>
               <div id="series-meta" class="muted" style="margin-top:8px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="tab-history" style="margin-top:12px;">
+          <div class="section-grid">
+            <div class="block">
+              <h3>Histórico de capturas</h3>
+              <p class="muted">Agrupamiento fijo por minuto (precisión [fecha hora:minuto]).</p>
+              <div class="actions" style="margin:8px 0;flex-wrap:wrap;">
+                <select id="history-bucket">
+                  <option value="">Cargando...</option>
+                </select>
+                <input id="history-symbol" placeholder="Símbolo opcional" />
+                <button id="history-refresh" type="button">Actualizar grupos</button>
+                <button id="history-load" type="button">Ver captura</button>
+              </div>
+              <div class="table-wrapper" style="margin-top:8px;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Captured</th>
+                      <th>Símbolo</th>
+                      <th>Precio</th>
+                      <th>Moneda</th>
+                      <th>Proveedor</th>
+                      <th>Tipo</th>
+                    </tr>
+                  </thead>
+                  <tbody id="history-body">
+                    <tr><td class="muted" colspan="6">Sin datos</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="block">
+              <div id="history-meta" class="muted">Selecciona un bucket para ver la captura.</div>
             </div>
           </div>
         </div>

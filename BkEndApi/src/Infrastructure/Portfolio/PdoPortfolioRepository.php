@@ -105,11 +105,18 @@ SQL;
 
     public function listPortfolios(int $userId): array
     {
-        $select = $this->pdo->prepare(
-            'SELECT id, name, base_currency, created_at, updated_at FROM portfolios WHERE user_id = :user_id AND deleted_at IS NULL ORDER BY id ASC'
-        );
-        $select->execute(['user_id' => $userId]);
-        $rows = $select->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $sql = 'SELECT id, name, base_currency, created_at, updated_at FROM portfolios WHERE user_id = :user_id AND deleted_at IS NULL ORDER BY id ASC';
+        try {
+            $select = $this->pdo->prepare($sql);
+            $select->execute(['user_id' => $userId]);
+            $rows = $select->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) {
+            // Fallback para esquemas sin columna deleted_at
+            $fallback = 'SELECT id, name, base_currency, created_at, updated_at FROM portfolios WHERE user_id = :user_id ORDER BY id ASC';
+            $select = $this->pdo->prepare($fallback);
+            $select->execute(['user_id' => $userId]);
+            $rows = $select->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
         return array_map(static function (array $row): array {
             return [
                 'id' => (int) $row['id'],
@@ -121,11 +128,18 @@ SQL;
         }, $rows);
     }
 
-    public function listSymbols(): array
+    public function listSymbols(?int $userId = null): array
     {
-        $sql = 'SELECT DISTINCT symbol FROM portfolio_instruments WHERE symbol IS NOT NULL AND symbol <> \'\' ORDER BY symbol ASC';
-        $stmt = $this->pdo->query($sql);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $baseSql = 'SELECT DISTINCT pi.symbol FROM portfolio_instruments pi';
+        $params = [];
+        if ($userId !== null) {
+            $baseSql .= ' INNER JOIN portfolios p ON pi.portfolio_id = p.id AND p.user_id = :user_id';
+            $params[':user_id'] = $userId;
+        }
+        $baseSql .= ' WHERE pi.symbol IS NOT NULL AND pi.symbol <> \'\' ORDER BY pi.symbol ASC';
+        $stmt = $this->pdo->prepare($baseSql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
         return array_values(array_filter(array_map(static fn ($r) => (string) $r['symbol'], $rows ?: [])));
     }
 

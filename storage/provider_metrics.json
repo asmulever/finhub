@@ -1,56 +1,37 @@
 {
-    "date": "2026-01-05",
+    "date": "2026-01-09",
     "providers": {
         "twelvedata": {
             "allowed": 800,
-            "used": 0,
+            "used": 1,
             "success": 0,
-            "failed": 0,
-            "last_reset": "2026-01-05T04:40:28+00:00",
+            "failed": 1,
+            "last_reset": "2026-01-09T15:49:17+00:00",
             "disabled_until": null,
-            "disabled_reason": null,
-            "remaining": 800
+            "disabled_reason": null
         },
         "eodhd": {
             "allowed": 20,
-            "used": 0,
+            "used": 1,
             "success": 0,
-            "failed": 0,
-            "last_reset": "2026-01-05T04:40:28+00:00",
-            "disabled_until": null,
-            "disabled_reason": null,
-            "remaining": 20
+            "failed": 1,
+            "last_reset": "2026-01-09T15:49:17+00:00",
+            "disabled_until": "2026-01-10T00:00:00+00:00",
+            "disabled_reason": "quota_error"
         },
         "alphavantage": {
             "allowed": 25,
-            "used": 0,
-            "success": 0,
+            "used": 1,
+            "success": 1,
             "failed": 0,
-            "last_reset": "2026-01-05T04:40:28+00:00",
+            "last_reset": "2026-01-09T15:49:17+00:00",
             "disabled_until": null,
-            "disabled_reason": null,
-            "remaining": 25
+            "disabled_reason": null
         }
     },
     "no_data": [],
     "snapshot": {
-        "date": "2026-01-05",
-        "providers": {
-            "twelvedata": {
-                "allowed": null,
-                "remaining": null,
-                "used": null
-            },
-            "eodhd": {
-                "allowed": null,
-                "remaining": null,
-                "used": null
-            },
-            "alphavantage": {
-                "allowed": null,
-                "remaining": null,
-                "used": null
-            }
-        }
+        "date": null,
+        "providers": []
     }
 }

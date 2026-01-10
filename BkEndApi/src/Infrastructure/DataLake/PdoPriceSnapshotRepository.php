@@ -144,4 +144,100 @@ SQL;
         }
         return $snapshots;
     }
+
+    public function fetchCaptureGroups(string $group = 'minute'): array
+    {
+        $fmt = $this->resolveGroupFormat($group);
+        $sql = sprintf(
+            "SELECT DATE_FORMAT(as_of, '%s') AS bucket, COUNT(*) AS total, MIN(as_of) AS min_as_of, MAX(as_of) AS max_as_of FROM dl_price_snapshots GROUP BY bucket ORDER BY bucket DESC LIMIT 200",
+            $fmt
+        );
+        $stmt = $this->pdo->query($sql);
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        $groups = [];
+        foreach ($rows ?: [] as $row) {
+            $groups[] = [
+                'bucket' => (string) $row['bucket'],
+                'total' => (int) $row['total'],
+                'from' => (string) $row['min_as_of'],
+                'to' => (string) $row['max_as_of'],
+            ];
+        }
+        return $groups;
+    }
+
+    public function fetchCaptures(string $bucket, string $group = 'minute', ?string $symbol = null): array
+    {
+        $range = $this->buildRange($bucket, $group);
+        if ($range === null) {
+            return [];
+        }
+        [$start, $end] = $range;
+        $params = [
+            ':start' => $start,
+            ':end' => $end,
+        ];
+        $where = 'as_of >= :start AND as_of < :end';
+        if ($symbol !== null && $symbol !== '') {
+            $where .= ' AND symbol = :symbol';
+            $params[':symbol'] = $symbol;
+        }
+        $sql = sprintf('SELECT symbol, provider, as_of, payload_json FROM dl_price_snapshots WHERE %s ORDER BY as_of DESC', $where);
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $captures = [];
+        foreach ($rows ?: [] as $row) {
+            $payload = $row['payload_json'];
+            if (is_string($payload)) {
+                $payload = json_decode($payload, true);
+            }
+            if (!is_array($payload)) {
+                continue;
+            }
+            $captures[] = [
+                'symbol' => (string) $row['symbol'],
+                'provider' => (string) $row['provider'],
+                'as_of' => (string) $row['as_of'],
+                'payload' => $payload,
+            ];
+        }
+        return $captures;
+    }
+
+    private function resolveGroupFormat(string $group): string
+    {
+        return match ($group) {
+            'hour' => '%Y-%m-%d %H:00',
+            'date' => '%Y-%m-%d',
+            default => '%Y-%m-%d %H:%i',
+        };
+    }
+
+    private function buildRange(string $bucket, string $group): ?array
+    {
+        $normalizedGroup = match ($group) {
+            'hour' => 'hour',
+            'date' => 'date',
+            default => 'minute',
+        };
+        try {
+            $start = match ($normalizedGroup) {
+                'hour' => new \DateTimeImmutable($bucket . ':00'),
+                'date' => new \DateTimeImmutable($bucket . ' 00:00:00'),
+                default => new \DateTimeImmutable($bucket . ':00'),
+            };
+        } catch (\Throwable) {
+            return null;
+        }
+        $end = match ($normalizedGroup) {
+            'hour' => $start->modify('+1 hour'),
+            'date' => $start->modify('+1 day'),
+            default => $start->modify('+1 minute'),
+        };
+        return [
+            $start->format('Y-m-d H:i:s'),
+            $end->format('Y-m-d H:i:s'),
+        ];
+    }
 }

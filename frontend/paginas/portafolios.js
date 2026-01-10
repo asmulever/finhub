@@ -387,6 +387,14 @@ const fetchFxRate = async () => {
   }
 };
 
+const withTimeout = (promise, ms = 5000) => {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('timeout')), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+};
+
 const loadData = async () => {
   setError('');
   const [cedears, acciones, bonos] = await Promise.all([
@@ -451,7 +459,7 @@ const loadPortfolio = async () => {
     })).filter((i) => i.symbol);
 
     try {
-      const summaryResp = await getJson('/portfolio/summary');
+      const summaryResp = await withTimeout(getJson('/portfolio/summary'), 5000);
       const summaryItems = Array.isArray(summaryResp?.data) ? summaryResp.data : [];
       const summaryMap = new Map(summaryItems.map((row) => [String(row.symbol ?? '').toUpperCase(), row]));
       portfolio.forEach((p) => {

@@ -11,6 +11,9 @@ const state = {
   profile: null,
   snapshots: {},
   series: [],
+  historyGroups: [],
+  historyItems: [],
+  historyGroup: 'minute',
 };
 
 const formatNumber = (value, digits = 2) => {
@@ -43,6 +46,17 @@ const renderTabs = () => {
       if (panel) panel.classList.add('active');
     });
   });
+};
+
+const extractPriceFromPayload = (payload) => {
+  if (Array.isArray(payload) && payload[0]) {
+    payload = payload[0];
+  }
+  const candidates = [payload?.close, payload?.price, payload?.c, payload?.ultimo];
+  for (const c of candidates) {
+    if (c !== null && c !== undefined && !Number.isNaN(Number(c))) return Number(c);
+  }
+  return null;
 };
 
 const loadSymbols = async () => {
@@ -93,7 +107,18 @@ const loadSeries = async () => {
   if (meta) meta.textContent = '';
   try {
     const resp = await overlay.withLoader(() => getJson(`/datalake/prices/series?symbol=${encodeURIComponent(symbol)}&period=${encodeURIComponent(period)}`));
-    const points = Array.isArray(resp?.points) ? resp.points : [];
+    const rawPoints = Array.isArray(resp?.points) ? resp.points : [];
+    const points = rawPoints.map((p) => {
+      const timeValue = p.t ?? p.fecha ?? p.as_of ?? p.asOf ?? null;
+      return {
+        t: timeValue,
+        open: p.open ?? p.apertura ?? null,
+        high: p.high ?? p.maximo ?? null,
+        low: p.low ?? p.minimo ?? null,
+        close: p.close ?? p.cierre ?? p.price ?? null,
+      };
+    });
+    console.debug('datalake.series.resp', { symbol, period, pointsCount: points.length });
     state.series = points;
     if (body) {
       body.innerHTML = points.map((p) => `
@@ -110,6 +135,85 @@ const loadSeries = async () => {
   } catch (error) {
     if (body) body.innerHTML = '<tr><td class="muted" colspan="5">Error al cargar</td></tr>';
     if (meta) meta.textContent = error?.error?.message ?? 'No se pudo cargar serie';
+  }
+};
+
+const loadHistoryGroups = async () => {
+  const bucketSel = document.getElementById('history-bucket');
+  const meta = document.getElementById('history-meta');
+  const body = document.getElementById('history-body');
+  const group = 'minute'; // precisión fija: fecha hora:minuto
+  state.historyGroup = group;
+  if (bucketSel) bucketSel.innerHTML = '<option value="">Cargando...</option>';
+  try {
+    const resp = await overlay.withLoader(() => getJson(`/datalake/prices/captures?group=${encodeURIComponent(group)}`));
+    const groups = Array.isArray(resp?.groups) ? resp.groups : [];
+    state.historyGroups = groups;
+    if (bucketSel) {
+      const formatBucket = (bucket) => {
+        const normalized = String(bucket ?? '').replace('T', ' ');
+        return normalized.length > 16 ? normalized.slice(0, 16) : normalized;
+      };
+      bucketSel.innerHTML = groups.map((g) => {
+        const label = formatBucket(g.bucket);
+        const count = Number.isFinite(g.total) ? g.total : g.count ?? '';
+        const suffix = count !== '' ? ` · ${count} símbolos` : '';
+        return `<option value="${g.bucket}">${label}${suffix}</option>`;
+      }).join('') || '<option value="">Sin capturas</option>';
+    }
+    if (meta) {
+      meta.textContent = groups.length > 0 ? `Buckets: ${groups.length} · Grupo: ${group}` : 'No hay capturas registradas';
+    }
+    if (groups.length > 0) {
+      await loadHistoryCaptures();
+    } else if (body) {
+      document.getElementById('history-body').innerHTML = '<tr><td class="muted" colspan="6">Sin datos</td></tr>';
+    }
+  } catch (error) {
+    console.error('loadHistoryGroups', error);
+    if (meta) meta.textContent = 'Error al cargar grupos';
+    if (bucketSel) bucketSel.innerHTML = '<option value="">Error</option>';
+  }
+};
+
+const loadHistoryCaptures = async () => {
+  const bucket = document.getElementById('history-bucket')?.value || '';
+  const symbol = document.getElementById('history-symbol')?.value || '';
+  const meta = document.getElementById('history-meta');
+  const body = document.getElementById('history-body');
+  if (!bucket) {
+    if (body) body.innerHTML = '<tr><td class="muted" colspan="6">Seleccione un bucket</td></tr>';
+    return;
+  }
+  if (body) body.innerHTML = '<tr><td class="muted" colspan="6">Cargando...</td></tr>';
+  try {
+    const group = state.historyGroup || 'minute';
+    const qsSymbol = symbol ? `&symbol=${encodeURIComponent(symbol)}` : '';
+    const resp = await overlay.withLoader(() => getJson(`/datalake/prices/captures?group=${encodeURIComponent(group)}&bucket=${encodeURIComponent(bucket)}${qsSymbol}`));
+    const items = Array.isArray(resp?.items) ? resp.items : [];
+    state.historyItems = items;
+    if (body) {
+      body.innerHTML = items.map((item) => {
+        const price = extractPriceFromPayload(item.payload) ?? null;
+        const currency = item?.payload?.currency ?? item?.payload?.moneda ?? '';
+        const type = item?.payload?.type ?? item?.payload?.panel ?? item?.payload?.mercado ?? '';
+        return `
+          <tr>
+            <td>${String(item.as_of ?? '').slice(0, 16)}</td>
+            <td>${item.symbol ?? ''}</td>
+            <td>${price !== null ? formatNumber(price, 4) : '–'}</td>
+            <td>${currency || 'N/D'}</td>
+            <td>${item.provider ?? ''}</td>
+            <td>${type || '—'}</td>
+          </tr>
+        `;
+      }).join('') || '<tr><td class="muted" colspan="6">Sin datos</td></tr>';
+    }
+    if (meta) meta.textContent = `Bucket: ${bucket} · ${items.length} filas · Agrupado por ${group}`;
+  } catch (error) {
+    console.error('loadHistoryCaptures', error);
+    if (body) body.innerHTML = '<tr><td class="muted" colspan="6">Error al cargar</td></tr>';
+    if (meta) meta.textContent = error?.error?.message ?? 'No se pudo cargar captura';
   }
 };
 
@@ -157,13 +261,18 @@ const init = async () => {
   await loadSymbols();
   await loadLatestSnapshot();
   await loadSeries();
+  await loadHistoryGroups();
 
   document.getElementById('snapshot-load')?.addEventListener('click', loadLatestSnapshot);
   document.getElementById('collect-btn')?.addEventListener('click', () => {
     if (window.confirm('Recolectar precios ahora?')) handleCollect();
   });
   document.getElementById('series-load')?.addEventListener('click', loadSeries);
+  document.getElementById('series-symbol')?.addEventListener('change', loadSeries);
   document.getElementById('series-period')?.addEventListener('change', loadSeries);
+  document.getElementById('history-refresh')?.addEventListener('click', loadHistoryGroups);
+  document.getElementById('history-load')?.addEventListener('click', loadHistoryCaptures);
+  document.getElementById('history-bucket')?.addEventListener('change', loadHistoryCaptures);
 };
 
 document.addEventListener('DOMContentLoaded', init);
