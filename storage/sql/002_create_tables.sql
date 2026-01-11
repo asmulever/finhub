@@ -116,3 +116,35 @@ CREATE TABLE IF NOT EXISTS `audit_log` (
   KEY `audit_actor_idx` (`actor_user_id`),
   CONSTRAINT `audit_actor_fk` FOREIGN KEY (`actor_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `instrument_prediction_runs` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `scope` ENUM('global','user') NOT NULL,
+  `user_id` INT UNSIGNED DEFAULT NULL,
+  `status` ENUM('running','success','partial','failed') NOT NULL,
+  `started_at` DATETIME(6) NOT NULL,
+  `finished_at` DATETIME(6) DEFAULT NULL,
+  `summary_json` JSON DEFAULT NULL,
+  `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  KEY `instrument_prediction_runs_user_idx` (`user_id`),
+  KEY `instrument_prediction_runs_status_idx` (`status`),
+  CONSTRAINT `instrument_prediction_runs_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `instrument_predictions` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `run_id` INT UNSIGNED NOT NULL,
+  `user_id` INT UNSIGNED NOT NULL,
+  `symbol` VARCHAR(32) NOT NULL,
+  `horizon_days` INT UNSIGNED NOT NULL,
+  `prediction` ENUM('up','down','neutral') NOT NULL,
+  `confidence` DECIMAL(5,4) DEFAULT NULL,
+  `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  KEY `instrument_predictions_user_idx` (`user_id`),
+  KEY `instrument_predictions_run_idx` (`run_id`),
+  KEY `instrument_predictions_symbol_idx` (`symbol`, `horizon_days`),
+  CONSTRAINT `instrument_predictions_run_fk` FOREIGN KEY (`run_id`) REFERENCES `instrument_prediction_runs` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `instrument_predictions_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

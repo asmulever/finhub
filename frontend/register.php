@@ -1,0 +1,121 @@
+<?php
+declare(strict_types=1);
+
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FinHub | Registro</title>
+  <link rel="icon" href="/logo/favicon.png" />
+  <script>
+    window.__ENV = window.__ENV ?? {};
+    window.__ENV.API_BASE_URL = '/api';
+    if (window.history?.replaceState) {
+      window.history.replaceState(null, '', '/');
+    }
+  </script>
+  <link rel="preload" href="/logo/full_logoweb.png" as="image" />
+  <style>
+    :root {
+      font-family: 'Inter', system-ui, sans-serif;
+      --bg: #0b1224;
+      --panel: #0f172a;
+      --border: rgba(148, 163, 184, 0.35);
+      --muted: #94a3b8;
+      --text: #e2e8f0;
+      --accent: #22d3ee;
+      --accent-2: #0ea5e9;
+      --shadow: 0 18px 55px rgba(0, 0, 0, 0.5);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at 20% 20%, #0f172a 0%, #050915 45%, #04060e 100%);
+      display: grid;
+      place-items: center;
+      padding: 28px 16px;
+      color: var(--text);
+    }
+    #app { width: min(1100px, 100%); }
+    .auth-shell {
+      display: flex;
+      width: 100%;
+      max-width: 520px;
+      margin: 0 auto;
+      justify-content: center;
+    }
+    .auth-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: linear-gradient(160deg, rgba(15, 23, 42, 0.94), rgba(9, 14, 30, 0.96));
+      box-shadow: var(--shadow);
+      padding: 22px 22px 20px;
+    }
+    .auth-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), transparent 65%);
+    }
+    .card-body { position: relative; z-index: 1; display: grid; gap: 14px; }
+    .brand-row { display: flex; align-items: center; justify-content: center; gap: 12px; }
+    .logo { width: 180px; display: block; }
+    .title { margin: 0; font-size: 1.6rem; }
+    .subtitle { margin: 0; text-align: center; color: var(--muted); font-size: 0.95rem; }
+    form { display: grid; gap: 12px; margin: 0; }
+    label { font-size: 0.82rem; color: var(--muted); letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 4px; display: block; }
+    .form-group { display: grid; gap: 6px; }
+    input {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+      background: rgba(11, 16, 34, 0.9);
+      color: var(--text);
+      font-size: 1rem;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+    }
+    input:focus { outline: 1px solid rgba(34, 211, 238, 0.6); }
+    .password-field { display: flex; gap: 8px; align-items: center; }
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-weight: 700;
+      background: linear-gradient(120deg, var(--accent), var(--accent-2));
+      color: #041023;
+      cursor: pointer;
+      box-shadow: 0 12px 30px rgba(14,165,233,0.28);
+    }
+    button:disabled { opacity: 0.7; cursor: not-allowed; }
+    .error { color: #f87171; min-height: 20px; font-weight: 700; }
+    .hint { margin: 0; font-size: 0.9rem; color: var(--muted); min-height: 1.2em; }
+    .hint.success { color: #22c55e; }
+    .hint.error { color: #f87171; }
+    .footnote { text-align: center; color: var(--muted); font-size: 0.95rem; margin: 2px 0 0; }
+    .status-line { text-align: center; color: var(--muted); font-size: 0.9rem; }
+    .status-strong { color: var(--text); font-weight: 700; display: block; }
+    .loading-overlay { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.82); display: none; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(2px); }
+    .loading-overlay.active { display: flex; }
+    .loading-spinner { width: 56px; height: 56px; border: 5px solid rgba(148, 163, 184, 0.3); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (max-width: 640px) {
+      body { padding: 20px 12px; }
+      .auth-card { padding: 20px 18px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="auth-shell"></div>
+  <script type="module" src="/Frontend/paginas/register.js"></script>
+</body>
+</html>

@@ -27,6 +27,7 @@ $portfolioService = $container->get('portfolio_service');
 $portfolioSummaryService = $container->get('portfolio_summary_service');
 $portfolioSectorService = $container->get('portfolio_sector_service');
 $portfolioHeatmapService = $container->get('portfolio_heatmap_service');
+$predictionService = $container->get('prediction_service');
 $dataLakeService = $container->get('datalake_service');
 $instrumentCatalogService = $container->get('instrument_catalog_service');
 $polygonService = $container->get('polygon_service');
@@ -59,6 +60,7 @@ $dispatcher = new ApiDispatcher(
     $portfolioSummaryService,
     $portfolioSectorService,
     $portfolioHeatmapService,
+    $predictionService,
     $dataLakeService,
     $instrumentCatalogService,
     $polygonService,

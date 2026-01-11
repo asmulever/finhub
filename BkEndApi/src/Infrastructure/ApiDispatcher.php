@@ -19,6 +19,7 @@ use FinHub\Application\Portfolio\PortfolioService;
 use FinHub\Application\Portfolio\PortfolioSummaryService;
 use FinHub\Application\Portfolio\PortfolioSectorService;
 use FinHub\Application\Portfolio\PortfolioHeatmapService;
+use FinHub\Application\Analytics\PredictionService;
 use FinHub\Application\DataLake\DataLakeService;
 use FinHub\Application\DataLake\InstrumentCatalogService;
 use FinHub\Domain\User\UserRepositoryInterface;
@@ -45,6 +46,7 @@ final class ApiDispatcher
     private PortfolioSummaryService $portfolioSummaryService;
     private PortfolioSectorService $portfolioSectorService;
     private PortfolioHeatmapService $portfolioHeatmapService;
+    private PredictionService $predictionService;
     private DataLakeService $dataLakeService;
     private InstrumentCatalogService $instrumentCatalogService;
     private PolygonService $polygonService;
@@ -73,6 +75,7 @@ final class ApiDispatcher
         PortfolioSummaryService $portfolioSummaryService,
         PortfolioSectorService $portfolioSectorService,
         PortfolioHeatmapService $portfolioHeatmapService,
+        PredictionService $predictionService,
         DataLakeService $dataLakeService,
         InstrumentCatalogService $instrumentCatalogService,
         PolygonService $polygonService,
@@ -100,6 +103,7 @@ final class ApiDispatcher
         $this->portfolioSummaryService = $portfolioSummaryService;
         $this->portfolioSectorService = $portfolioSectorService;
         $this->portfolioHeatmapService = $portfolioHeatmapService;
+        $this->predictionService = $predictionService;
         $this->dataLakeService = $dataLakeService;
         $this->instrumentCatalogService = $instrumentCatalogService;
         $this->polygonService = $polygonService;
@@ -260,6 +264,20 @@ final class ApiDispatcher
         }
         if ($method === 'GET' && $path === '/datalake/prices/latest') {
             $this->handleLatestPrice();
+            return;
+        }
+        if ($method === 'POST' && $path === '/analytics/predictions/run') {
+            $this->handlePredictionRunGlobal($traceId);
+            return;
+        }
+        if ($method === 'POST' && $path === '/analytics/predictions/run/me') {
+            $user = $this->requireUser();
+            $this->handlePredictionRunMe($user, $traceId);
+            return;
+        }
+        if ($method === 'GET' && $path === '/analytics/predictions/latest') {
+            $user = $this->requireUser();
+            $this->handlePredictionLatest($user);
             return;
         }
         if ($method === 'GET' && $path === '/eodhd/eod') {
@@ -1498,6 +1516,44 @@ HTML;
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Lanza predicciones para todos los usuarios (endpoint público).
+     */
+    private function handlePredictionRunGlobal(string $traceId): void
+    {
+        $result = $this->predictionService->runGlobal();
+        $status = $result['status'] === 'running' ? 202 : ($result['status'] === 'failed' ? 500 : 200);
+        $this->logger->info('analytics.prediction.run_global', [
+            'trace_id' => $traceId,
+            'status' => $result['status'] ?? '',
+        ]);
+        $this->sendJson($result, $status);
+    }
+
+    /**
+     * Lanza predicciones solo para el usuario autenticado.
+     */
+    private function handlePredictionRunMe(\FinHub\Domain\User\User $user, string $traceId): void
+    {
+        $result = $this->predictionService->runForUser($user->getId());
+        $status = $result['status'] === 'running' ? 202 : ($result['status'] === 'failed' ? 500 : 200);
+        $this->logger->info('analytics.prediction.run_user', [
+            'trace_id' => $traceId,
+            'user_id' => $user->getId(),
+            'status' => $result['status'] ?? '',
+        ]);
+        $this->sendJson($result, $status);
+    }
+
+    /**
+     * Obtiene las predicciones más recientes del usuario autenticado.
+     */
+    private function handlePredictionLatest(\FinHub\Domain\User\User $user): void
+    {
+        $result = $this->predictionService->latestForUser($user->getId());
+        $this->sendJson($result);
     }
 
     /**

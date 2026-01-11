@@ -1,0 +1,155 @@
+<?php
+declare(strict_types=1);
+
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FinHub | Estadística</title>
+  <link rel="icon" href="/logo/favicon.png" />
+  <script>
+    window.__ENV = window.__ENV ?? {};
+    window.__ENV.API_BASE_URL = '/api';
+  </script>
+  <style>
+    :root {
+      font-family: 'Inter', system-ui, sans-serif;
+      --bg: #050915;
+      --panel: #0f172a;
+      --border: rgba(148, 163, 184, 0.3);
+      --muted: #94a3b8;
+      --text: #e2e8f0;
+      --accent: #22d3ee;
+      --accent-2: #0ea5e9;
+      --green: #22c55e;
+      --red: #ef4444;
+      --amber: #eab308;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: radial-gradient(circle at 15% 20%, #0f172a 0%, #050915 45%, #04060e 100%); color: var(--text); }
+    .content-shell { padding: 22px 30px; }
+    main { display: grid; gap: 16px; max-width: 1500px; margin: 0 auto; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; box-shadow: 0 15px 38px rgba(0,0,0,0.45); }
+    h1, h2, h3 { margin: 0 0 8px 0; }
+    .muted { color: var(--muted); }
+    .hero { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    button { background: linear-gradient(120deg, var(--accent), var(--accent-2)); border: none; color: #041023; padding: 10px 14px; border-radius: 12px; font-weight: 700; cursor: pointer; }
+    .btn-secondary { background: rgba(34, 211, 238, 0.12); color: var(--text); border: 1px solid rgba(34, 211, 238, 0.4); }
+    .pill { font-size: 0.85rem; letter-spacing: 0.06em; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--border); color: var(--text); background: rgba(148, 163, 184, 0.08); display: inline-flex; align-items: center; gap: 6px; }
+    .pill-strong { border-color: rgba(34, 211, 238, 0.45); background: rgba(34, 211, 238, 0.1); color: var(--accent); }
+    .badge-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    table { width: 100%; border-collapse: collapse; color: var(--text); }
+    th, td { padding: 10px 8px; border-bottom: 1px solid rgba(148,163,184,0.2); text-align: left; }
+    th { color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.85rem; }
+    td { font-size: 0.95rem; }
+    .signal-up { color: var(--green); font-weight: 700; }
+    .signal-down { color: var(--red); font-weight: 700; }
+    .signal-neutral { color: var(--amber); font-weight: 700; }
+    .table-wrapper { width: 100%; overflow-x: auto; }
+    .icon-button { background: rgba(148,163,184,0.1); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+    .icon-button:hover { border-color: rgba(34,211,238,0.6); color: var(--accent); }
+    .status { min-height: 22px; font-weight: 700; }
+    .status.error { color: var(--red); }
+    .status.info { color: var(--amber); }
+    .analysis-overlay {
+      position: fixed; inset: 0; background: rgba(3, 7, 18, 0.8); color: var(--text);
+      display: none; align-items: center; justify-content: center; z-index: 9000; backdrop-filter: blur(2px);
+    }
+    .analysis-overlay.visible { display: flex; }
+    .analysis-box { background: linear-gradient(145deg, #0b1224, #0a172f); border: 1px solid var(--border); border-radius: 16px; padding: 24px; text-align: center; box-shadow: 0 20px 55px rgba(0,0,0,0.55); max-width: 520px; }
+    .analysis-box h3 { margin: 0 0 8px 0; }
+    .spinner { width: 42px; height: 42px; border-radius: 50%; border: 5px solid rgba(148,163,184,0.3); border-top-color: var(--accent); margin: 0 auto 12px auto; animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* Overlay de gráfico */
+    .chart-overlay { position: fixed; inset: 0; background: rgba(4, 6, 15, 0.78); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 10000; padding: 24px; }
+    .chart-overlay.visible { display: flex; }
+    .chart-modal { width: min(1100px, 100%); background: linear-gradient(145deg, #0b1224, #0a172f); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,0.55); padding: 16px 18px; color: var(--text); }
+    .chart-modal header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .chart-modal h4 { margin: 0; }
+    .chart-close { background: rgba(248, 113, 113, 0.18); border: 1px solid rgba(248, 113, 113, 0.4); color: #fecdd3; border-radius: 10px; padding: 6px 10px; cursor: pointer; }
+    .chart-canvas-wrap { background: radial-gradient(circle at 20% 20%, rgba(34,211,238,0.08), rgba(15,23,42,0.6)); border: 1px solid rgba(148,163,184,0.25); border-radius: 12px; padding: 10px; margin-top: 12px; }
+    canvas { max-width: 100%; border-radius: 10px; background: #0b1222; }
+  </style>
+</head>
+<body>
+  <div class="content-shell">
+    <main>
+      <section class="card hero">
+        <div>
+          <p class="muted" style="margin:0 0 6px 0;">Estadística · Predicciones 30/60/90</p>
+          <h2>Predicción de valorización por instrumento</h2>
+          <p class="muted">Usa momentum, SMA y RSI sobre series del Data Lake. No se guarda precio, se consulta en vivo.</p>
+        </div>
+        <div class="actions">
+          <button id="btn-run" type="button">Recalcular análisis</button>
+          <button id="btn-refresh" class="btn-secondary" type="button">Refrescar</button>
+          <span class="pill" id="badge-run">Último run: --</span>
+          <span class="pill pill-strong" id="badge-status"><span class="badge-dot" style="background:var(--muted);"></span> Estado: --</span>
+        </div>
+      </section>
+
+      <section class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div>
+            <h3>Predicciones</h3>
+            <p class="muted">Instrumentos del usuario con señal a 30/60/90 días y confianza. Gráfico con histórico + RSI/Bandas.</p>
+          </div>
+          <div class="status" id="status-box"></div>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Símbolo</th>
+                <th>Precio actual</th>
+                <th>30d</th>
+                <th>60d</th>
+                <th>90d</th>
+                <th>Confianza</th>
+                <th>Gráfico</th>
+              </tr>
+            </thead>
+            <tbody id="pred-table-body">
+              <tr><td colspan="7" class="muted">Sin datos aún.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="analysis-overlay" class="analysis-overlay" aria-hidden="true">
+    <div class="analysis-box">
+      <div class="spinner" aria-hidden="true"></div>
+      <h3 id="analysis-overlay-title">Análisis en curso</h3>
+      <p class="muted" id="analysis-overlay-text">Calculando predicciones, esto puede demorar unos segundos.</p>
+    </div>
+  </div>
+
+  <div id="chart-overlay" class="chart-overlay" aria-hidden="true">
+    <div class="chart-modal">
+      <header>
+        <div>
+          <p class="muted" id="chart-subtitle" style="margin:0;">Histórico + RSI/Bandas</p>
+          <h4 id="chart-title" style="margin:0;">Instrumento</h4>
+        </div>
+        <button class="chart-close" type="button" id="chart-close-btn">Cerrar</button>
+      </header>
+      <div class="chart-canvas-wrap">
+        <canvas id="price-canvas" width="1100" height="360"></canvas>
+      </div>
+      <div class="chart-canvas-wrap">
+        <canvas id="rsi-canvas" width="1100" height="160"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/Frontend/paginas/estadistica.js"></script>
+</body>
+</html>

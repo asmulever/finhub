@@ -22,6 +22,7 @@ use FinHub\Application\Portfolio\PortfolioSectorService;
 use FinHub\Application\Portfolio\PortfolioHeatmapService;
 use FinHub\Application\DataLake\DataLakeService;
 use FinHub\Application\DataLake\InstrumentCatalogService;
+use FinHub\Application\Analytics\PredictionService;
 use FinHub\Infrastructure\MarketData\AlphaVantageClient;
 use FinHub\Infrastructure\MarketData\TwelveDataClient;
 use FinHub\Infrastructure\MarketData\EodhdClient;
@@ -44,6 +45,8 @@ use FinHub\Infrastructure\DataLake\PdoInstrumentCatalogRepository;
 use FinHub\Infrastructure\User\PdoUserRepository;
 use FinHub\Infrastructure\User\UserDeletionService;
 use FinHub\Infrastructure\Mail\BrevoMailSender;
+use FinHub\Infrastructure\Analytics\PdoPredictionRepository;
+use FinHub\Infrastructure\Analytics\PdoPredictionRunRepository;
 
 final class ApplicationBootstrap
 {
@@ -91,6 +94,8 @@ final class ApplicationBootstrap
         $passwordHasher = new PasswordHasher();
         $userRepository = new PdoUserRepository($pdo);
         $userDeletionService = new UserDeletionService($pdo);
+        $predictionRunRepository = new PdoPredictionRunRepository($pdo);
+        $predictionRepository = new PdoPredictionRepository($pdo);
         $mailSender = new BrevoMailSender($config);
         $activationService = new ActivationService($userRepository, $passwordHasher, $jwt, $config, $mailSender);
         $apiKey = trim((string) $config->get('TWELVE_DATA_API_KEY', ''));
@@ -179,6 +184,7 @@ final class ApplicationBootstrap
         $portfolioSummaryService = new PortfolioSummaryService($portfolioService, $dataLakeService, $priceService, $logger);
         $portfolioSectorService = new PortfolioSectorService($portfolioService, $priceService, $logger);
         $portfolioHeatmapService = new PortfolioHeatmapService($portfolioService, $portfolioSummaryService, $portfolioSectorService, $priceService, $tiingoService, $logger);
+        $predictionService = new PredictionService($predictionRepository, $predictionRunRepository, $portfolioService, $dataLakeService, $userRepository);
 
         return new Container([
             'config' => $config,
@@ -205,6 +211,9 @@ final class ApplicationBootstrap
             'portfolio_summary_service' => $portfolioSummaryService,
             'portfolio_sector_service' => $portfolioSectorService,
             'portfolio_heatmap_service' => $portfolioHeatmapService,
+            'prediction_service' => $predictionService,
+            'prediction_repository' => $predictionRepository,
+            'prediction_run_repository' => $predictionRunRepository,
             'datalake_service' => $dataLakeService,
             'instrument_catalog_service' => $instrumentCatalogService,
             'rava_cedears_service' => $ravaCedearsService,

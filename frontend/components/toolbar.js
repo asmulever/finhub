@@ -10,6 +10,7 @@ const toolbarTemplate = `
   <nav class="toolbar-menu">
       <button type="button" data-menu="portfolios" data-link="/Frontend/Portafolios.php">Portafolios</button>
       <button type="button" data-menu="heatmap" data-link="/Frontend/heatmap.php">Heatmap</button>
+      <button type="button" id="stats-menu" data-menu="stats" data-link="/Frontend/estadistica.php">Estadística</button>
       <button type="button" id="datalake-menu" data-menu="datalake" data-link="/Frontend/datalake.php">DataLake</button>
       <select id="providers-select" aria-label="Proveedores">
         <option value="">Proveedores</option>
