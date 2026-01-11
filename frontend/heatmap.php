@@ -1,0 +1,67 @@
+<?php
+declare(strict_types=1);
+
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FinHub | Heatmap de Portafolio</title>
+  <link rel="icon" href="/logo/favicon.png" />
+  <script>
+    window.__ENV = window.__ENV ?? {};
+    window.__ENV.API_BASE_URL = '/api';
+  </script>
+  <style>
+    :root { font-family: 'Inter', system-ui, sans-serif; }
+    body { margin: 0; background: radial-gradient(circle at 15% 20%, #0b1021 0%, #050915 45%, #030712 100%); color: #e2e8f0; min-height: 100vh; }
+    .content-shell { padding: 20px; max-width: 1440px; margin: 0 auto; }
+    .card { background: rgba(15, 23, 42, 0.95); border-radius: 16px; padding: 18px 20px; border: 1px solid rgba(148, 163, 184, 0.3); box-shadow: 0 20px 45px rgba(2,6,23,0.6); }
+    .muted { color: #94a3b8; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    select, button { background: #0f172a; color: #e2e8f0; border: 1px solid rgba(148,163,184,0.4); border-radius: 10px; padding: 9px 12px; }
+    button { cursor: pointer; font-weight: 700; background: linear-gradient(120deg, #22d3ee, #0ea5e9); border: none; color: #0b1021; }
+    .heatmap { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .tile { position: relative; border-radius: 10px; padding: 10px; color: #e2e8f0; min-width: 120px; min-height: 100px; box-sizing: border-box; }
+    .tile small { color: #cbd5f5; }
+    .tile .weight { color: #cbd5f5; font-size: 0.85rem; }
+    .legend { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+    .legend .bar { flex: 1; height: 10px; border-radius: 10px; background: linear-gradient(90deg, #ef4444, #0f172a, #22c55e); }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; border: 1px solid rgba(56, 189, 248, 0.35); background: rgba(14, 165, 233, 0.08); color: #e0f2fe; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <div class="content-shell">
+    <section class="card">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;">
+        <div>
+          <h2>Heatmap de Portafolio</h2>
+          <p class="muted">Color = variación diaria (%) · Tamaño = valor de mercado (ARS) o volumen promedio.</p>
+        </div>
+        <span id="heatmap-meta" class="pill">Cargando...</span>
+      </div>
+      <div class="actions" style="margin-top:12px;">
+        <select id="heatmap-currency">
+          <option value="ARS">ARS</option>
+          <option value="USD">USD</option>
+        </select>
+        <button id="heatmap-reload" type="button">Recargar</button>
+      </div>
+      <div class="legend">
+        <span class="muted">-5%</span>
+        <div class="bar"></div>
+        <span class="muted">+5%</span>
+      </div>
+      <div id="heatmap-error" class="muted" style="margin-top:8px;"></div>
+      <div id="heatmap-grid" class="heatmap">
+        <p class="muted">Cargando heatmap...</p>
+      </div>
+    </section>
+  </div>
+  <script type="module" src="/Frontend/paginas/heatmap.js"></script>
+</body>
+</html>

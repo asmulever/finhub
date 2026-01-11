@@ -48,6 +48,68 @@ header('Expires: 0');
     .tile footer { display:flex; gap:8px; flex-wrap:wrap; }
     .btn-secondary { background: rgba(56, 189, 248, 0.15); color: #e0f2fe; border: 1px solid rgba(56, 189, 248, 0.4); }
     .deselect-btn { background: #facc15; color: #0f172a; }
+    /* Overlay de gráfico */
+    .chart-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 6, 15, 0.78);
+      backdrop-filter: blur(3px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      padding: 24px;
+    }
+    .chart-overlay.visible { display: flex; }
+    .chart-modal {
+      width: min(1100px, 100%);
+      background: linear-gradient(145deg, #0b1224, #0a172f);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 16px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+      padding: 16px 18px;
+      color: #e2e8f0;
+    }
+    .chart-modal header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .chart-modal h4 { margin: 0; }
+    .chart-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .chart-controls select, .chart-controls button {
+      background: #0f172a;
+      color: #e2e8f0;
+      border: 1px solid rgba(148,163,184,0.35);
+      border-radius: 10px;
+      padding: 8px 10px;
+    }
+    .chart-close {
+      background: rgba(248, 113, 113, 0.18);
+      border: 1px solid rgba(248, 113, 113, 0.4);
+      color: #fecdd3;
+      border-radius: 10px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    .chart-canvas-wrap {
+      background: radial-gradient(circle at 20% 20%, rgba(34,211,238,0.08), rgba(15,23,42,0.6));
+      border: 1px solid rgba(148,163,184,0.25);
+      border-radius: 12px;
+      padding: 10px;
+    }
+    .chart-empty {
+      text-align: center;
+      color: #94a3b8;
+      padding: 24px;
+    }
   </style>
 </head>
 <body>
@@ -91,45 +153,9 @@ header('Expires: 0');
           <p class="muted">Cargando...</p>
         </div>
       </section>
-
-      <section class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-          <div>
-            <h3>Histórico diario (RAVA)</h3>
-            <p class="muted">Haz click en cualquier tarjeta para cargar el histórico desde RAVA.</p>
-          </div>
-          <div class="history-meta">
-            <span class="pill" id="history-symbol">Símbolo: --</span>
-            <span class="pill" id="history-count">Registros: 0</span>
-          </div>
-        </div>
-        <div class="meta-row">
-          <span id="history-status" class="muted">Selecciona un instrumento para ver su histórico.</span>
-          <span id="history-meta"></span>
-        </div>
-        <div id="history-error" class="error"></div>
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Apertura</th>
-                <th>Máximo</th>
-                <th>Mínimo</th>
-                <th>Cierre</th>
-                <th>Var %</th>
-                <th>Volumen</th>
-                <th>Ajuste</th>
-              </tr>
-            </thead>
-            <tbody id="historicos-body">
-              <tr><td colspan="8" class="muted">Selecciona un instrumento</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
     </main>
   </div>
+  <div id="chart-overlay" class="chart-overlay" aria-hidden="true"></div>
   <script type="module" src="/Frontend/paginas/portafolios.js"></script>
 </body>
 </html>

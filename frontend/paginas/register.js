@@ -44,6 +44,7 @@ const render = () => {
                 <div class="password-field">
                   <input id="password-confirm" name="password-confirm" type="password" required autocomplete="new-password" />
                 </div>
+                <p id="match-hint" class="hint" aria-live="polite"></p>
               </div>
             </div>
             <button type="submit">Registrarme</button>
@@ -57,10 +58,15 @@ const render = () => {
         </div>
       </section>
     </div>
+    <div class="loading-overlay" id="register-loading">
+      <div class="loading-spinner" role="status" aria-label="Enviando registro"></div>
+    </div>
   `;
 
   const form = document.getElementById('register-form');
   const errorMessage = document.getElementById('error-message');
+   const matchHint = document.getElementById('match-hint');
+  const loadingOverlay = document.getElementById('register-loading');
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const emailInput = document.getElementById('email');
@@ -69,6 +75,34 @@ const render = () => {
     const email = emailInput?.value.trim() ?? '';
     const password = passwordInput?.value ?? '';
     const confirm = confirmInput?.value ?? '';
+    const submitButton = form.querySelector('button[type="submit"]');
+    const showLoading = (show) => {
+      if (!loadingOverlay) return;
+      if (show) {
+        loadingOverlay.classList.add('active');
+      } else {
+        loadingOverlay.classList.remove('active');
+      }
+      if (submitButton) {
+        submitButton.disabled = show;
+      }
+    };
+    const updateMatchHint = () => {
+      if (!matchHint) return;
+      matchHint.className = 'hint';
+      if (confirmInput?.value === '') {
+        matchHint.textContent = '';
+        return;
+      }
+      if (passwordInput?.value === confirmInput?.value) {
+        matchHint.textContent = 'Coinciden';
+        matchHint.classList.add('success');
+      } else {
+        matchHint.textContent = 'No coinciden';
+        matchHint.classList.add('error');
+      }
+    };
+    updateMatchHint();
     if (!email.match(emailPattern)) {
       errorMessage.textContent = 'Email inválido';
       return;
@@ -83,13 +117,36 @@ const render = () => {
     }
     try {
       errorMessage.textContent = '';
+      showLoading(true);
       await postJson('/auth/register', { email, password });
       window.location.href = '/';
     } catch (err) {
       const message = err?.error?.message ?? 'No se pudo registrar';
       errorMessage.textContent = message;
+    } finally {
+      showLoading(false);
     }
   });
+
+  const passwordInput = document.getElementById('password');
+  const confirmInput = document.getElementById('password-confirm');
+  const updateHintLive = () => {
+    if (!matchHint) return;
+    matchHint.className = 'hint';
+    if (confirmInput?.value === '') {
+      matchHint.textContent = '';
+      return;
+    }
+    if (passwordInput?.value === confirmInput?.value) {
+      matchHint.textContent = 'Coinciden';
+      matchHint.classList.add('success');
+    } else {
+      matchHint.textContent = 'No coinciden';
+      matchHint.classList.add('error');
+    }
+  };
+  passwordInput?.addEventListener('input', updateHintLive);
+  confirmInput?.addEventListener('input', updateHintLive);
 };
 
 document.addEventListener('DOMContentLoaded', render);

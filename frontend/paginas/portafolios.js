@@ -13,25 +13,15 @@ const state = {
   counts: { all: 0, cedears: 0, acciones: 0, bonos: 0, portfolio: 0 },
   historicosCache: {},
   historicoItems: [],
-  historicoMeta: {},
   historicoSymbol: '',
   historicoCurrency: 'ARS',
+  historicoPeriod: 'all',
   targetCurrency: 'ARS',
   fx: { rate: null, asOf: null, source: 'AlphaVantage', fetchedAt: 0 },
 };
 
 const setError = (msg) => {
   const el = document.getElementById('rava-error');
-  if (el) el.textContent = msg || '';
-};
-
-const setHistoryError = (msg) => {
-  const el = document.getElementById('history-error');
-  if (el) el.textContent = msg || '';
-};
-
-const setHistoryStatus = (msg) => {
-  const el = document.getElementById('history-status');
   if (el) el.textContent = msg || '';
 };
 
@@ -79,6 +69,7 @@ const normalizeCatalogItems = (items) => {
     const tipo = row.tipo ?? row.type ?? '';
     return {
       symbol,
+      especie: row.especie ?? row.symbol ?? symbol,
       name: row.name ?? row.nombre ?? symbol,
       panel: row.panel ?? '',
       mercado: row.mercado ?? '',
@@ -101,84 +92,190 @@ const normalizeCatalogItems = (items) => {
   }).filter((row) => row.symbol);
 };
 
-const renderHistoricosMeta = () => {
-  const meta = state.historicoMeta || {};
-  const extras = [];
-  if (meta.from) extras.push(`desde ${meta.from}`);
-  if (meta.to) extras.push(`hasta ${meta.to}`);
-  if (meta.source) extras.push(meta.source);
-  if (state.targetCurrency && state.targetCurrency !== 'ARS') {
-    extras.push(`FX USD/ARS: ${state.fx.rate ? formatNumber(state.fx.rate, 4) : 'N/D'}`);
+const ensureChartOverlay = () => {
+  let overlayEl = document.getElementById('chart-overlay');
+  if (!overlayEl) {
+    overlayEl = document.createElement('div');
+    overlayEl.id = 'chart-overlay';
+    overlayEl.className = 'chart-overlay';
+    document.body.appendChild(overlayEl);
   }
-  const metaEl = document.getElementById('history-meta');
-  if (metaEl) metaEl.textContent = extras.join(' · ');
-  const symbolEl = document.getElementById('history-symbol');
-  if (symbolEl) symbolEl.textContent = `Símbolo: ${state.historicoSymbol || '--'} · ${state.targetCurrency || 'ARS'}`;
-  const countEl = document.getElementById('history-count');
-  if (countEl) countEl.textContent = `Registros: ${state.historicoItems.length || 0}`;
+  return overlayEl;
 };
 
-const renderHistoricosTable = () => {
-  const body = document.getElementById('historicos-body');
-  if (!body) return;
-  if (!state.historicoSymbol) {
-    body.innerHTML = '<tr><td colspan="8" class="muted">Selecciona un instrumento para ver su histórico.</td></tr>';
+const drawCandles = (canvas, items) => {
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const dpr = window.devicePixelRatio || 1;
+  const width = canvas.clientWidth * dpr;
+  const height = canvas.clientHeight * dpr;
+  canvas.width = width;
+  canvas.height = height;
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (!items || items.length === 0) {
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText('Sin datos para graficar', 20, 30);
     return;
   }
-  const ordered = [...(state.historicoItems || [])].sort((a, b) => (b.fecha ?? '').localeCompare(a.fecha ?? ''));
-  const rows = ordered.map((item) => {
-    const variation = formatSignedPercent(item.variacion);
-    const currency = state.historicoCurrency || 'ARS';
-    return `
-      <tr>
-        <td>${item.fecha ?? '–'}</td>
-        <td>${formatNumber(convertPrice(item.apertura, currency), 2)}</td>
-        <td>${formatNumber(convertPrice(item.maximo, currency), 2)}</td>
-        <td>${formatNumber(convertPrice(item.minimo, currency), 2)}</td>
-        <td>${formatNumber(convertPrice(item.cierre, currency), 2)}</td>
-        <td class="${variation.className}">${variation.text}</td>
-        <td>${formatNumber(item.volumen, 0)}</td>
-        <td>${formatNumber(convertPrice(item.ajuste, currency), 2)}</td>
-      </tr>
-    `;
-  }).join('');
-  body.innerHTML = rows || '<tr><td colspan="8" class="muted">Sin datos</td></tr>';
+
+  const padding = { top: 20, right: 20, bottom: 30, left: 50 };
+  const plotW = canvas.clientWidth - padding.left - padding.right;
+  const plotH = canvas.clientHeight - padding.top - padding.bottom;
+  const highs = items.map((p) => Number(p.high)).filter(Number.isFinite);
+  const lows = items.map((p) => Number(p.low)).filter(Number.isFinite);
+  if (highs.length === 0 || lows.length === 0) {
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText('Sin datos para graficar', 20, 30);
+    return;
+  }
+  const max = Math.max(...highs);
+  const min = Math.min(...lows);
+  const range = max - min || 1;
+  const barW = Math.max(3, Math.min(18, plotW / Math.max(items.length, 1)));
+  const gap = Math.min(6, barW * 0.3);
+
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padding.left, padding.top);
+  ctx.lineTo(padding.left, padding.top + plotH);
+  ctx.lineTo(padding.left + plotW, padding.top + plotH);
+  ctx.stroke();
+
+  items.forEach((p, idx) => {
+    const x = padding.left + idx * (barW + gap);
+    const yHigh = padding.top + (1 - (Number(p.high) - min) / range) * plotH;
+    const yLow = padding.top + (1 - (Number(p.low) - min) / range) * plotH;
+    const yOpen = padding.top + (1 - (Number(p.open) - min) / range) * plotH;
+    const yClose = padding.top + (1 - (Number(p.close) - min) / range) * plotH;
+    const rising = Number(p.close) >= Number(p.open);
+    ctx.strokeStyle = rising ? '#22c55e' : '#ef4444';
+    ctx.fillStyle = rising ? '#22c55e' : '#ef4444';
+    ctx.beginPath();
+    ctx.moveTo(x + barW / 2, yHigh);
+    ctx.lineTo(x + barW / 2, yLow);
+    ctx.stroke();
+    const rectY = Math.min(yOpen, yClose);
+    const rectH = Math.max(2, Math.abs(yClose - yOpen));
+    ctx.fillRect(x, rectY, barW, rectH);
+  });
 };
 
-const loadHistoricos = async (especie) => {
+const renderChartOverlay = (symbol, items, period) => {
+  const overlayEl = ensureChartOverlay();
+  overlayEl.innerHTML = '';
+  const modal = document.createElement('div');
+  modal.className = 'chart-modal';
+  const header = document.createElement('header');
+  const title = document.createElement('h4');
+  title.textContent = `Gráfico ${symbol}`;
+  const controls = document.createElement('div');
+  controls.className = 'chart-controls';
+  const select = document.createElement('select');
+  select.innerHTML = `
+    <option value="all">Todos</option>
+    <option value="3m">Últimos 3 meses</option>
+    <option value="6m">Últimos 6 meses</option>
+  `;
+  select.value = period;
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'chart-close';
+  closeBtn.textContent = 'Cerrar';
+  controls.appendChild(select);
+  controls.appendChild(closeBtn);
+  header.appendChild(title);
+  header.appendChild(controls);
+  const canvasWrap = document.createElement('div');
+  canvasWrap.className = 'chart-canvas-wrap';
+  const canvas = document.createElement('canvas');
+  canvas.style.width = '100%';
+  canvas.style.height = '420px';
+  canvasWrap.appendChild(canvas);
+  modal.appendChild(header);
+  modal.appendChild(canvasWrap);
+  overlayEl.appendChild(modal);
+  overlayEl.classList.add('visible');
+  overlayEl.setAttribute('aria-hidden', 'false');
+
+  const applyDraw = (per) => {
+    let filtered = items;
+    if (per === '3m' || per === '6m') {
+      const months = per === '3m' ? 3 : 6;
+      const cutoff = new Date();
+      cutoff.setMonth(cutoff.getMonth() - months);
+      filtered = items.filter((p) => {
+        const d = p.fecha ? new Date(p.fecha) : (p.t ? new Date(p.t) : null);
+        return d && d >= cutoff;
+      });
+    }
+    if (!filtered || filtered.length === 0) {
+      canvasWrap.innerHTML = '<div class="chart-empty">Sin datos en el período seleccionado</div>';
+    } else {
+      canvasWrap.innerHTML = '';
+      canvasWrap.appendChild(canvas);
+      const mapped = filtered.map((p) => ({
+        open: p.apertura ?? p.open ?? p.price ?? p.close,
+        high: p.maximo ?? p.high ?? p.price ?? p.close,
+        low: p.minimo ?? p.low ?? p.price ?? p.close,
+        close: p.cierre ?? p.close ?? p.price,
+      }));
+      drawCandles(canvas, mapped);
+    }
+  };
+
+  applyDraw(period);
+
+  select.addEventListener('change', () => {
+    state.historicoPeriod = select.value;
+    applyDraw(select.value);
+  });
+
+  const close = () => {
+    overlayEl.classList.remove('visible');
+    overlayEl.setAttribute('aria-hidden', 'true');
+  };
+  closeBtn.addEventListener('click', close);
+  overlayEl.addEventListener('click', (e) => {
+    if (e.target === overlayEl) close();
+  });
+};
+
+const loadHistoricos = async (especie, { openOverlay = false } = {}) => {
   const normalized = (especie || '').trim();
   if (!normalized) return;
   const found = state.items.find((i) => i.symbol === normalized.toUpperCase()) || state.portfolio.find((i) => i.symbol === normalized.toUpperCase());
   state.historicoCurrency = (found?.currency || 'ARS').toUpperCase();
-  const cacheKey = normalized.toUpperCase();
-  setHistoryError('');
-  setHistoryStatus(`Cargando histórico para ${normalized}...`);
+  const especieParam = (found?.especie || normalized).trim();
+  const cacheKey = especieParam.toUpperCase();
   if (state.historicosCache[cacheKey]) {
-    state.historicoSymbol = normalized;
+    state.historicoSymbol = especieParam;
     state.historicoItems = state.historicosCache[cacheKey].data ?? [];
-    state.historicoMeta = state.historicosCache[cacheKey].meta ?? {};
-    renderHistoricosMeta();
-    renderHistoricosTable();
-    setHistoryStatus(`Histórico en caché para ${normalized}`);
+    try { console.table(state.historicoItems); } catch {}
+    if (openOverlay) {
+      renderChartOverlay(especieParam, state.historicoItems, state.historicoPeriod || 'all');
+    }
     return;
   }
   try {
-    const resp = await overlay.withLoader(() => getJson(`/rava/historicos?especie=${encodeURIComponent(normalized)}`));
+    const resp = await overlay.withLoader(() => getJson(`/rava/historicos?especie=${encodeURIComponent(especieParam)}`));
     const items = Array.isArray(resp?.data) ? resp.data : (resp?.items ?? []);
-    const meta = resp?.meta ?? {};
-    state.historicoSymbol = normalized;
+    state.historicoSymbol = especieParam;
     state.historicoItems = Array.isArray(items) ? items : [];
-    state.historicoMeta = meta;
-    state.historicosCache[cacheKey] = { data: state.historicoItems, meta };
-    renderHistoricosMeta();
-    renderHistoricosTable();
-    setHistoryStatus(`Histórico cargado para ${normalized}`);
+    state.historicosCache[cacheKey] = { data: state.historicoItems };
+    try { console.table(state.historicoItems); } catch {}
+    if (openOverlay) {
+      renderChartOverlay(especieParam, state.historicoItems, state.historicoPeriod || 'all');
+    }
   } catch (error) {
     console.info('[portafolios] historicos error', error);
-    setHistoryError(error?.error?.message ?? 'No se pudo obtener histórico');
-    setHistoryStatus(`Fallo al cargar ${normalized}`);
-    renderHistoricosMeta();
-    renderHistoricosTable();
+    if (openOverlay) {
+      const overlayEl = ensureChartOverlay();
+      overlayEl.innerHTML = '<div class="chart-modal"><p class="chart-empty">No se pudo obtener histórico</p></div>';
+      overlayEl.classList.add('visible');
+    }
   }
 };
 
@@ -191,6 +288,7 @@ const normalizeItems = (lists) => {
       if (map.has(symbol)) return;
       map.set(symbol, {
         symbol,
+        especie: row.especie ?? row.symbol ?? symbol,
         name: row.nombre ?? row.name ?? row.especie ?? row.symbol ?? symbol,
         panel: row.panel ?? '',
         mercado: row.mercado ?? '',
@@ -233,6 +331,7 @@ const syncPortfolioFromCatalog = (list = state.portfolio) => {
     return {
       ...p,
       name: cat.name || p.name || p.symbol,
+      especie: cat.especie ?? p.especie ?? p.symbol,
       price: Number.isFinite(cat.price) ? cat.price : p.price,
       var_pct: Number.isFinite(cat.var_pct) ? cat.var_pct : p.var_pct,
       var_mtd: Number.isFinite(cat.var_mtd) ? cat.var_mtd : p.var_mtd,
@@ -290,10 +389,8 @@ const renderList = () => {
           <span>Mínimo: ${formatNumber(convertPrice(item.minimo, item.currency ?? 'ARS'), 2)}</span>
         </div>
         <div class="meta-row">
-          <span>Vol. Nominal: ${volumeNom ?? '—'}</span>
-          <span>Vol. Efectivo: ${volumeEfe !== null && volumeEfe !== undefined ? formatNumber(volumeEfe, 2) : '—'}</span>
-          <span>Vol. Promedio: ${formatNumber(item.volumen_promedio, 2)}</span>
-          <span>Volumen %: ${formatNumber(item.volumen_pct, 2)}</span>
+          <span>Vol. Nominal: ${volumeNom ?? "—"}</span>
+          <span>Vol. Efectivo: ${volumeEfe !== null && volumeEfe !== undefined ? formatNumber(volumeEfe, 2) : "—"}</span>
         </div>
       <button type="button" class="${category === 'selected' ? 'deselect-btn' : ''}" data-symbol="${item.symbol}">
           ${category === 'selected' ? 'Quitar de cartera' : 'Agregar a cartera'}
@@ -323,7 +420,7 @@ const renderList = () => {
     tile.addEventListener('click', (event) => {
       if (event.target?.closest?.('button[data-symbol]')) return;
       const symbol = tile.getAttribute('data-symbol') || '';
-      loadHistoricos(symbol);
+      loadHistoricos(symbol, { openOverlay: true });
     });
   });
 };
@@ -440,7 +537,6 @@ const bindUi = () => {
       await fetchFxRate();
     }
     applyFilter();
-    renderHistoricosTable();
   });
 };
 
@@ -521,9 +617,6 @@ const init = async () => {
     }
     applyFilter();
   });
-  setHistoryStatus('Selecciona un instrumento para ver su histórico.');
-  renderHistoricosMeta();
-  renderHistoricosTable();
   bindUi();
 };
 

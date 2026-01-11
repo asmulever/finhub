@@ -192,11 +192,40 @@ const loadHistoryCaptures = async () => {
     const resp = await overlay.withLoader(() => getJson(`/datalake/prices/captures?group=${encodeURIComponent(group)}&bucket=${encodeURIComponent(bucket)}${qsSymbol}`));
     const items = Array.isArray(resp?.items) ? resp.items : [];
     state.historyItems = items;
+    // Debug: inspeccionar payload y tipo
+    try {
+      const debugRows = items.map((item) => {
+        let payload = item?.payload ?? item?.payload_json ?? item?.payloadJson ?? {};
+        if (typeof payload === 'string') {
+          try { payload = JSON.parse(payload); } catch { payload = {}; }
+        }
+        if (Array.isArray(payload)) {
+          payload = payload[0] ?? {};
+        }
+        return {
+          symbol: item.symbol ?? '',
+          provider: item.provider ?? '',
+          type: payload?.Type ?? payload?.type ?? payload?.panel ?? payload?.mercado ?? payload?.tipo ?? '',
+          currency: payload?.currency ?? payload?.moneda ?? '',
+          keys: Object.keys(payload || {}),
+        };
+      });
+      console.table(debugRows);
+    } catch (err) {
+      console.info('debug history table build skipped', err);
+    }
     if (body) {
       body.innerHTML = items.map((item) => {
-        const price = extractPriceFromPayload(item.payload) ?? null;
-        const currency = item?.payload?.currency ?? item?.payload?.moneda ?? '';
-        const type = item?.payload?.type ?? item?.payload?.panel ?? item?.payload?.mercado ?? '';
+        let payload = item?.payload ?? item?.payload_json ?? item?.payloadJson ?? {};
+        if (typeof payload === 'string') {
+          try { payload = JSON.parse(payload); } catch { payload = {}; }
+        }
+        if (Array.isArray(payload)) {
+          payload = payload[0] ?? {};
+        }
+        const price = extractPriceFromPayload(payload) ?? null;
+        const currency = payload?.currency ?? payload?.moneda ?? '';
+        const type = payload?.Type ?? payload?.type ?? payload?.panel ?? payload?.mercado ?? payload?.tipo ?? '';
         return `
           <tr>
             <td>${String(item.as_of ?? '').slice(0, 16)}</td>

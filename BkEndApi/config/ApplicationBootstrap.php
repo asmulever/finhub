@@ -8,6 +8,7 @@ use FinHub\Infrastructure\Config\Container;
 use FinHub\Infrastructure\Logging\FileLogger;
 use FinHub\Application\MarketData\PriceService;
 use FinHub\Application\MarketData\ProviderUsageService;
+use FinHub\Application\Auth\ActivationService;
 use FinHub\Application\MarketData\RavaBonosService;
 use FinHub\Application\MarketData\RavaAccionesService;
 use FinHub\Application\MarketData\RavaCedearsService;
@@ -40,6 +41,9 @@ use FinHub\Infrastructure\Security\PasswordHasher;
 use FinHub\Infrastructure\Portfolio\PdoPortfolioRepository;
 use FinHub\Infrastructure\DataLake\PdoPriceSnapshotRepository;
 use FinHub\Infrastructure\DataLake\PdoInstrumentCatalogRepository;
+use FinHub\Infrastructure\User\PdoUserRepository;
+use FinHub\Infrastructure\User\UserDeletionService;
+use FinHub\Infrastructure\Mail\BrevoMailSender;
 
 final class ApplicationBootstrap
 {
@@ -85,6 +89,10 @@ final class ApplicationBootstrap
         $logger = new FileLogger($logPath, $config->get('LOG_LEVEL', 'info'));
         $jwt = new JwtTokenProvider($config->require('JWT_SECRET'));
         $passwordHasher = new PasswordHasher();
+        $userRepository = new PdoUserRepository($pdo);
+        $userDeletionService = new UserDeletionService($pdo);
+        $mailSender = new BrevoMailSender($config);
+        $activationService = new ActivationService($userRepository, $passwordHasher, $jwt, $config, $mailSender);
         $apiKey = trim((string) $config->get('TWELVE_DATA_API_KEY', ''));
         $twelveDataClient = null;
         if ($apiKey !== '') {
@@ -170,7 +178,7 @@ final class ApplicationBootstrap
         $instrumentCatalogService = new InstrumentCatalogService($ravaCedearsService, $ravaAccionesService, $ravaBonosService, $instrumentCatalogRepository, $logger, $portfolioService, $priceService);
         $portfolioSummaryService = new PortfolioSummaryService($portfolioService, $dataLakeService, $priceService, $logger);
         $portfolioSectorService = new PortfolioSectorService($portfolioService, $priceService, $logger);
-        $portfolioHeatmapService = new PortfolioHeatmapService($portfolioService, $portfolioSectorService, $priceService, $tiingoService, $logger);
+        $portfolioHeatmapService = new PortfolioHeatmapService($portfolioService, $portfolioSummaryService, $portfolioSectorService, $priceService, $tiingoService, $logger);
 
         return new Container([
             'config' => $config,
@@ -178,6 +186,10 @@ final class ApplicationBootstrap
             'logger' => $logger,
             'jwt' => $jwt,
             'password_hasher' => $passwordHasher,
+            'user_repository' => $userRepository,
+            'user_deletion_service' => $userDeletionService,
+            'mail_sender' => $mailSender,
+            'activation_service' => $activationService,
             'price_service' => $priceService,
             'eodhd_client' => $eodhdClient,
             'provider_metrics' => $metrics,

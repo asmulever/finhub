@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace FinHub\Infrastructure;
 
 use FinHub\Application\Auth\AuthService;
+use FinHub\Application\Auth\ActivationService;
 use FinHub\Application\MarketData\Dto\PriceRequest;
 use FinHub\Application\MarketData\PriceService;
 use FinHub\Application\MarketData\ProviderUsageService;
@@ -26,12 +27,14 @@ use FinHub\Infrastructure\Logging\LoggerInterface;
 use FinHub\Infrastructure\MarketData\EodhdClient;
 use FinHub\Infrastructure\Security\JwtTokenProvider;
 use FinHub\Infrastructure\Security\PasswordHasher;
+use FinHub\Infrastructure\User\UserDeletionService;
 
 final class ApiDispatcher
 {
     private Config $config;
     private LoggerInterface $logger;
     private AuthService $authService;
+    private ActivationService $activationService;
     private PriceService $priceService;
     private UserRepositoryInterface $userRepository;
     private JwtTokenProvider $jwt;
@@ -51,6 +54,7 @@ final class ApiDispatcher
     private RavaAccionesService $ravaAccionesService;
     private RavaBonosService $ravaBonosService;
     private RavaHistoricosService $ravaHistoricosService;
+    private UserDeletionService $userDeletionService;
     /** Rutas base deben terminar sin barra final. */
     private string $apiBase;
 
@@ -58,6 +62,7 @@ final class ApiDispatcher
         Config $config,
         LoggerInterface $logger,
         AuthService $authService,
+        ActivationService $activationService,
         PriceService $priceService,
         UserRepositoryInterface $userRepository,
         JwtTokenProvider $jwt,
@@ -76,13 +81,15 @@ final class ApiDispatcher
         RavaCedearsService $ravaCedearsService,
         RavaAccionesService $ravaAccionesService,
         RavaBonosService $ravaBonosService,
-        RavaHistoricosService $ravaHistoricosService
+        RavaHistoricosService $ravaHistoricosService,
+        UserDeletionService $userDeletionService
     )
     {
         $this->config = $config;
         $this->logger = $logger;
         $this->apiBase = rtrim($config->get('API_BASE_PATH', '/api'), '/');
         $this->authService = $authService;
+        $this->activationService = $activationService;
         $this->priceService = $priceService;
         $this->userRepository = $userRepository;
         $this->jwt = $jwt;
@@ -102,6 +109,7 @@ final class ApiDispatcher
         $this->ravaAccionesService = $ravaAccionesService;
         $this->ravaBonosService = $ravaBonosService;
         $this->ravaHistoricosService = $ravaHistoricosService;
+        $this->userDeletionService = $userDeletionService;
     }
 
     /**
@@ -337,7 +345,7 @@ final class ApiDispatcher
             }
             if ($method === 'DELETE') {
                 $this->requireAdmin();
-                $this->handleDeleteUser($userId);
+                $this->handleDeleteUser($userId, $traceId);
                 return;
             }
         }
@@ -346,7 +354,11 @@ final class ApiDispatcher
             return;
         }
         if ($method === 'POST' && $path === '/auth/register') {
-            $this->handleRegister();
+            $this->handleRegister($traceId);
+            return;
+        }
+        if ($method === 'GET' && $path === '/auth/activate') {
+            $this->handleActivate($traceId);
             return;
         }
         throw new \RuntimeException('Ruta no encontrada', 404);
@@ -409,30 +421,138 @@ final class ApiDispatcher
         $this->sendJson($payload);
     }
 
-    private function handleRegister(): void
+    private function handleActivate(string $traceId): void
+    {
+        $token = isset($_GET['token']) ? trim((string) $_GET['token']) : '';
+        if ($token === '') {
+            $this->logger->error('activation.token.missing', ['trace_id' => $traceId]);
+            $this->sendActivationPage('Enlace inválido', 'Falta el token de activación.', 400);
+        }
+
+        try {
+            $payload = $this->jwt->decode($token);
+        } catch (\Throwable $e) {
+            $this->logger->error('activation.token.invalid', [
+                'trace_id' => $traceId,
+                'message' => $e->getMessage(),
+            ]);
+            $this->sendActivationPage('Enlace inválido', 'El enlace de activación es inválido o expiró.', 400);
+        }
+
+        if (($payload['type'] ?? '') !== 'activation') {
+            $this->logger->error('activation.token.wrong_type', ['trace_id' => $traceId]);
+            $this->sendActivationPage('Enlace incorrecto', 'Este enlace no corresponde a una activación.', 400);
+        }
+
+        $userId = (int) ($payload['sub'] ?? 0);
+        $email = (string) ($payload['email'] ?? '');
+        $user = $this->userRepository->findById($userId);
+        if ($user === null || ($email !== '' && $user->getEmail() !== $email)) {
+            $this->logger->error('activation.user.not_found', [
+                'trace_id' => $traceId,
+                'user_id' => $userId,
+                'email' => $email,
+            ]);
+            $this->sendActivationPage('Cuenta no encontrada', 'No pudimos validar tu cuenta.', 404);
+        }
+
+        if ($user->isActive()) {
+            $this->sendActivationPage('Cuenta ya activada', 'Tu cuenta ya está activa. Puedes iniciar sesión.', 200);
+        }
+
+        $updated = $this->userRepository->update($user->getId(), ['status' => 'active']);
+        if ($updated === null) {
+            $this->logger->error('activation.update.failed', [
+                'trace_id' => $traceId,
+                'user_id' => $userId,
+            ]);
+            $this->sendActivationPage('No se pudo activar', 'Intenta nuevamente más tarde.', 500);
+        }
+
+        $this->logger->info('activation.success', [
+            'trace_id' => $traceId,
+            'user_id' => $userId,
+            'email' => $user->getEmail(),
+        ]);
+        $this->sendActivationPage('Cuenta activada', 'Tu cuenta fue activada. Ya puedes ingresar.', 200);
+    }
+
+    private function sendActivationPage(string $title, string $message, int $status = 200): void
+    {
+        $baseUrl = rtrim((string) $this->config->get('APP_BASE_URL', ''), '/');
+        $apiBase = '/' . trim((string) $this->config->get('API_BASE_PATH', '/api'), '/');
+        $redirectUrl = '/';
+        if ($baseUrl !== '') {
+            $redirectUrl = $baseUrl;
+            if (str_ends_with($baseUrl, $apiBase)) {
+                $redirectUrl = rtrim(substr($baseUrl, 0, -strlen($apiBase)), '/');
+                if ($redirectUrl === '') {
+                    $redirectUrl = '/';
+                }
+            }
+        }
+        $html = <<<HTML
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{$title} | FinHub</title>
+  <meta http-equiv="refresh" content="5;url={$redirectUrl}">
+  <style>
+    body { margin:0; font-family: 'Segoe UI', Arial, sans-serif; background: radial-gradient(circle at 20% 20%, rgba(56,189,248,0.08), transparent 35%), #0b1224; color: #e2e8f0; display:flex; align-items:center; justify-content:center; min-height:100vh; padding: 20px; }
+    .card { max-width: 520px; width: 100%; background: linear-gradient(145deg, rgba(12, 21, 45, 0.95), rgba(7, 12, 26, 0.93)); border: 1px solid rgba(56,189,248,0.3); border-radius: 20px; padding: 28px; box-shadow: 0 18px 40px rgba(0,0,0,0.45); text-align: center; }
+    h1 { margin: 0 0 12px; font-size: 24px; color: #cbd5f5; }
+    p { margin: 0 0 16px; color: #cbd5e1; line-height: 1.6; }
+    .button { display: inline-block; padding: 12px 18px; background: linear-gradient(120deg, #38bdf8, #2563eb); color: #0b1224; border-radius: 12px; text-decoration: none; font-weight: 700; letter-spacing: 0.02em; box-shadow: 0 10px 24px rgba(37, 99, 235, 0.35); }
+    .button:hover { transform: translateY(-1px); }
+    .muted { color: #94a3b8; font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>{$title}</h1>
+    <p>{$message}</p>
+    <p><a class="button" href="{$redirectUrl}">Ir a FinHub</a></p>
+    <p class="muted">Redirigiremos automáticamente en 5 segundos.</p>
+    <p class="muted">Si no solicitaste esta cuenta, puedes ignorar este mensaje.</p>
+  </div>
+  <script>setTimeout(() => { window.location.href = '{$redirectUrl}'; }, 5000);</script>
+</body>
+</html>
+HTML;
+        $this->sendHtml($html, $status);
+    }
+
+    private function handleRegister(string $traceId): void
     {
         $data = $this->parseJsonBody();
         $email = trim((string) ($data['email'] ?? ''));
         $password = (string) ($data['password'] ?? '');
 
-        if ($email === '' || $password === '') {
-            throw new \RuntimeException('Email y contraseña requeridos', 422);
-        }
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            throw new \RuntimeException('Email inválido', 422);
-        }
-        if (strlen($password) < 6) {
-            throw new \RuntimeException('La contraseña debe tener al menos 6 caracteres', 422);
+        $result = $this->activationService->registerAndSendActivation($email, $password);
+        $mailResult = $result['mail_result'];
+        $mailStatus = $mailResult->getStatusCode();
+
+        if ($mailResult->isSuccess()) {
+            $this->logger->info('mail.activation.sent', [
+                'trace_id' => $traceId,
+                'email' => $email,
+                'status_code' => $mailStatus,
+                'activation_url' => $result['activation_url'],
+            ]);
+        } else {
+            $this->logger->error('mail.activation.failed', [
+                'trace_id' => $traceId,
+                'email' => $email,
+                'status_code' => $mailStatus,
+                'body' => $mailResult->getBody(),
+                'activation_url' => $result['activation_url'],
+            ]);
+            throw new \RuntimeException('No se pudo enviar el correo de activación', 502);
         }
 
-        $existing = $this->userRepository->findByEmail($email);
-        if ($existing !== null) {
-            throw new \RuntimeException('Email ya registrado', 409);
-        }
-
-        $hash = $this->passwordHasher->hash($password);
-        $user = $this->userRepository->create($email, 'user', 'disabled', $hash);
-        $this->sendJson($user->toResponse(), 201);
+        $this->sendJson($result['user']->toResponse(), 201);
     }
 
     private function handleCreateUser(): void
@@ -484,13 +604,24 @@ final class ApiDispatcher
         $this->sendJson($user->toResponse());
     }
 
-    private function handleDeleteUser(int $userId): void
+    private function handleDeleteUser(int $userId, string $traceId): void
     {
-        $deleted = $this->userRepository->delete($userId);
-        if (!$deleted) {
-            throw new \RuntimeException('Usuario no encontrado', 404);
+        try {
+            $deleted = $this->userDeletionService->deleteCascade($userId);
+            if (!$deleted) {
+                throw new \RuntimeException('Usuario no encontrado', 404);
+            }
+            $this->logger->info('user.delete.cascade', ['trace_id' => $traceId, 'user_id' => $userId]);
+            $this->sendJson(['deleted' => true, 'mode' => 'hard']);
+        } catch (\Throwable $e) {
+            $this->logger->error('user.delete.cascade_failed', [
+                'trace_id' => $traceId,
+                'user_id' => $userId,
+                'message' => $e->getMessage(),
+            ]);
+            $code = $e->getCode() === 404 ? 404 : 500;
+            throw new \RuntimeException($code === 404 ? 'Usuario no encontrado' : 'No se pudo eliminar en cascada', $code);
         }
-        $this->sendJson(['deleted' => true]);
     }
 
     /**

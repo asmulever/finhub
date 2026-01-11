@@ -283,3 +283,333 @@ Stack trace:
 #0 Command line code(1): FinHub\Application\MarketData\PriceService->getPrice(Object(FinHub\Application\MarketData\Dto\PriceRequest))
 #1 {main}
   thrown in /var/www/html/BkEndApi/src/Application/MarketData/PriceService.php on line 102
+[10-Jan-2026 06:46:38 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:46:39 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:46:39 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:46:40 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:46:41 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:46:51 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:46:52 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:46:52 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:46:53 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:46:54 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:06 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:15 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:28 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:54 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:56 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:56 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:56 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:56 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:57 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:57 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:57 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:57 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:58 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:58 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:58 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:58 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:58 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:59 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:59 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:59 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:59 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:47:59 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:00 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:00 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:00 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:00 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:00 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:00 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:01 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:01 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:02 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:02 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:02 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:02 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:03 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:03 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:03 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:03 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:03 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:04 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:04 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:04 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:05 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:06 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[10-Jan-2026 06:48:13 UTC] PHP Fatal error:  Uncaught TypeError: FinHub\Application\Portfolio\PortfolioHeatmapService::__construct(): Argument #2 ($portfolioSummaryService) must be of type FinHub\Application\Portfolio\PortfolioSummaryService, FinHub\Application\Portfolio\PortfolioSectorService given, called in /var/www/html/BkEndApi/config/ApplicationBootstrap.php on line 173 and defined in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php:24
+Stack trace:
+#0 /var/www/html/BkEndApi/config/ApplicationBootstrap.php(173): FinHub\Application\Portfolio\PortfolioHeatmapService->__construct(Object(FinHub\Application\Portfolio\PortfolioService), Object(FinHub\Application\Portfolio\PortfolioSectorService), Object(FinHub\Application\MarketData\PriceService), Object(FinHub\Application\MarketData\TiingoService), Object(FinHub\Infrastructure\Logging\FileLogger))
+#1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
+#2 {main}
+  thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24

@@ -6,6 +6,7 @@ namespace FinHub\Application\Portfolio;
 use FinHub\Application\MarketData\PriceService;
 use FinHub\Application\MarketData\TiingoService;
 use FinHub\Infrastructure\Logging\LoggerInterface;
+use FinHub\Application\Portfolio\PortfolioSummaryService;
 
 /**
  * Arma el payload de heatmap del portafolio con precios, FX y sector/industry.
@@ -14,6 +15,7 @@ use FinHub\Infrastructure\Logging\LoggerInterface;
 final class PortfolioHeatmapService
 {
     private PortfolioService $portfolioService;
+    private PortfolioSummaryService $portfolioSummaryService;
     private PortfolioSectorService $sectorService;
     private PriceService $priceService;
     private TiingoService $tiingoService;
@@ -21,12 +23,14 @@ final class PortfolioHeatmapService
 
     public function __construct(
         PortfolioService $portfolioService,
+        PortfolioSummaryService $portfolioSummaryService,
         PortfolioSectorService $sectorService,
         PriceService $priceService,
         TiingoService $tiingoService,
         LoggerInterface $logger
     ) {
         $this->portfolioService = $portfolioService;
+        $this->portfolioSummaryService = $portfolioSummaryService;
         $this->sectorService = $sectorService;
         $this->priceService = $priceService;
         $this->tiingoService = $tiingoService;
@@ -50,6 +54,8 @@ final class PortfolioHeatmapService
         }
 
         $quotes = $this->fetchQuotes(array_keys($uniqueSymbols));
+        // Fallback: summary ya normalizado (incluye precio desde DataLake o providers)
+        $summaryMap = $this->mapSummary($userId);
         $sectors = $this->sectorService->listSectorIndustry($userId);
         $sectorMap = $this->mapSectors($sectors);
         $now = new \DateTimeImmutable();
@@ -73,7 +79,7 @@ final class PortfolioHeatmapService
                     'reason' => 'missing_quantity',
                 ]);
             }
-            $quote = $quotes[$symbol] ?? null;
+            $quote = $quotes[$symbol] ?? ($summaryMap[$symbol] ?? null);
             if ($quote === null) {
                 $this->logger->info('portfolio.heatmap.excluded', [
                     'symbol' => $symbol,
@@ -82,11 +88,17 @@ final class PortfolioHeatmapService
                 continue;
             }
             $lastPrice = $this->floatOrNull($quote['close'] ?? $quote['price'] ?? null);
+            if ($lastPrice === null) {
+                $lastPrice = $this->floatOrNull($summaryMap[$symbol]['close'] ?? $summaryMap[$symbol]['price'] ?? null);
+            }
             $prevClose = $this->floatOrNull($quote['previous_close'] ?? $quote['previousClose'] ?? null);
-            if ($lastPrice === null || $prevClose === null) {
+            if ($prevClose === null) {
+                $prevClose = $this->floatOrNull($summaryMap[$symbol]['previous_close'] ?? $summaryMap[$symbol]['previousClose'] ?? null);
+            }
+            if ($lastPrice === null) {
                 $this->logger->info('portfolio.heatmap.excluded', [
                     'symbol' => $symbol,
-                    'reason' => 'missing_prev_close',
+                    'reason' => 'missing_price',
                 ]);
                 continue;
             }
@@ -102,14 +114,16 @@ final class PortfolioHeatmapService
                 }
             }
 
-            $instrumentCurrency = strtoupper((string) ($quote['currency'] ?? $instrument['currency'] ?? ''));
+            $instrumentCurrency = strtoupper((string) ($quote['currency'] ?? $instrument['currency'] ?? ($summaryMap[$symbol]['currency'] ?? $baseCurrency)));
             $fx = $this->resolveFx($instrumentCurrency, $baseCurrency);
             if ($fx['rate'] === null) {
-                $this->logger->info('portfolio.heatmap.excluded', [
+                // fallback: asumir 1:1 en base
+                $fx = ['rate' => 1.0, 'source' => 'assumed', 'at' => null];
+                $this->logger->info('portfolio.heatmap.fx.assumed', [
                     'symbol' => $symbol,
-                    'reason' => 'missing_fx_rate',
+                    'instrument_currency' => $instrumentCurrency,
+                    'base_currency' => $baseCurrency,
                 ]);
-                continue;
             }
             if ($fxMeta['source'] === null && $fx['source'] !== null) {
                 $fxMeta['source'] = $fx['source'];
@@ -117,7 +131,7 @@ final class PortfolioHeatmapService
             }
 
             $marketValueBase = $quantity * $lastPrice * $fx['rate'];
-            $changePct = (($lastPrice / $prevClose) - 1) * 100;
+            $changePct = ($prevClose !== null && $prevClose != 0.0) ? (($lastPrice / $prevClose) - 1) * 100 : 0.0;
             $sectorRow = $sectorMap[$symbol] ?? ['sector' => 'Sin sector', 'industry' => 'Sin industry'];
 
             $items[] = [
@@ -258,6 +272,34 @@ final class PortfolioHeatmapService
                 'sector' => $row['sector'] ?? 'Sin sector',
                 'industry' => $row['industry'] ?? 'Sin industry',
             ];
+        }
+        return $map;
+    }
+
+    /**
+     * Mapea summary (precio, prev close, currency) por símbolo.
+     *
+     * @return array<string,array<string,mixed>>
+     */
+    private function mapSummary(int $userId): array
+    {
+        $map = [];
+        try {
+            $summary = $this->portfolioSummaryService->summaryForUser($userId);
+            foreach ($summary as $row) {
+                $symbol = strtoupper((string) ($row['symbol'] ?? ''));
+                if ($symbol === '') {
+                    continue;
+                }
+                $map[$symbol] = [
+                    'close' => $row['price'] ?? $row['close'] ?? null,
+                    'previous_close' => $row['previous_close'] ?? $row['previousClose'] ?? null,
+                    'currency' => $row['currency'] ?? null,
+                    'price_at' => $row['as_of'] ?? null,
+                ];
+            }
+        } catch (\Throwable $e) {
+            $this->logger->info('portfolio.heatmap.summary_fallback_failed', ['message' => $e->getMessage()]);
         }
         return $map;
     }

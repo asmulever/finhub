@@ -6,7 +6,7 @@ use FinHub\Infrastructure\ApiDispatcher;
 use FinHub\Infrastructure\Config\ApplicationBootstrap;
 use FinHub\Infrastructure\Config\Config;
 use FinHub\Infrastructure\Logging\LoggerInterface;
-use FinHub\Infrastructure\User\PdoUserRepository;
+use FinHub\Infrastructure\User\UserDeletionService;
 
 require_once __DIR__ . '/autoload.php';
 require_once __DIR__ . '/config/ApplicationBootstrap.php';
@@ -36,16 +36,19 @@ $ravaCedearsService = $container->get('rava_cedears_service');
 $ravaAccionesService = $container->get('rava_acciones_service');
 $ravaBonosService = $container->get('rava_bonos_service');
 $ravaHistoricosService = $container->get('rava_historicos_service');
+$userRepository = $container->get('user_repository');
+$userDeletionService = $container->get('user_deletion_service');
+$activationService = $container->get('activation_service');
 
 $traceId = generateTraceId();
 set_error_handler(fn ($severity, $message, $file, $line) => handleFatalError($logger, $traceId, $message, $file, $line));
 
-$userRepository = new PdoUserRepository($pdo);
 $authService = new AuthService($userRepository, $passwordHasher, $jwt, $config);
 $dispatcher = new ApiDispatcher(
     $config,
     $logger,
     $authService,
+    $activationService,
     $priceService,
     $userRepository,
     $jwt,
@@ -64,7 +67,8 @@ $dispatcher = new ApiDispatcher(
     $ravaCedearsService,
     $ravaAccionesService,
     $ravaBonosService,
-    $ravaHistoricosService
+    $ravaHistoricosService,
+    $userDeletionService
 );
 $dispatcher->dispatch($traceId);
 

@@ -153,14 +153,14 @@ const handleRowAction = async (event) => {
     }
   }
   if (button.dataset.action === 'delete') {
-    const confirmed = window.confirm('¿Eliminar este usuario?');
+    const confirmed = window.confirm('¿Eliminar este usuario y todos sus datos (portafolios e instrumentos)?');
     if (!confirmed) return;
     try {
       button.disabled = true;
       await deleteJson(`/users/${userId}`);
       await fetchUsers();
     } catch (error) {
-      state.error = error?.error?.message ?? 'No se pudo eliminar el usuario';
+      state.error = error?.error?.message ?? 'No se pudo eliminar en cascada';
       renderUsers();
     } finally {
       button.disabled = false;
