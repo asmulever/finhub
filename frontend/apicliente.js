@@ -19,10 +19,15 @@ export const getBaseUrl = (() => {
 /** Construye la URL final agregando la base configurada si la ruta es relativa. */
 const buildUrl = (path) => (path.startsWith('http') ? path : `${getBaseUrl()}${path}`);
 
-/** Borra el token y redirige al login si el backend responde con 401. */
+/** Borra el token y redirige al login (forzando la ventana top) si el backend responde con 401. */
 const handleUnauthorized = () => {
   authStore.clearToken();
-  window.location.href = '/';
+  const target = '/';
+  if (window.top && window.top !== window) {
+    window.top.location.href = target;
+  } else {
+    window.location.href = target;
+  }
 };
 
 /** Fusiona headers adicionales con el header JSON obligatorio. */

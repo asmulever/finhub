@@ -25,6 +25,18 @@ const setError = (msg) => {
   if (el) el.textContent = msg || '';
 };
 
+const ensureAuthenticated = () => {
+  const token = authStore.getToken() ?? localStorage.getItem('jwt');
+  if (!token) {
+    const target = '/';
+    if (window.top && window.top !== window) {
+      window.top.location.href = target;
+    } else {
+      window.location.href = target;
+    }
+  }
+};
+
 const formatNumber = (value, digits = 2) => {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '–';
   return new Intl.NumberFormat('es-AR', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(value));
@@ -623,6 +635,7 @@ const loadPortfolio = async () => {
 };
 
 const init = async () => {
+  ensureAuthenticated();
   renderToolbar();
   bindToolbarNavigation();
   setToolbarUserName('');
