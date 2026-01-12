@@ -79,7 +79,7 @@ const render = () => {
       const response = await postJson('/auth/login', payload);
       authStore.setToken(response.token);
       authStore.setProfile(response.user);
-      window.location.href = '/Frontend/app.html';
+      window.location.href = '/Frontend/app.php';
     } catch (err) {      
       const message = err?.error?.message ?? 'No se pudo iniciar sesión';
       errorMessage.textContent = message;
