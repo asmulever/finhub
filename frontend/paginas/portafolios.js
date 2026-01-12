@@ -30,6 +30,19 @@ const formatNumber = (value, digits = 2) => {
   return new Intl.NumberFormat('es-AR', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(value));
 };
 
+const formatCompact = (value, decimals = 1) => {
+  if (!Number.isFinite(Number(value))) return '—';
+  const num = Number(value);
+  const abs = Math.abs(num);
+  if (abs >= 1_000_000) {
+    return `${formatNumber(num / 1_000_000, decimals)}M`;
+  }
+  if (abs >= 1_000) {
+    return `${formatNumber(num / 1_000, decimals)}k`;
+  }
+  return formatNumber(num, Math.min(decimals, 2));
+};
+
 const formatSignedPercent = (value) => {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return { text: '–', className: '' };
   const num = Number(value);
@@ -323,6 +336,20 @@ const rebuildCatalogIndex = () => {
   state.catalogIndex = map;
 };
 
+const formatAsOf = (value) => {
+  if (!value) return '—';
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) {
+    const text = String(value);
+    if (/^\d{4}-\d{2}-\d{2}/.test(text)) {
+      return `${text.slice(8, 10)}/${text.slice(5, 7)}/${text.slice(2, 4)}:${text.slice(11, 16)}`;
+    }
+    return text.slice(0, 16);
+  }
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(dt.getDate())}/${pad(dt.getMonth() + 1)}/${String(dt.getFullYear()).slice(-2)}:${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+};
+
 const syncPortfolioFromCatalog = (list = state.portfolio) => {
   if (!(state.catalogIndex instanceof Map) || state.catalogIndex.size === 0) return list;
   return list.map((p) => {
@@ -362,24 +389,29 @@ const renderList = () => {
   list.innerHTML = state.filtered.map((item) => {
     const displayPrice = convertPrice(item.price, item.currency ?? 'ARS');
     const varPct = item.var_pct !== null && item.var_pct !== undefined ? `${item.var_pct.toFixed(2)}%` : '—';
+    const varTooltip = 'Variación porcentual del instrumento (último vs. anterior)';
     const varMtd = item.var_mtd !== null && item.var_mtd !== undefined ? `${item.var_mtd.toFixed(2)}%` : '—';
     const varYtd = item.var_ytd !== null && item.var_ytd !== undefined ? `${item.var_ytd.toFixed(2)}%` : '—';
     const volumeNom = item.volume_nominal ?? item.volumen_nominal ?? null;
     const volumeEfe = convertPrice(item.volume_efectivo ?? item.volumen_efectivo ?? null, item.currency ?? 'ARS');
     const volLabel = item.volatility_30d !== null && item.volatility_30d !== undefined ? item.volatility_30d.toFixed(3) : '—';
-    const asOf = item.as_of ? String(item.as_of).replace('T', ' ').slice(0, 16) : '—';
+    const asOf = formatAsOf(item.as_of);
+    const volumeNomLabel = volumeNom !== null && volumeNom !== undefined ? formatCompact(volumeNom, 1) : '—';
+    const volumeEfeLabel = volumeEfe !== null && volumeEfe !== undefined ? formatCompact(volumeEfe, 2) : '—';
+    const volumeNomTitle = `Volumen nominal: cantidad de títulos negociados (unidades). Valor completo: ${volumeNom !== null && volumeNom !== undefined ? formatNumber(volumeNom, 0) : '—'}`;
+    const volumeEfeTitle = `Volumen efectivo: monto operado en dinero (VNº x precio), en ${state.targetCurrency || item.currency || ''}. Valor completo: ${volumeEfe !== null && volumeEfe !== undefined ? formatNumber(volumeEfe, 2) : '—'}`;
     return `
       <div class="tile" data-symbol="${item.symbol}">
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
           <div>
             <strong>${item.symbol}</strong>
             <small style="display:block;">${item.name || 'Sin nombre'}</small>
-            <small class="muted">${item.tipo || item.type || 'N/D'} · ${item.mercado || 'Mercado N/D'} · ${state.targetCurrency || item.currency || 'N/D'}</small>
+            <small class="muted">${item.tipo || item.type || 'N/D'} · ${state.targetCurrency || item.currency || 'N/D'}</small>
           </div>
           <div>
-            <div style="font-size:1.4rem;font-weight:800;color:#e2e8f0;">${Number.isFinite(displayPrice) ? formatNumber(displayPrice, 2) : '—'}</div>
-            <div style="color:${(item.var_pct ?? 0) < 0 ? '#ef4444' : '#22c55e'};">${varPct}</div>
-            <div class="muted">${asOf}</div>
+            <div style="font-size:1.1rem;font-weight:800;color:#e2e8f0;">${Number.isFinite(displayPrice) ? formatNumber(displayPrice, 2) : '—'}</div>
+            <div title="${varTooltip}" style="font-size:0.85rem;color:${(item.var_pct ?? 0) < 0 ? '#ef4444' : '#22c55e'};">${varPct}</div>
+            <div class="muted" style="font-size:0.85rem;">${asOf}</div>
           </div>
         </div>
         <div class="meta-row" style="margin-top:6px;">
@@ -388,9 +420,9 @@ const renderList = () => {
           <span>Máximo: ${formatNumber(convertPrice(item.maximo, item.currency ?? 'ARS'), 2)}</span>
           <span>Mínimo: ${formatNumber(convertPrice(item.minimo, item.currency ?? 'ARS'), 2)}</span>
         </div>
-        <div class="meta-row">
-          <span>Vol. Nominal: ${volumeNom ?? "—"}</span>
-          <span>Vol. Efectivo: ${volumeEfe !== null && volumeEfe !== undefined ? formatNumber(volumeEfe, 2) : "—"}</span>
+        <div class="meta-row" style="font-size:0.9rem;gap:6px;align-items:center;">
+          <span title="${volumeNomTitle}">${'VNº: '}<span title="${volumeNomTitle}">${volumeNomLabel}</span></span>
+          <span title="${volumeEfeTitle}">${'VE$: '}<span title="${volumeEfeTitle}">${volumeEfeLabel}</span></span>
         </div>
       <button type="button" class="${category === 'selected' ? 'deselect-btn' : ''}" data-symbol="${item.symbol}">
           ${category === 'selected' ? 'Quitar de cartera' : 'Agregar a cartera'}

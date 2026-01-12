@@ -12,10 +12,12 @@ use PDO;
 final class PdoPredictionRepository implements PredictionRepositoryInterface
 {
     private PDO $pdo;
+    private bool $hasChangeColumn = false;
 
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
+        $this->hasChangeColumn = $this->detectChangeColumn();
     }
 
     public function replacePredictions(int $runId, int $userId, array $items): void
@@ -25,12 +27,10 @@ final class PdoPredictionRepository implements PredictionRepositoryInterface
             $delete = $this->pdo->prepare('DELETE FROM instrument_predictions WHERE run_id = :run_id AND user_id = :user_id');
             $delete->execute(['run_id' => $runId, 'user_id' => $userId]);
 
-            $insert = $this->pdo->prepare(
-                <<<'SQL'
-INSERT INTO instrument_predictions (run_id, user_id, symbol, horizon_days, prediction, confidence, created_at)
-VALUES (:run_id, :user_id, :symbol, :horizon, :prediction, :confidence, :created_at)
-SQL
-            );
+            $insertSql = $this->hasChangeColumn
+                ? 'INSERT INTO instrument_predictions (run_id, user_id, symbol, horizon_days, prediction, confidence, change_pct, created_at) VALUES (:run_id, :user_id, :symbol, :horizon, :prediction, :confidence, :change_pct, :created_at)'
+                : 'INSERT INTO instrument_predictions (run_id, user_id, symbol, horizon_days, prediction, confidence, created_at) VALUES (:run_id, :user_id, :symbol, :horizon, :prediction, :confidence, :created_at)';
+            $insert = $this->pdo->prepare($insertSql);
             foreach ($items as $item) {
                 $insert->execute([
                     'run_id' => $runId,
@@ -39,6 +39,7 @@ SQL
                     'horizon' => (int) $item['horizon'],
                     'prediction' => $item['prediction'],
                     'confidence' => $item['confidence'],
+                    'change_pct' => $this->hasChangeColumn ? ($item['change_pct'] ?? null) : null,
                     'created_at' => $item['created_at'] ?? date('Y-m-d H:i:s'),
                 ]);
             }
@@ -64,12 +65,9 @@ SQL;
             return [];
         }
 
-        $sql = <<<'SQL'
-SELECT symbol, horizon_days, prediction, confidence, created_at
-FROM instrument_predictions
-WHERE user_id = :user_id AND run_id = :run_id
-ORDER BY symbol ASC, horizon_days ASC
-SQL;
+        $sql = $this->hasChangeColumn
+            ? 'SELECT symbol, horizon_days, prediction, confidence, change_pct, created_at FROM instrument_predictions WHERE user_id = :user_id AND run_id = :run_id ORDER BY symbol ASC, horizon_days ASC'
+            : 'SELECT symbol, horizon_days, prediction, confidence, created_at FROM instrument_predictions WHERE user_id = :user_id AND run_id = :run_id ORDER BY symbol ASC, horizon_days ASC';
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute(['user_id' => $userId, 'run_id' => (int) $runId]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -81,9 +79,21 @@ SQL;
                 'horizon' => (int) $row['horizon_days'],
                 'prediction' => (string) $row['prediction'],
                 'confidence' => $row['confidence'] !== null ? (float) $row['confidence'] : null,
+                'change_pct' => isset($row['change_pct']) && $row['change_pct'] !== null ? (float) $row['change_pct'] : null,
                 'created_at' => $row['created_at'] ?? null,
             ];
         }
         return $items;
+    }
+
+    private function detectChangeColumn(): bool
+    {
+        try {
+            $stmt = $this->pdo->query("SHOW COLUMNS FROM instrument_predictions LIKE 'change_pct'");
+            $row = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : false;
+            return $row !== false;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 }

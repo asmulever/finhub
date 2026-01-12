@@ -3,7 +3,7 @@ import { authStore } from '../auth/authStore.js';
 const toolbarTemplate = `
   <header class="toolbar">
     <div class="toolbar-logo">
-      <a href="/Frontend/app.html">
+      <a href="/Frontend/app.php">
         <img src="/logo/full_logoweb.png" alt="FinHub" style="height: 88px;" />
       </a>
     </div>

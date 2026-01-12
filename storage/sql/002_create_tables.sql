@@ -140,6 +140,7 @@ CREATE TABLE IF NOT EXISTS `instrument_predictions` (
   `horizon_days` INT UNSIGNED NOT NULL,
   `prediction` ENUM('up','down','neutral') NOT NULL,
   `confidence` DECIMAL(5,4) DEFAULT NULL,
+  `change_pct` DECIMAL(10,6) DEFAULT NULL,
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   KEY `instrument_predictions_user_idx` (`user_id`),

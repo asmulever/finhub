@@ -172,6 +172,7 @@ final class PredictionService
                         'horizon' => $pred['horizon'],
                         'prediction' => $pred['prediction'],
                         'confidence' => $pred['confidence'],
+                        'change_pct' => $pred['change_pct'],
                         'created_at' => $nowIso,
                     ];
                 }
@@ -204,16 +205,24 @@ final class PredictionService
      * Construye predicciones 30/60/90 días a partir de la serie.
      *
      * @param array<int,array<string,mixed>> $points
-     * @return array<int,array{horizon:int,prediction:string,confidence:float|null}>
+     * @return array<int,array{horizon:int,prediction:string,confidence:float|null,change_pct:float|null}>
      */
     private function computePredictions(array $points): array
     {
         $closes = [];
+        $dates = [];
         foreach ($points as $p) {
             if (isset($p['close']) && is_numeric($p['close'])) {
                 $closes[] = (float) $p['close'];
             } elseif (isset($p['price']) && is_numeric($p['price'])) {
                 $closes[] = (float) $p['price'];
+            }
+            if (isset($p['t'])) {
+                $dates[] = (string) $p['t'];
+            } elseif (isset($p['as_of'])) {
+                $dates[] = (string) $p['as_of'];
+            } elseif (isset($p['date'])) {
+                $dates[] = (string) $p['date'];
             }
         }
         if (count($closes) < 20) {
@@ -224,6 +233,10 @@ final class PredictionService
         $rsi14 = $this->rsi($closes, 14);
         $momentum = $this->momentum($closes, 10);
         $volatility = $this->volatility($closes, 20);
+        $boll = $this->bollinger($closes, 20, 2);
+        $macd = $this->macd($closes, 12, 26, 9);
+        $atr = $this->atrFromCloses($closes, 14);
+        $reg = $this->linearRegressionPct($closes, $dates);
         $last = end($closes) ?: null;
         $prev = count($closes) >= 2 ? $closes[count($closes) - 2] : null;
         $slope = null;
@@ -238,6 +251,10 @@ final class PredictionService
             'momentum' => $momentum,
             'volatility' => $volatility,
             'slope' => $slope,
+            'boll' => $boll,
+            'macd' => $macd,
+            'atr' => $atr,
+            'reg' => $reg,
         ];
 
         $horizons = [30, 60, 90];
@@ -248,6 +265,7 @@ final class PredictionService
                 'horizon' => $horizon,
                 'prediction' => $prediction['direction'],
                 'confidence' => $prediction['confidence'],
+                'change_pct' => $prediction['change_pct'],
             ];
         }
         return $result;
@@ -264,6 +282,10 @@ final class PredictionService
         $momentum = $indicators['momentum'];
         $slope = $indicators['slope'] ?? 0.0;
         $volatility = $indicators['volatility'];
+        $boll = $indicators['boll'];
+        $macd = $indicators['macd'];
+        $atr = $indicators['atr'];
+        $reg = $indicators['reg'];
 
         $smaGap = ($sma20 !== null && $sma50 !== null && $sma50 !== 0.0)
             ? ($sma20 - $sma50) / $sma50
@@ -271,8 +293,10 @@ final class PredictionService
         $rsiBias = $rsi !== null ? ($rsi - 50.0) / 50.0 : 0.0;
         $momentumBias = $momentum;
         $slopeBias = $slope ?? 0.0;
+        $bollBias = ($boll['z'] ?? 0.0) * -0.1;
+        $macdBias = $macd['hist'] ?? 0.0;
 
-        $baseScore = (0.4 * $smaGap) + (0.25 * $rsiBias) + (0.2 * $momentumBias) + (0.15 * $slopeBias);
+        $baseScore = (0.35 * $smaGap) + (0.25 * $rsiBias) + (0.2 * $momentumBias) + (0.1 * $slopeBias) + (0.1 * $macdBias) + $bollBias;
         // Penalizar volatilidad para horizontes cortos
         if ($horizon <= 30) {
             $baseScore -= min(0.15, $volatility * 0.5);
@@ -292,9 +316,22 @@ final class PredictionService
             $confidence = max(0.05, min(0.6, 0.5 - (abs($baseScore) / 2)));
         }
 
+        $regProjected = $reg['slope_pct'] !== null ? $reg['slope_pct'] * $horizon : 0.0;
+        $signalProjected = $baseScore * max(0.3, (1.0 - $volatility));
+        $atrNoise = $atr !== null ? $atr * 0.001 : 0.0;
+        $changePct = ($regProjected + $signalProjected) - $atrNoise;
+        if ($direction === 'down') {
+            $changePct = min($changePct, -abs($changePct));
+        } elseif ($direction === 'up') {
+            $changePct = max($changePct, abs($changePct));
+        } else {
+            $changePct = $changePct * 0.3;
+        }
+
         return [
             'direction' => $direction,
             'confidence' => round($confidence, 4),
+            'change_pct' => round($changePct, 4),
         ];
     }
 
@@ -372,6 +409,114 @@ final class PredictionService
             $sumSq += ($r - $avg) ** 2;
         }
         return sqrt($sumSq / count($returns));
+    }
+
+    /**
+     * @return array{mid:?float,upper:?float,lower:?float,z:?float}
+     */
+    private function bollinger(array $values, int $window, int $multiplier): array
+    {
+        if (count($values) < $window) {
+            return ['mid' => null, 'upper' => null, 'lower' => null, 'z' => null];
+        }
+        $slice = array_slice($values, -$window);
+        $avg = array_sum($slice) / count($slice);
+        $variance = 0.0;
+        foreach ($slice as $v) {
+            $variance += ($v - $avg) ** 2;
+        }
+        $std = sqrt($variance / count($slice));
+        $last = end($values);
+        $z = $std > 0 ? ($last - $avg) / $std : null;
+        return [
+            'mid' => $avg,
+            'upper' => $avg + $multiplier * $std,
+            'lower' => $avg - $multiplier * $std,
+            'z' => $z,
+        ];
+    }
+
+    /**
+     * MACD simple: EMA12 - EMA26 y su histograma contra EMA9.
+     *
+     * @return array{macd:?float,signal:?float,hist:?float}
+     */
+    private function macd(array $values, int $fast, int $slow, int $signal): array
+    {
+        if (count($values) < $slow) {
+            return ['macd' => null, 'signal' => null, 'hist' => null];
+        }
+        $emaFast = $this->ema($values, $fast);
+        $emaSlow = $this->ema($values, $slow);
+        if ($emaFast === null || $emaSlow === null) {
+            return ['macd' => null, 'signal' => null, 'hist' => null];
+        }
+        $macd = $emaFast - $emaSlow;
+        $signalVal = $this->ema(array_slice($values, -($signal + $slow)), $signal);
+        $hist = $signalVal !== null ? $macd - $signalVal : null;
+        return ['macd' => $macd, 'signal' => $signalVal, 'hist' => $hist];
+    }
+
+    private function ema(array $values, int $period): ?float
+    {
+        if (count($values) < $period) {
+            return null;
+        }
+        $k = 2 / ($period + 1);
+        $ema = array_sum(array_slice($values, 0, $period)) / $period;
+        for ($i = $period; $i < count($values); $i++) {
+            $ema = ($values[$i] - $ema) * $k + $ema;
+        }
+        return $ema;
+    }
+
+    private function atrFromCloses(array $values, int $period): ?float
+    {
+        if (count($values) <= $period) {
+            return null;
+        }
+        $trs = [];
+        for ($i = 1; $i < count($values); $i++) {
+            $trs[] = abs($values[$i] - $values[$i - 1]);
+        }
+        if (count($trs) < $period) {
+            return null;
+        }
+        return array_sum(array_slice($trs, -$period)) / $period;
+    }
+
+    /**
+     * Regresión lineal simple sobre log-precio para estimar slope diario.
+     *
+     * @param array<int,string> $dates
+     * @return array{slope_pct:?float}
+     */
+    private function linearRegressionPct(array $closes, array $dates): array
+    {
+        if (count($closes) < 10) {
+            return ['slope_pct' => null];
+        }
+        $xs = [];
+        $ys = [];
+        foreach ($closes as $idx => $price) {
+            $xs[] = (float) $idx;
+            $ys[] = log(max(1e-6, (float) $price));
+        }
+        $n = count($xs);
+        $sumX = array_sum($xs);
+        $sumY = array_sum($ys);
+        $sumXY = 0.0;
+        $sumX2 = 0.0;
+        for ($i = 0; $i < $n; $i++) {
+            $sumXY += $xs[$i] * $ys[$i];
+            $sumX2 += $xs[$i] * $xs[$i];
+        }
+        $den = ($n * $sumX2 - $sumX * $sumX);
+        if ($den == 0.0) {
+            return ['slope_pct' => null];
+        }
+        $slope = ($n * $sumXY - $sumX * $sumY) / $den;
+        return ['slope_pct' => $slope];
     }
 
     /**

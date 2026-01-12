@@ -77,7 +77,7 @@
         <div>
           <p class="muted" style="margin:0 0 6px 0;">Estadística · Predicciones 30/60/90</p>
           <h2>Predicción de valorización por instrumento</h2>
-          <p class="muted">Usa momentum, SMA y RSI sobre series del Data Lake. No se guarda precio, se consulta en vivo.</p>
+          <p class="muted">Usa momentum, SMA, RSI y proyección de precio. No se guarda precio, se consulta en vivo.</p>
         </div>
         <div class="actions">
           <button id="btn-run" type="button">Recalcular análisis</button>
@@ -91,7 +91,7 @@
         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
           <div>
             <h3>Predicciones</h3>
-            <p class="muted">Instrumentos del usuario con señal a 30/60/90 días y confianza. Gráfico con histórico + RSI/Bandas.</p>
+            <p class="muted">Instrumentos del usuario con proyección a 90 días y confianza. Gráfico con histórico + RSI/Bandas.</p>
           </div>
           <div class="status" id="status-box"></div>
         </div>
@@ -101,15 +101,13 @@
               <tr>
                 <th>Símbolo</th>
                 <th>Precio actual</th>
-                <th>30d</th>
-                <th>60d</th>
-                <th>90d</th>
+                <th>Proyección 90d</th>
                 <th>Confianza</th>
                 <th>Gráfico</th>
               </tr>
             </thead>
             <tbody id="pred-table-body">
-              <tr><td colspan="7" class="muted">Sin datos aún.</td></tr>
+              <tr><td colspan="5" class="muted">Sin datos aún.</td></tr>
             </tbody>
           </table>
         </div>

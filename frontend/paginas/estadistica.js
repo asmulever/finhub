@@ -34,30 +34,30 @@ const renderTable = () => {
   if (!tbody) return;
   const symbols = Object.keys(state.grouped).sort();
   if (symbols.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="muted">Sin datos aún.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="muted">Sin datos aún.</td></tr>';
     return;
   }
 
-  const renderCell = (symbol, horizon) => {
-    const item = state.grouped[symbol].horizons[horizon];
+  const formatProjection = (item) => {
     if (!item) return '<span class="muted">—</span>';
     const dir = item.prediction;
     const cls = dir === 'up' ? 'signal-up' : dir === 'down' ? 'signal-down' : 'signal-neutral';
     const label = dir === 'up' ? 'Alza' : dir === 'down' ? 'Baja' : 'Neutral';
-    return `<span class="${cls}">${label}</span>`;
+    const delta = Number.isFinite(item.change_pct) ? `${(item.change_pct * 100).toFixed(2)}%` : 'N/D';
+    return `<span class="${cls}">${label} · ${delta}</span>`;
   };
 
   tbody.innerHTML = symbols.map((symbol) => {
     const row = state.grouped[symbol];
     const price = formatMoney(row.price);
-    const confidence = row.confidenceAvg !== null ? `${(row.confidenceAvg * 100).toFixed(1)}%` : 'N/D';
+    const confidence = row.selected?.confidence !== null && row.selected?.confidence !== undefined
+      ? `${(row.selected.confidence * 100).toFixed(1)}%`
+      : 'N/D';
     return `
       <tr>
         <td>${symbol}</td>
         <td>${price}</td>
-        <td>${renderCell(symbol, 30)}</td>
-        <td>${renderCell(symbol, 60)}</td>
-        <td>${renderCell(symbol, 90)}</td>
+        <td>${formatProjection(row.selected)}</td>
         <td>${confidence}</td>
         <td><button class="icon-button" data-symbol="${symbol}" aria-label="Ver gráfico de ${symbol}">📈 Gráfico</button></td>
       </tr>
@@ -88,13 +88,14 @@ const groupPredictions = (items) => {
     grouped[symbol].horizons[item.horizon] = {
       prediction: item.prediction,
       confidence: item.confidence,
+      change_pct: item.change_pct ?? null,
     };
   });
 
   Object.keys(grouped).forEach((key) => {
     const horizons = grouped[key].horizons;
-    const confidences = Object.values(horizons).map((h) => h.confidence).filter((c) => typeof c === 'number');
-    grouped[key].confidenceAvg = confidences.length ? (confidences.reduce((a, b) => a + b, 0) / confidences.length) : null;
+    const preferred = horizons[90] ?? horizons[60] ?? horizons[30] ?? null;
+    grouped[key].selected = preferred;
   });
 
   state.grouped = grouped;

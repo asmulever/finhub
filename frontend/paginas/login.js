@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     if (!authStore.getToken()) return;
     await getJson('/me');
-    window.location.href = '/Frontend/app.html';
+      window.location.href = '/Frontend/app.php';
   } catch {
     // sesión no válida, continuar en login
   }
