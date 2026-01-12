@@ -8,21 +8,21 @@ const toolbarTemplate = `
       </a>
     </div>
   <nav class="toolbar-menu">
-      <button type="button" data-menu="portfolios" data-link="/Frontend/Portafolios.php">Portafolios</button>
-      <button type="button" data-menu="heatmap" data-link="/Frontend/heatmap.php">Heatmap</button>
-      <button type="button" id="stats-menu" data-menu="stats" data-link="/Frontend/estadistica.php">Estadística</button>
-      <button type="button" id="datalake-menu" data-menu="datalake" data-link="/Frontend/datalake.php">DataLake</button>
+      <button type="button" data-menu="portfolios" data-link="/Frontend/Portafolios.html">Portafolios</button>
+      <button type="button" data-menu="heatmap" data-link="/Frontend/heatmap.html">Heatmap</button>
+      <button type="button" id="stats-menu" data-menu="stats" data-link="/Frontend/estadistica.html">Estadística</button>
+      <button type="button" id="datalake-menu" data-menu="datalake" data-link="/Frontend/datalake.html">DataLake</button>
       <select id="providers-select" aria-label="Proveedores">
         <option value="">Proveedores</option>
         <option value="/Frontend/eodhd.html">EODHD</option>
         <option value="/Frontend/twelvedata.html">TwelveData</option>
         <option value="/Frontend/alphavantage.html">Alpha Vantage</option>
-        <option value="/Frontend/polygon.php">Polygon</option>
-        <option value="/Frontend/tiingo.php">Tiingo</option>
-        <option value="/Frontend/stooq.php">Stooq</option>
+        <option value="/Frontend/polygon.html">Polygon</option>
+        <option value="/Frontend/tiingo.html">Tiingo</option>
+        <option value="/Frontend/stooq.html">Stooq</option>
       </select>
-      <button type="button" id="rava-menu" data-menu="rava" data-link="/Frontend/rava.php">RAVA</button>
-      <button type="button" id="analysis-menu" data-menu="analysis" data-link="/Frontend/analisis_indicadores.php">Análisis</button>
+      <button type="button" id="rava-menu" data-menu="rava" data-link="/Frontend/rava.html">RAVA</button>
+      <button type="button" id="analysis-menu" data-menu="analysis" data-link="/Frontend/analisis_indicadores.html">Análisis</button>
     </nav>
     <div class="toolbar-user">
       <button id="user-menu-button" type="button">

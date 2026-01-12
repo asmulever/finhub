@@ -113,7 +113,7 @@ const showAnalysisOverlay = (message, redirect = false) => {
     overlayEl.classList.remove('visible');
     overlayEl.setAttribute('aria-hidden', 'true');
     if (redirect) {
-      window.location.href = '/Frontend/Portafolios.php';
+      window.location.href = '/Frontend/Portafolios.html';
     }
   }, 5000);
 };
