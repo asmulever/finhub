@@ -417,9 +417,13 @@ const openChart = async (symbol) => {
   const resp = await getJson(`/datalake/prices/series?symbol=${encodeURIComponent(symbol)}&period=6m`);
   const points = Array.isArray(resp?.points) ? resp.points : [];
   const parsed = points.map((p) => {
-    const close = Number.isFinite(p.close) ? p.close : Number.isFinite(p.price) ? p.price : null;
-    return close !== null ? { t: new Date(p.t ?? p.as_of ?? Date.now()), v: close } : null;
-  }).filter(Boolean);
+    const candidates = [p.close, p.price, p.cierre, p.ajuste, p.ultimo];
+    const close = candidates.find((v) => Number.isFinite(v));
+    if (!Number.isFinite(close)) return null;
+    const rawTime = p.t ?? p.as_of ?? p.fecha ?? p.date ?? null;
+    const t = rawTime ? new Date(rawTime) : new Date();
+    return { t, v: Number(close) };
+  }).filter(Boolean).sort((a, b) => a.t.getTime() - b.t.getTime());
 
   const closes = parsed.map((p) => p.v);
   const bands = bollinger(closes);
