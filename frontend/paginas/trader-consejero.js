@@ -38,7 +38,7 @@ const renderTable = () => {
     return `
       <tr data-symbol="${s.symbol}">
         <td>${s.especie || s.symbol}</td>
-        <td>${formatAction(s.action)}</td>
+        <td data-action-symbol="${s.symbol}">${formatAction(s.action)}</td>
         <td>${formatPct(s.confidence, 1)}</td>
         <td>${s.horizon_days || '—'}d</td>
         <td>${formatPct(s.exp_return_pct)}</td>
@@ -57,6 +57,18 @@ const renderTable = () => {
         state.selected = signal;
         renderDetail();
         await overlay.withLoader(() => openChart(signal));
+      }
+    });
+  });
+  body.querySelectorAll('td[data-action-symbol]').forEach((cell) => {
+    cell.style.cursor = 'pointer';
+    cell.title = 'Ver detalle de la señal';
+    cell.addEventListener('click', () => {
+      const sym = cell.getAttribute('data-action-symbol') || '';
+      const signal = state.signals.find((x) => x.symbol === sym);
+      if (signal) {
+        state.selected = signal;
+        renderDetail();
       }
     });
   });
