@@ -431,15 +431,13 @@ const renderList = () => {
             <div class="muted" style="font-size:0.85rem;">${asOf}</div>
           </div>
         </div>
-        <div class="meta-row" style="margin-top:6px;">
-          <span>Anterior: ${formatNumber(convertPrice(item.anterior, item.currency ?? 'ARS'), 2)}</span>
-          <span>Apertura: ${formatNumber(convertPrice(item.apertura, item.currency ?? 'ARS'), 2)}</span>
-          <span>Máximo: ${formatNumber(convertPrice(item.maximo, item.currency ?? 'ARS'), 2)}</span>
-          <span>Mínimo: ${formatNumber(convertPrice(item.minimo, item.currency ?? 'ARS'), 2)}</span>
-        </div>
-        <div class="meta-row" style="font-size:0.9rem;gap:6px;align-items:center;">
-          <span title="${volumeNomTitle}">${'VNº: '}<span title="${volumeNomTitle}">${volumeNomLabel}</span></span>
-          <span title="${volumeEfeTitle}">${'VE$: '}<span title="${volumeEfeTitle}">${volumeEfeLabel}</span></span>
+        <div class="meta-row" style="margin-top:6px; flex-wrap: wrap; gap: 8px;">
+          <span title="Precio.Anterior">P.Ant: ${formatNumber(convertPrice(item.anterior, item.currency ?? 'ARS'), 2)}</span>
+          <span title="Precio.Apertura">P.Ape: ${formatNumber(convertPrice(item.apertura, item.currency ?? 'ARS'), 2)}</span>
+          <span title="Precio.Máximo">P.Máx: ${formatNumber(convertPrice(item.maximo, item.currency ?? 'ARS'), 2)}</span>
+          <span title="Precio.Mínimo">P.Min: ${formatNumber(convertPrice(item.minimo, item.currency ?? 'ARS'), 2)}</span>
+          <span title="${volumeNomTitle}">VNº: <span title="${volumeNomTitle}">${volumeNomLabel}</span></span>
+          <span title="${volumeEfeTitle}">VE$: <span title="${volumeEfeTitle}">${volumeEfeLabel}</span></span>
         </div>
       <button type="button" class="${category === 'selected' ? 'deselect-btn' : ''}" data-symbol="${item.symbol}">
           ${category === 'selected' ? 'Quitar de cartera' : 'Agregar a cartera'}

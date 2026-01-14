@@ -30,6 +30,7 @@ const toolbarTemplate = `
         <span class="chevron">▾</span>
       </button>
     </div>
+    <button class="toolbar-toggle" type="button" aria-expanded="true" aria-label="Ocultar barra" title="Ocultar barra">▲</button>
   </header>
   <div class="user-dropdown" id="user-dropdown">
     <button id="admin-users-action" type="button">Admin Usuarios</button>
@@ -39,6 +40,36 @@ const toolbarTemplate = `
 
 let toolbarMounted = false;
 const isAdminProfile = (profile) => String(profile?.role ?? '').toLowerCase() === 'admin';
+
+const ensureToolbarStyles = () => {
+  if (document.getElementById('toolbar-collapsible-style')) return;
+  const style = document.createElement('style');
+  style.id = 'toolbar-collapsible-style';
+  style.textContent = `
+    .toolbar.has-toggle { position: sticky; top: 0; z-index: 15; padding-bottom: 28px; position: relative; }
+    .toolbar-toggle {
+      position: absolute;
+      right: 12px;
+      bottom: 6px;
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      background: rgba(15, 23, 42, 0.85);
+      color: #e2e8f0;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+    .toolbar-toggle:focus-visible { outline: 2px solid rgba(14, 165, 233, 0.6); outline-offset: 2px; }
+    .toolbar.collapsed .toolbar-menu,
+    .toolbar.collapsed .toolbar-user,
+    .toolbar.collapsed .toolbar-logo { display: none !important; }
+    .toolbar.collapsed { padding-bottom: 16px; }
+  `;
+  document.head.appendChild(style);
+};
 
 export const setAdminMenuVisibility = (profile) => {
   const adminButton = document.getElementById('admin-users-action');
@@ -59,6 +90,7 @@ export const renderToolbar = () => {
   if (!container || toolbarMounted) {
     return;
   }
+  ensureToolbarStyles();
   container.innerHTML = toolbarTemplate;
   toolbarMounted = true;
   const cachedProfile = authStore.getProfile();
@@ -81,6 +113,26 @@ export const highlightToolbar = () => {
     });
     providersSelect.value = matched;
   }
+};
+
+const updateToggleVisual = (toolbar, toggle) => {
+  const collapsed = toolbar.classList.contains('collapsed');
+  toggle.textContent = collapsed ? '▼' : '▲';
+  toggle.setAttribute('aria-expanded', String(!collapsed));
+  toggle.setAttribute('aria-label', collapsed ? 'Mostrar barra' : 'Ocultar barra');
+  toggle.title = collapsed ? 'Mostrar barra' : 'Ocultar barra';
+};
+
+const bindToolbarToggle = () => {
+  const toolbar = document.querySelector('.toolbar');
+  const toggle = document.querySelector('.toolbar-toggle');
+  if (!toolbar || !toggle) return;
+  toolbar.classList.add('has-toggle');
+  updateToggleVisual(toolbar, toggle);
+  toggle.addEventListener('click', () => {
+    toolbar.classList.toggle('collapsed');
+    updateToggleVisual(toolbar, toggle);
+  });
 };
 
 export const bindToolbarNavigation = () => {
@@ -119,6 +171,7 @@ export const bindToolbarNavigation = () => {
       window.location.href = link;
     });
   }
+  bindToolbarToggle();
 };
 
 export const setToolbarUserName = (name) => {

@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>FinHub | Registro</title>
   <link rel="icon" href="/logo/favicon.png" />
   <script>
@@ -71,7 +74,7 @@
       width: 100%;
       border-radius: 12px;
       border: 1px solid var(--border);
-      padding: 12px 14px;
+      padding: 14px;
       background: rgba(11, 16, 34, 0.9);
       color: var(--text);
       font-size: 1rem;
@@ -82,7 +85,7 @@
     button {
       border: none;
       border-radius: 12px;
-      padding: 12px 14px;
+      padding: 14px;
       font-weight: 700;
       background: linear-gradient(120deg, var(--accent), var(--accent-2));
       color: #041023;
@@ -104,6 +107,15 @@
     @media (max-width: 640px) {
       body { padding: 20px 12px; }
       .auth-card { padding: 20px 18px; }
+      form { gap: 14px; }
+      button { width: 100%; }
+    }
+    @media (max-width: 480px) {
+      body { padding: 16px 12px; }
+      .auth-card { padding: 18px 16px; border-radius: 16px; }
+      .title { font-size: 1.4rem; }
+      .subtitle { font-size: 0.9rem; }
+      input { font-size: 1rem; }
     }
   </style>
 </head>
