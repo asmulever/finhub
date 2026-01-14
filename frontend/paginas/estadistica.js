@@ -6,6 +6,8 @@ const state = {
   grouped: {},
   run: null,
   status: 'idle',
+  speciesMap: {},
+  lastChartSymbol: '',
 };
 
 const setStatus = (msg, type = '') => {
@@ -55,11 +57,11 @@ const renderTable = () => {
       : 'N/D';
     return `
       <tr>
-        <td>${symbol}</td>
+        <td>${row.especie || symbol}</td>
         <td>${price}</td>
         <td>${formatProjection(row.selected)}</td>
         <td>${confidence}</td>
-        <td><button class="icon-button" data-symbol="${symbol}" aria-label="Ver gráfico de ${symbol}">📈 Gráfico</button></td>
+        <td><button class="icon-button" data-symbol="${symbol}" data-especie="${row.especie || symbol}" aria-label="Ver gráfico de ${symbol}">📈 Gráfico</button></td>
       </tr>
     `;
   }).join('');
@@ -81,9 +83,17 @@ const groupPredictions = (items) => {
   const grouped = {};
   items.forEach((item) => {
     const symbol = String(item.symbol ?? '').toUpperCase();
+    const especie = String(item.especie ?? item.symbol ?? '').toUpperCase();
     if (!symbol) return;
     if (!grouped[symbol]) {
-      grouped[symbol] = { symbol, price: item.price ?? null, price_as_of: item.price_as_of ?? null, horizons: {}, confidenceAvg: null };
+      grouped[symbol] = {
+        symbol,
+        especie,
+        price: item.price ?? null,
+        price_as_of: item.price_as_of ?? null,
+        horizons: {},
+        confidenceAvg: null,
+      };
     }
     grouped[symbol].horizons[item.horizon] = {
       prediction: item.prediction,
@@ -99,6 +109,53 @@ const groupPredictions = (items) => {
   });
 
   state.grouped = grouped;
+};
+
+const loadSpeciesMap = async () => {
+  try {
+    const fetchList = async (path) => {
+      try {
+        const resp = await getJson(path);
+        return resp?.items ?? resp?.data ?? [];
+      } catch {
+        return [];
+      }
+    };
+    const [cedears, acciones, bonos] = await Promise.all([
+      fetchList('/rava/cedears'),
+      fetchList('/rava/acciones'),
+      fetchList('/rava/bonos'),
+    ]);
+    const map = {};
+    const add = (list) => {
+      list.forEach((row) => {
+        const symbol = (row.symbol ?? '').toUpperCase();
+        const especie = (row.especie ?? '').toUpperCase();
+        if (!symbol) return;
+        if (especie) {
+          map[symbol] = especie;
+        }
+      });
+    };
+    add(cedears);
+    add(acciones);
+    add(bonos);
+    state.speciesMap = map;
+  } catch {
+    state.speciesMap = {};
+  }
+};
+
+const applySpeciesMapping = () => {
+  Object.keys(state.grouped).forEach((sym) => {
+    const row = state.grouped[sym];
+    if (!row.especie || row.especie === sym) {
+      const mapped = state.speciesMap[sym];
+      if (mapped) {
+        row.especie = mapped;
+      }
+    }
+  });
 };
 
 const showAnalysisOverlay = (message, redirect = false) => {
@@ -146,6 +203,8 @@ const fetchLatest = async () => {
 
   const predictions = Array.isArray(resp.predictions) ? resp.predictions : [];
   groupPredictions(predictions);
+  await loadSpeciesMap();
+  applySpeciesMapping();
   state.run = resp.run ?? null;
   const runLabel = resp.run?.finished_at ?? resp.run?.started_at ?? '--';
   setBadges('Listo', runLabel, '#22c55e');
@@ -267,6 +326,58 @@ const drawLineChart = (canvas, points, { color = '#22d3ee', label = '' } = {}) =
   }
 };
 
+const filterByRange = (points, days) => {
+  if (!Number.isFinite(days) || days <= 0) return points;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  return points.filter((p) => p.t >= cutoff);
+};
+
+const buildTicks = (min, max, count = 4) => {
+  const ticks = [];
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return ticks;
+  const step = (max - min) / Math.max(1, count);
+  for (let i = 0; i <= count; i++) {
+    ticks.push(min + step * i);
+  }
+  return ticks;
+};
+
+const drawAxes = (ctx, margin, width, height, minX, maxX, minY, maxY) => {
+  ctx.strokeStyle = 'rgba(148,163,184,0.35)';
+  ctx.beginPath();
+  ctx.moveTo(margin.left, margin.top);
+  ctx.lineTo(margin.left, margin.top + height);
+  ctx.lineTo(margin.left + width, margin.top + height);
+  ctx.stroke();
+
+  const yTicks = buildTicks(minY, maxY, 4);
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '11px Inter, system-ui, sans-serif';
+  yTicks.forEach((val) => {
+    const y = margin.top + height - ((val - minY) / Math.max(1e-6, maxY - minY)) * height;
+    ctx.fillText(val.toFixed(2), 6, y + 4);
+    ctx.strokeStyle = 'rgba(148,163,184,0.15)';
+    ctx.beginPath();
+    ctx.moveTo(margin.left, y);
+    ctx.lineTo(margin.left + width, y);
+    ctx.stroke();
+  });
+
+  const xTicks = buildTicks(minX, maxX, 3);
+  xTicks.forEach((val) => {
+    const x = margin.left + ((val - minX) / Math.max(1, maxX - minX)) * width;
+    const d = new Date(val);
+    const label = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+    ctx.fillText(label, x - 14, margin.top + height + 16);
+    ctx.strokeStyle = 'rgba(148,163,184,0.15)';
+    ctx.beginPath();
+    ctx.moveTo(x, margin.top);
+    ctx.lineTo(x, margin.top + height);
+    ctx.stroke();
+  });
+};
+
 const drawPriceChart = (points, bands) => {
   const canvas = document.getElementById('price-canvas');
   if (!canvas) return;
@@ -298,12 +409,7 @@ const drawPriceChart = (points, bands) => {
   const scaleX = (t) => margin.left + ((t - minX) / Math.max(1, maxX - minX)) * width;
   const scaleY = (v) => margin.top + height - ((v - minY) / Math.max(1e-6, maxY - minY)) * height;
 
-  ctx.strokeStyle = 'rgba(148,163,184,0.35)';
-  ctx.beginPath();
-  ctx.moveTo(margin.left, margin.top);
-  ctx.lineTo(margin.left, margin.top + height);
-  ctx.lineTo(margin.left + width, margin.top + height);
-  ctx.stroke();
+  drawAxes(ctx, margin, width, height, minX, maxX, minY, maxY);
 
   // Bollinger bands
   ctx.strokeStyle = 'rgba(14,165,233,0.5)';
@@ -377,12 +483,7 @@ const drawRsiChart = (points) => {
   const scaleX = (t) => margin.left + ((t - minX) / Math.max(1, maxX - minX)) * width;
   const scaleY = (v) => margin.top + height - ((v - minY) / Math.max(1e-6, maxY - minY)) * height;
 
-  ctx.strokeStyle = 'rgba(148,163,184,0.35)';
-  ctx.beginPath();
-  ctx.moveTo(margin.left, margin.top);
-  ctx.lineTo(margin.left, margin.top + height);
-  ctx.lineTo(margin.left + width, margin.top + height);
-  ctx.stroke();
+  drawAxes(ctx, margin, width, height, minX, maxX, minY, maxY);
 
   // Zonas RSI
   ctx.strokeStyle = 'rgba(248, 113, 113, 0.4)';
@@ -415,7 +516,15 @@ const drawRsiChart = (points) => {
 const openChart = async (symbol) => {
   const overlayEl = document.getElementById('chart-overlay');
   if (!overlayEl) return;
-  const resp = await getJson(`/datalake/prices/series?symbol=${encodeURIComponent(symbol)}&period=6m`);
+  const rangeSelect = document.getElementById('chart-range');
+  const rangeVal = rangeSelect?.value || 'all';
+  const days = rangeVal === 'all' ? null : Number(rangeVal);
+  state.lastChartSymbol = symbol;
+
+  const entry = state.grouped[symbol] ?? {};
+  const especie = (entry.especie || state.speciesMap[symbol] || symbol).toUpperCase();
+  const period = days === null ? '12m' : (days <= 30 ? '1m' : (days <= 90 ? '3m' : '6m'));
+  const resp = await getJson(`/datalake/prices/series?symbol=${encodeURIComponent(especie)}&period=${encodeURIComponent(period)}`);
   const points = Array.isArray(resp?.points) ? resp.points : [];
   const parsed = points.map((p) => {
     const candidates = [p.close, p.price, p.cierre, p.ajuste, p.ultimo];
@@ -426,18 +535,29 @@ const openChart = async (symbol) => {
     return { t, v: Number(close) };
   }).filter(Boolean).sort((a, b) => a.t.getTime() - b.t.getTime());
 
-  const closes = parsed.map((p) => p.v);
+  const filtered = days ? filterByRange(parsed, days) : parsed;
+  if (!filtered.length) {
+    const title = document.getElementById('chart-title');
+    const subtitle = document.getElementById('chart-subtitle');
+    if (title) title.textContent = especie;
+    if (subtitle) subtitle.textContent = 'Sin datos en el rango seleccionado';
+    overlayEl.classList.add('visible');
+    overlayEl.setAttribute('aria-hidden', 'false');
+    return;
+  }
+
+  const closes = filtered.map((p) => p.v);
   const bands = bollinger(closes);
-  drawPriceChart(parsed, bands);
+  drawPriceChart(filtered, bands);
 
   const rsiValues = rsiSeries(closes);
-  const rsiPoints = rsiValues.map((v, idx) => ({ t: parsed[idx]?.t ?? new Date(), v }));
+  const rsiPoints = rsiValues.map((v, idx) => ({ t: filtered[idx]?.t ?? new Date(), v }));
   drawRsiChart(rsiPoints);
 
   const title = document.getElementById('chart-title');
   const subtitle = document.getElementById('chart-subtitle');
-  if (title) title.textContent = symbol;
-  if (subtitle) subtitle.textContent = 'Histórico 6m + RSI/Bandas de Bollinger';
+  if (title) title.textContent = especie;
+  if (subtitle) subtitle.textContent = days ? `Histórico ${days}d + RSI/Bandas de Bollinger` : 'Histórico completo + RSI/Bandas de Bollinger';
 
   overlayEl.classList.add('visible');
   overlayEl.setAttribute('aria-hidden', 'false');
@@ -461,6 +581,11 @@ const bindOverlayClose = () => {
 
 const init = async () => {
   bindOverlayClose();
+  document.getElementById('chart-range')?.addEventListener('change', () => {
+    if (state.lastChartSymbol) {
+      overlay.withLoader(() => openChart(state.lastChartSymbol)).catch(() => setStatus('No se pudo recargar el gráfico', 'error'));
+    }
+  });
   document.getElementById('btn-refresh')?.addEventListener('click', () => overlay.withLoader(fetchLatest));
   document.getElementById('btn-run')?.addEventListener('click', () => overlay.withLoader(() => triggerRun(false)));
   await overlay.withLoader(fetchLatest);

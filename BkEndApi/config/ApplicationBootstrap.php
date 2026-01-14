@@ -20,6 +20,7 @@ use FinHub\Application\Portfolio\PortfolioService;
 use FinHub\Application\Portfolio\PortfolioSummaryService;
 use FinHub\Application\Portfolio\PortfolioSectorService;
 use FinHub\Application\Portfolio\PortfolioHeatmapService;
+use FinHub\Application\Signals\SignalService;
 use FinHub\Application\DataLake\DataLakeService;
 use FinHub\Application\DataLake\InstrumentCatalogService;
 use FinHub\Application\Analytics\PredictionService;
@@ -47,6 +48,7 @@ use FinHub\Infrastructure\User\UserDeletionService;
 use FinHub\Infrastructure\Mail\BrevoMailSender;
 use FinHub\Infrastructure\Analytics\PdoPredictionRepository;
 use FinHub\Infrastructure\Analytics\PdoPredictionRunRepository;
+use FinHub\Infrastructure\Signals\PdoSignalRepository;
 
 final class ApplicationBootstrap
 {
@@ -185,6 +187,8 @@ final class ApplicationBootstrap
         $portfolioSectorService = new PortfolioSectorService($portfolioService, $priceService, $logger);
         $portfolioHeatmapService = new PortfolioHeatmapService($portfolioService, $portfolioSummaryService, $portfolioSectorService, $priceService, $tiingoService, $logger);
         $predictionService = new PredictionService($predictionRepository, $predictionRunRepository, $portfolioService, $dataLakeService, $userRepository);
+        $signalRepository = new PdoSignalRepository($pdo, $logger);
+        $signalService = new SignalService($signalRepository, $dataLakeService, $logger);
 
         return new Container([
             'config' => $config,
@@ -214,6 +218,8 @@ final class ApplicationBootstrap
             'prediction_service' => $predictionService,
             'prediction_repository' => $predictionRepository,
             'prediction_run_repository' => $predictionRunRepository,
+            'signal_repository' => $signalRepository,
+            'signal_service' => $signalService,
             'datalake_service' => $dataLakeService,
             'instrument_catalog_service' => $instrumentCatalogService,
             'rava_cedears_service' => $ravaCedearsService,

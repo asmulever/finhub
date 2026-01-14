@@ -613,3 +613,4 @@ Stack trace:
 #1 /var/www/html/BkEndApi/index.php(14): FinHub\Infrastructure\Config\ApplicationBootstrap->createContainer()
 #2 {main}
   thrown in /var/www/html/BkEndApi/src/Application/Portfolio/PortfolioHeatmapService.php on line 24
+[13-Jan-2026 12:41:02 America/New_York] PHP Parse error:  syntax error, unexpected token "=", expecting end of file in Standard input code on line 2

@@ -22,6 +22,7 @@ use FinHub\Application\Portfolio\PortfolioHeatmapService;
 use FinHub\Application\Analytics\PredictionService;
 use FinHub\Application\DataLake\DataLakeService;
 use FinHub\Application\DataLake\InstrumentCatalogService;
+use FinHub\Application\Signals\SignalService;
 use FinHub\Domain\User\UserRepositoryInterface;
 use FinHub\Infrastructure\Config\Config;
 use FinHub\Infrastructure\Logging\LoggerInterface;
@@ -49,6 +50,7 @@ final class ApiDispatcher
     private PredictionService $predictionService;
     private DataLakeService $dataLakeService;
     private InstrumentCatalogService $instrumentCatalogService;
+    private SignalService $signalService;
     private PolygonService $polygonService;
     private TiingoService $tiingoService;
     private StooqService $stooqService;
@@ -78,6 +80,7 @@ final class ApiDispatcher
         PredictionService $predictionService,
         DataLakeService $dataLakeService,
         InstrumentCatalogService $instrumentCatalogService,
+        SignalService $signalService,
         PolygonService $polygonService,
         TiingoService $tiingoService,
         StooqService $stooqService,
@@ -106,6 +109,7 @@ final class ApiDispatcher
         $this->predictionService = $predictionService;
         $this->dataLakeService = $dataLakeService;
         $this->instrumentCatalogService = $instrumentCatalogService;
+        $this->signalService = $signalService;
         $this->polygonService = $polygonService;
         $this->tiingoService = $tiingoService;
         $this->stooqService = $stooqService;
@@ -194,6 +198,16 @@ final class ApiDispatcher
             $this->requireUser();
             $metrics = $this->providerUsage->getUsage();
             $this->sendJson($metrics);
+            return;
+        }
+        if ($method === 'GET' && $path === '/signals/latest') {
+            $user = $this->requireUser();
+            $this->handleSignalsLatest($user);
+            return;
+        }
+        if ($method === 'GET' && $path === '/alphavantage/fx-daily') {
+            $this->requireUser();
+            $this->handleAlphaVantage($path);
             return;
         }
         if ($method === 'GET' && str_starts_with($path, '/alphavantage/')) {
@@ -874,6 +888,36 @@ HTML;
         // Fallback: proveedor directo
         $series = $this->dataLakeService->series($symbol, $period);
         $this->sendJson($series);
+    }
+
+    /**
+     * Devuelve señales calculadas y sus indicadores asociados.
+     */
+    private function handleSignalsLatest(\FinHub\Domain\User\User $user): void
+    {
+        $raw = $_GET['s'] ?? null;
+        $symbols = [];
+        if (is_string($raw)) {
+            $symbols = array_filter(array_map('trim', explode(',', $raw)));
+        } elseif (is_array($raw)) {
+            foreach ($raw as $chunk) {
+                $parts = preg_split('/,/', (string) $chunk, -1, PREG_SPLIT_NO_EMPTY);
+                foreach ($parts as $p) {
+                    $symbols[] = trim($p);
+                }
+            }
+        }
+        if (empty($symbols)) {
+            $symbols = $this->portfolioService->listSymbols($user->getId());
+        }
+        if (empty($symbols)) {
+            throw new \RuntimeException('No hay símbolos en tu portafolio para generar señales', 400);
+        }
+        $horizon = (int) ($_GET['horizon'] ?? 90);
+        $forceRecompute = isset($_GET['force']) && in_array((string) $_GET['force'], ['1', 'true', 'yes'], true);
+        $collectMissing = isset($_GET['collect']) && in_array((string) $_GET['collect'], ['1', 'true', 'yes'], true);
+        $signals = $this->signalService->latest($symbols, $horizon, $forceRecompute, $collectMissing);
+        $this->sendJson(['data' => $signals]);
     }
 
     /**

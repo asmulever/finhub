@@ -42,6 +42,7 @@ final class DataLakeService
 
     public function collect(array $symbols): array
     {
+        $symbols = $this->normalizeSymbolsToSpecies($symbols);
         $this->repository->ensureTables();
         $startedAt = microtime(true);
         $total = count($symbols);
@@ -181,6 +182,42 @@ final class DataLakeService
             'duration' => $results['duration_seconds'],
         ]);
         return $results;
+    }
+
+    /**
+     * Normaliza la lista de insumos para ingesta priorizando especie (RAVA).
+     * Si encuentra un mapeo símbolo -> especie en el catálogo RAVA, reemplaza por especie.
+     * Si no hay mapeo, deja el valor original pero registra un log informativo.
+     *
+     * @param array<int,string> $symbols
+     * @return array<int,string>
+     */
+    private function normalizeSymbolsToSpecies(array $symbols): array
+    {
+        $normalized = [];
+        $ravaMap = $this->buildRavaMap();
+        foreach ($symbols as $sym) {
+            $key = strtoupper((string) $sym);
+            if ($key === '') {
+                continue;
+            }
+            $snapshot = $ravaMap[$key] ?? null;
+            $payload = is_array($snapshot) ? ($snapshot['payload'] ?? []) : [];
+            $especie = is_array($payload) ? ($payload['especie'] ?? null) : null;
+            if (is_string($especie) && $especie !== '' && $especie !== $key) {
+                $normalized[] = strtoupper($especie);
+                $this->logger->info('datalake.collect.normalize_especie', [
+                    'input' => $key,
+                    'especie' => strtoupper($especie),
+                ]);
+                continue;
+            }
+            if (!isset($ravaMap[$key])) {
+                $this->logger->info('datalake.collect.symbol_without_especie_map', ['symbol' => $key]);
+            }
+            $normalized[] = $key;
+        }
+        return $normalized;
     }
 
     public function latestQuote(string $symbol): array

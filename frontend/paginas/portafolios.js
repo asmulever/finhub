@@ -21,6 +21,11 @@ const state = {
 };
 
 const setError = (msg) => {
+  const normalized = String(msg || '').trim().toLowerCase();
+  if (normalized.includes('acceso restringido')) {
+    console.info('[portafolios] se omite aviso de acceso restringido en UI');
+    msg = '';
+  }
   const el = document.getElementById('rava-error');
   if (el) el.textContent = msg || '';
 };
@@ -628,7 +633,13 @@ const loadPortfolio = async () => {
     state.counts.portfolio = state.portfolio.length;
     console.info('[portafolios] cartera cargada', state.portfolio.length);
   } catch (error) {
-    setError(error?.error?.message ?? 'No se pudo cargar tu portafolio');
+    const msg = String(error?.error?.message ?? '').toLowerCase();
+    if (error?.status === 403 || msg.includes('acceso restringido')) {
+      setError('');
+      console.info('[portafolios] acceso restringido reportado por API; se omite aviso en UI');
+    } else {
+      setError(error?.error?.message ?? 'No se pudo cargar tu portafolio');
+    }
     state.portfolio = [];
     state.counts.portfolio = 0;
   }

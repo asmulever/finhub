@@ -22,6 +22,25 @@ const logError = (context, error) => {
   console.info(`[alphavantage] Error en ${context}`, error);
 };
 
+const guardAction = (prefix) => {
+  if (requireAdmin()) return true;
+  if (prefix === 'fx-daily') return true;
+  setError(`${prefix}-error`, 'Acceso solo admin');
+  return false;
+};
+
+const lockAdminSections = () => {
+  if (requireAdmin()) return;
+  const adminButtons = ['btn-quote', 'btn-search', 'btn-daily', 'btn-intraday', 'btn-crypto', 'btn-sma', 'btn-rsi', 'btn-overview'];
+  adminButtons.forEach((id) => {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = true;
+  });
+  ['quote', 'search', 'daily', 'intraday', 'crypto', 'sma', 'rsi', 'overview'].forEach((prefix) => {
+    setError(`${prefix}-error`, 'Acceso solo admin');
+  });
+};
+
 const loadProfile = async () => {
   try {
     state.profile = await getJson('/me');
@@ -32,19 +51,11 @@ const loadProfile = async () => {
     setToolbarUserName(state.profile?.email ?? '');
     setAdminMenuVisibility(state.profile);
   }
-};
-
-const guardAdmin = () => {
-  if (requireAdmin()) return true;
-  document.querySelectorAll('button').forEach((b) => { b.disabled = true; });
-  ['quote','search','daily','fx-daily','sma','rsi','overview'].forEach((prefix) => {
-    setError(`${prefix}-error`, 'Acceso solo admin');
-  });
-  return false;
+  lockAdminSections();
 };
 
 const fetchQuote = async () => {
-  if (!guardAdmin()) return;
+  if (!guardAction('quote')) return;
   const symbol = document.getElementById('quote-symbol')?.value.trim().toUpperCase();
   setError('quote-error', '');
   if (!symbol) return setError('quote-error', 'Ingresa símbolo');
@@ -58,7 +69,7 @@ const fetchQuote = async () => {
 };
 
 const fetchSearch = async () => {
-  if (!guardAdmin()) return;
+  if (!guardAction('search')) return;
   const kw = document.getElementById('search-keywords')?.value.trim();
   setError('search-error', '');
   if (!kw) return setError('search-error', 'Ingresa keywords');
@@ -72,7 +83,7 @@ const fetchSearch = async () => {
 };
 
 const fetchDaily = async () => {
-  if (!guardAdmin()) return;
+  if (!guardAction('daily')) return;
   const symbol = document.getElementById('daily-symbol')?.value.trim().toUpperCase();
   const size = document.getElementById('daily-size')?.value || 'compact';
   setError('daily-error', '');
@@ -87,7 +98,7 @@ const fetchDaily = async () => {
 };
 
 const fetchFxDaily = async () => {
-  if (!guardAdmin()) return;
+  if (!guardAction('fx-daily')) return;
   const from = document.getElementById('fxd-from')?.value.trim().toUpperCase();
   const to = document.getElementById('fxd-to')?.value.trim().toUpperCase();
   setError('fx-daily-error', '');
@@ -102,7 +113,7 @@ const fetchFxDaily = async () => {
 };
 
 const fetchSma = async () => {
-  if (!guardAdmin()) return;
+  if (!guardAction('sma')) return;
   const symbol = document.getElementById('sma-symbol')?.value.trim().toUpperCase();
   const interval = document.getElementById('sma-interval')?.value || 'daily';
   const period = parseInt(document.getElementById('sma-period')?.value || '20', 10);
@@ -119,7 +130,7 @@ const fetchSma = async () => {
 };
 
 const fetchRsi = async () => {
-  if (!guardAdmin()) return;
+  if (!guardAction('rsi')) return;
   const symbol = document.getElementById('rsi-symbol')?.value.trim().toUpperCase();
   const interval = document.getElementById('rsi-interval')?.value || 'daily';
   const period = parseInt(document.getElementById('rsi-period')?.value || '14', 10);
@@ -136,7 +147,7 @@ const fetchRsi = async () => {
 };
 
 const fetchOverview = async () => {
-  if (!guardAdmin()) return;
+  if (!guardAction('overview')) return;
   const symbol = document.getElementById('overview-symbol')?.value.trim().toUpperCase();
   setError('overview-error', '');
   if (!symbol) return setError('overview-error', 'Ingresa símbolo');

@@ -22,7 +22,7 @@ const toolbarTemplate = `
         <option value="/Frontend/stooq.html">Stooq</option>
       </select>
       <button type="button" id="rava-menu" data-menu="rava" data-link="/Frontend/rava.html">RAVA</button>
-      <button type="button" id="analysis-menu" data-menu="analysis" data-link="/Frontend/analisis_indicadores.html">Análisis</button>
+      <button type="button" id="signals-menu" data-menu="signals" data-link="/Frontend/trader-consejero.html">Trader Consejero</button>
     </nav>
     <div class="toolbar-user">
       <button id="user-menu-button" type="button">
@@ -43,12 +43,14 @@ const isAdminProfile = (profile) => String(profile?.role ?? '').toLowerCase() ==
 export const setAdminMenuVisibility = (profile) => {
   const adminButton = document.getElementById('admin-users-action');
   const datalakeButton = document.getElementById('datalake-menu');
-  const analysisButton = document.getElementById('analysis-menu');
+  const signalsButton = document.getElementById('signals-menu');
+  const ravaButton = document.getElementById('rava-menu');
   const providersSelect = document.getElementById('providers-select');
   const isAdmin = isAdminProfile(profile);
   if (adminButton) adminButton.hidden = !isAdmin;
   if (datalakeButton) datalakeButton.hidden = !isAdmin;
-  if (analysisButton) analysisButton.hidden = !isAdmin;
+  if (ravaButton) ravaButton.hidden = !isAdmin;
+  if (signalsButton) signalsButton.hidden = false;
   if (providersSelect) providersSelect.hidden = !isAdmin;
 };
 

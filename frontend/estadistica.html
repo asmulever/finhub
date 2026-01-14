@@ -99,7 +99,7 @@
           <table>
             <thead>
               <tr>
-                <th>Símbolo</th>
+                <th>Especie</th>
                 <th>Precio actual</th>
                 <th>Proyección 90d</th>
                 <th>Confianza</th>
@@ -130,7 +130,15 @@
           <p class="muted" id="chart-subtitle" style="margin:0;">Histórico + RSI/Bandas</p>
           <h4 id="chart-title" style="margin:0;">Instrumento</h4>
         </div>
-        <button class="chart-close" type="button" id="chart-close-btn">Cerrar</button>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <select id="chart-range" style="background:#0f172a;color:#e2e8f0;border:1px solid var(--border);padding:6px 10px;border-radius:10px;">
+            <option value="all">Todo</option>
+            <option value="180">6 meses</option>
+            <option value="90">3 meses</option>
+            <option value="30">Último mes</option>
+          </select>
+          <button class="chart-close" type="button" id="chart-close-btn">Cerrar</button>
+        </div>
       </header>
       <div class="chart-canvas-wrap">
         <canvas id="price-canvas" width="1100" height="360"></canvas>

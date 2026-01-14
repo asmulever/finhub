@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FinHub | Trader Consejero</title>
+  <link rel="icon" href="/logo/favicon.png" />
+  <script>
+    window.__ENV = window.__ENV ?? {};
+    window.__ENV.API_BASE_URL = '/api';
+  </script>
+  <style>
+    :root { font-family: 'Inter', system-ui, sans-serif; --bg: #050915; --card: rgba(10, 14, 28, 0.92); --border: rgba(148,163,184,0.25); --text: #e2e8f0; --muted: #94a3b8; }
+    body { margin: 0; background: radial-gradient(circle at 20% 20%, #0f172a 0%, #050915 50%, #030712 100%); color: var(--text); }
+    .content-shell { padding: 22px 30px; }
+    main { display: grid; gap: 16px; max-width: 1500px; margin: 0 auto; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; box-shadow: 0 15px 40px rgba(0,0,0,0.35); }
+    h2, h3, h4 { margin: 0 0 8px 0; }
+    .muted { color: var(--muted); font-size: 0.95rem; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 6px 12px; font-size: 0.85rem; border: 1px solid rgba(56, 189, 248, 0.35); background: rgba(14, 165, 233, 0.08); color: #e0f2fe; }
+    .status { font-weight: 700; }
+    .table-wrapper { width: 100%; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; color: var(--text); }
+    th, td { padding: 10px; border-bottom: 1px solid rgba(148,163,184,0.2); text-align: left; }
+    th { color: var(--muted); font-weight: 700; font-size: 0.9rem; }
+    .signal-buy { color: #22c55e; font-weight: 700; }
+    .signal-sell { color: #f87171; font-weight: 700; }
+    .signal-hold { color: #eab308; font-weight: 700; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    button { background: linear-gradient(120deg, #22d3ee, #0ea5e9); border: none; color: #0b1021; padding: 8px 12px; border-radius: 10px; font-weight: 700; cursor: pointer; }
+    .btn-secondary { background: rgba(56, 189, 248, 0.12); color: #e0f2fe; border: 1px solid rgba(56, 189, 248, 0.35); }
+    .icon-button { background: rgba(148,163,184,0.18); color: #e2e8f0; border: 1px solid var(--border); padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+    .stat { background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
+    canvas { width: 100%; max-width: 100%; border-radius: 8px; background: #0f172a; }
+    .chart-overlay { position: fixed; inset: 0; background: rgba(4, 6, 15, 0.8); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 10000; padding: 24px; }
+    .chart-overlay.visible { display: flex; }
+    .chart-modal { width: min(1100px, 100%); background: linear-gradient(145deg, #0b1224, #0a172f); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,0.55); padding: 16px 18px; color: var(--text); }
+    .chart-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .chart-close { background: rgba(248, 113, 113, 0.18); border: 1px solid rgba(248, 113, 113, 0.4); color: #fecdd3; border-radius: 10px; padding: 6px 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="content-shell">
+    <main>
+      <section class="card hero">
+        <div>
+          <p class="muted" style="margin:0 0 6px 0;">Consejero · Señales + Indicadores</p>
+          <h2>Trader Consejero</h2>
+          <p class="muted">Señales BUY/HOLD/SELL, confianza, rango esperado y stops/takes. Incluye indicadores listos para graficar.</p>
+        </div>
+        <div class="actions">
+          <button id="btn-refresh" type="button">&#x1f501; Actualizar Tendencias</button>
+          <span class="pill" id="badge-count">-- señales</span>
+          <span class="pill" id="badge-updated">Actualizado: --</span>
+        </div>
+      </section>
+
+      <section class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div>
+            <h3>Señales</h3>
+            <p class="muted">Especie, acción, confianza, retorno esperado y niveles stop/take. Selecciona para ver detalle y gráfico.</p>
+          </div>
+          <div class="status" id="status-box"></div>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Especie</th>
+                <th>Acción</th>
+                <th>Confianza</th>
+                <th>Horizonte</th>
+                <th>Retorno esp.</th>
+                <th>Rango P10-P90</th>
+                <th>Stop / Take</th>
+                <th>Rationale</th>
+                <th>Gráfico</th>
+              </tr>
+            </thead>
+            <tbody id="signals-body">
+              <tr><td colspan="9" class="muted">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Detalle seleccionado</h3>
+        <div id="detail-panel" class="muted">Selecciona una señal.</div>
+      </section>
+    </main>
+  </div>
+
+  <div id="chart-overlay" class="chart-overlay" aria-hidden="true">
+    <div class="chart-modal">
+      <div class="chart-header">
+        <div>
+          <p class="muted" id="chart-subtitle" style="margin:0;">Indicadores</p>
+          <h4 id="chart-title" style="margin:0;">Especie</h4>
+        </div>
+        <div class="actions">
+          <select id="chart-range" style="background:#0f172a;color:var(--text);border:1px solid var(--border);padding:6px 10px;border-radius:10px;">
+            <option value="all">Todo</option>
+            <option value="180">6 meses</option>
+            <option value="90">3 meses</option>
+            <option value="30">1 mes</option>
+          </select>
+          <button class="chart-close" type="button" id="chart-close-btn">Cerrar</button>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap">
+        <canvas id="price-canvas" width="1100" height="360"></canvas>
+      </div>
+      <div class="chart-canvas-wrap">
+        <canvas id="rsi-canvas" width="1100" height="160"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/Frontend/paginas/trader-consejero.js"></script>
+</body>
+</html>

@@ -5,6 +5,8 @@ _no hagas commit automatico , siempre espera la peticion expresa.
 _siempre espera confirmacion expresa para hacer modificaciones.
 _no hagas ajustes sin confirmacion expresa.
 
+Regla toolbar: todas las opciones actuales y futuras deben ser visibles y accesibles para usuarios finales, excepto el combo `providers-select` y la vista DataLake, que permanecen restringidos a administradores.
+
 Mantener correctamente implementado Patrón: Container / AppFactory y patrón IoC/DI.
 
 <!-- ## Regla obligatoria: No cache en vistas (DEV)
