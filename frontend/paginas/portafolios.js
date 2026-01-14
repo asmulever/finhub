@@ -418,30 +418,32 @@ const renderList = () => {
     const volumeNomTitle = `Volumen nominal: cantidad de títulos negociados (unidades). Valor completo: ${volumeNom !== null && volumeNom !== undefined ? formatNumber(volumeNom, 0) : '—'}`;
     const volumeEfeTitle = `Volumen efectivo: monto operado en dinero (VNº x precio), en ${state.targetCurrency || item.currency || ''}. Valor completo: ${volumeEfe !== null && volumeEfe !== undefined ? formatNumber(volumeEfe, 2) : '—'}`;
     return `
-      <div class="tile" data-symbol="${item.symbol}">
-        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-          <div>
-            <strong>${item.symbol}</strong>
-            <small style="display:block;">${item.name || 'Sin nombre'}</small>
-            <small class="muted">${item.tipo || item.type || 'N/D'} · ${state.targetCurrency || item.currency || 'N/D'}</small>
+      <div class="col-12 col-sm-6 col-lg-3">
+        <div class="tile" data-symbol="${item.symbol}">
+          <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+            <div>
+              <strong>${item.symbol}</strong>
+              <small style="display:block;">${item.name || 'Sin nombre'}</small>
+              <small class="muted">${item.tipo || item.type || 'N/D'} · ${state.targetCurrency || item.currency || 'N/D'}</small>
+            </div>
+            <div>
+              <div style="font-size:1.1rem;font-weight:800;color:#e2e8f0;">${Number.isFinite(displayPrice) ? formatNumber(displayPrice, 2) : '—'}</div>
+              <div title="${varTooltip}" style="font-size:0.85rem;color:${(item.var_pct ?? 0) < 0 ? '#ef4444' : '#22c55e'};">${varPct}</div>
+              <div class="muted" style="font-size:0.85rem;">${asOf}</div>
+            </div>
           </div>
-          <div>
-            <div style="font-size:1.1rem;font-weight:800;color:#e2e8f0;">${Number.isFinite(displayPrice) ? formatNumber(displayPrice, 2) : '—'}</div>
-            <div title="${varTooltip}" style="font-size:0.85rem;color:${(item.var_pct ?? 0) < 0 ? '#ef4444' : '#22c55e'};">${varPct}</div>
-            <div class="muted" style="font-size:0.85rem;">${asOf}</div>
+          <div class="meta-row" style="margin-top:6px; flex-wrap: wrap; gap: 8px;">
+            <span title="Precio.Anterior">P.Ant: ${formatNumber(convertPrice(item.anterior, item.currency ?? 'ARS'), 2)}</span>
+            <span title="Precio.Apertura">P.Ape: ${formatNumber(convertPrice(item.apertura, item.currency ?? 'ARS'), 2)}</span>
+            <span title="Precio.Máximo">P.Máx: ${formatNumber(convertPrice(item.maximo, item.currency ?? 'ARS'), 2)}</span>
+            <span title="Precio.Mínimo">P.Min: ${formatNumber(convertPrice(item.minimo, item.currency ?? 'ARS'), 2)}</span>
+            <span title="${volumeNomTitle}">VNº: <span title="${volumeNomTitle}">${volumeNomLabel}</span></span>
+            <span title="${volumeEfeTitle}">VE$: <span title="${volumeEfeTitle}">${volumeEfeLabel}</span></span>
           </div>
+        <button type="button" class="${category === 'selected' ? 'deselect-btn' : ''}" data-symbol="${item.symbol}">
+            ${category === 'selected' ? 'Quitar de cartera' : 'Agregar a cartera'}
+          </button>
         </div>
-        <div class="meta-row" style="margin-top:6px; flex-wrap: wrap; gap: 8px;">
-          <span title="Precio.Anterior">P.Ant: ${formatNumber(convertPrice(item.anterior, item.currency ?? 'ARS'), 2)}</span>
-          <span title="Precio.Apertura">P.Ape: ${formatNumber(convertPrice(item.apertura, item.currency ?? 'ARS'), 2)}</span>
-          <span title="Precio.Máximo">P.Máx: ${formatNumber(convertPrice(item.maximo, item.currency ?? 'ARS'), 2)}</span>
-          <span title="Precio.Mínimo">P.Min: ${formatNumber(convertPrice(item.minimo, item.currency ?? 'ARS'), 2)}</span>
-          <span title="${volumeNomTitle}">VNº: <span title="${volumeNomTitle}">${volumeNomLabel}</span></span>
-          <span title="${volumeEfeTitle}">VE$: <span title="${volumeEfeTitle}">${volumeEfeLabel}</span></span>
-        </div>
-      <button type="button" class="${category === 'selected' ? 'deselect-btn' : ''}" data-symbol="${item.symbol}">
-          ${category === 'selected' ? 'Quitar de cartera' : 'Agregar a cartera'}
-        </button>
       </div>
     `;
   }).join('');

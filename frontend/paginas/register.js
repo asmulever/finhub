@@ -6,38 +6,44 @@ const render = () => {
   const app = document.getElementById('app');
   if (!app) return;
   app.innerHTML = `
-    <section class="auth-card">
-      <div class="card-body">
-        <div class="brand-row">
-          <img src="/logo/full_logoweb.png" alt="FinHub" class="logo" />
-          <h2 class="title">Crear cuenta FinHub</h2>
+    <div class="container">
+      <div class="row justify-content-between" style="gap:16px; justify-content:center;">
+        <div class="col-12 col-sm-10 col-lg-6">
+          <section class="auth-card">
+            <div class="card-body">
+              <div class="brand-row">
+                <img src="/logo/full_logoweb.png" alt="FinHub" class="logo" />
+                <h2 class="title">Crear cuenta FinHub</h2>
+              </div>
+              <p class="subtitle">Tu cuenta se crea inactiva hasta que el proceso de activacion por mail ,sea completado</p>
+              <form id="register-form">
+                <div class="form-group">
+                  <label for="email">Correo</label>
+                  <input id="email" name="email" type="email" required autocomplete="username" pattern="${emailPattern}" />
+                </div>
+                <div class="form-group password-group">
+                  <label for="password">Contraseña</label>
+                  <div class="password-field">
+                    <input id="password" name="password" type="password" required autocomplete="new-password" />
+                  </div>
+                </div>
+                <div class="form-group password-group">
+                  <label for="password-confirm">Confirmar contraseña</label>
+                  <div class="password-field">
+                    <input id="password-confirm" name="password-confirm" type="password" required autocomplete="new-password" />
+                  </div>
+                  <p id="match-hint" class="hint" aria-live="polite"></p>
+                </div>
+                <button type="submit">Registrarme</button>
+                <p id="error-message" class="error" aria-live="polite"></p>
+                <p class="footnote">¿Ya tienes cuenta? <a href="/">Inicia sesión</a></p>
+              </form>
+              <p class="status-line">Estado inicial: <span class="status-strong">inactive</span></p>
+            </div>
+          </section>
         </div>
-        <p class="subtitle">Tu cuenta se crea inactiva hasta que el proceso de activacion por mail ,sea completado</p>
-        <form id="register-form">
-          <div class="form-group">
-            <label for="email">Correo</label>
-            <input id="email" name="email" type="email" required autocomplete="username" pattern="${emailPattern}" />
-          </div>
-          <div class="form-group password-group">
-            <label for="password">Contraseña</label>
-            <div class="password-field">
-              <input id="password" name="password" type="password" required autocomplete="new-password" />
-            </div>
-          </div>
-          <div class="form-group password-group">
-            <label for="password-confirm">Confirmar contraseña</label>
-            <div class="password-field">
-              <input id="password-confirm" name="password-confirm" type="password" required autocomplete="new-password" />
-            </div>
-            <p id="match-hint" class="hint" aria-live="polite"></p>
-          </div>
-          <button type="submit">Registrarme</button>
-          <p id="error-message" class="error" aria-live="polite"></p>
-          <p class="footnote">¿Ya tienes cuenta? <a href="/">Inicia sesión</a></p>
-        </form>
-        <p class="status-line">Estado inicial: <span class="status-strong">inactive</span></p>
       </div>
-    </section>
+    </div>
     <div class="loading-overlay" id="register-loading">
       <div class="loading-spinner" role="status" aria-label="Enviando registro"></div>
     </div>

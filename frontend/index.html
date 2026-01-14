@@ -8,6 +8,7 @@
   <meta http-equiv="Expires" content="0" />
   <title>FinHub | Login</title>
   <link rel="icon" href="/logo/favicon.png" />
+  <link rel="stylesheet" href="/Frontend/styles/layout.css" />
   <script>
     window.__ENV = window.__ENV ?? {};
     window.__ENV.API_BASE_URL = '/api';
@@ -31,19 +32,7 @@
       justify-content: center;
       padding: 32px 28px;
     }
-    #app {
-      width: min(1100px, 100%);
-      display: grid;
-      place-items: center;
-    }
-    .landing-grid {
-      width: 100%;
-      max-width: 1024px;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 32px;
-      align-items: stretch;
-    }
+    #app { width: 100%; }
     .hero {
       padding: 28px;
       border-radius: 18px;
@@ -272,9 +261,8 @@
     }
     @media (max-width: 1200px) {
       body { padding: 24px 18px; }
-      .landing-grid { grid-template-columns: 1fr; gap: 24px; }
-      .hero { order: 2; padding: 22px; border-radius: 16px; }
-      .panel { order: 1; width: 100%; max-width: 520px; padding: 24px 22px; }
+      .hero { order: 1; padding: 22px; border-radius: 16px; }
+      .panel { order: 2; width: 100%; max-width: 520px; padding: 24px 22px; }
       form { width: 100%; }
       .form-options { flex-direction: column; align-items: flex-start; gap: 10px; }
       .login-header h2 { font-size: 1.6rem; }
@@ -282,8 +270,7 @@
     @media (max-width: 640px) {
       body { padding: 18px 12px; }
       .hero h1 { font-size: 1.7rem; }
-      .hero { gap: 12px; display: none; }
-      .landing-grid { grid-template-columns: 1fr; }
+      .hero { gap: 12px; display: flex; }
       .panel { padding: 22px 18px; }
       .panel-copy { font-size: 0.95rem; }
       .form-options { gap: 8px; }
@@ -291,6 +278,20 @@
       button[type='submit'] { margin-top: 10px; padding: 14px; }
       .form-options .checkbox { font-size: 0.9rem; }
       .feature-list { font-size: 0.92rem; }
+    }
+    @media (max-width: 576px) {
+      .hero-col { display: none; }
+    }
+    @media (min-width: 992px) {
+      .login-row {
+        display: flex;
+        align-items: stretch;
+        gap: 32px;
+      }
+      .hero-col,
+      .form-col { flex: 1 1 0; display: flex; }
+      .hero-col .hero,
+      .form-col .panel { flex: 1 1 auto; height: 100%; }
     }
     @keyframes slideUp {
       from {

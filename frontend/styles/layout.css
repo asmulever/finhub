@@ -1,0 +1,60 @@
+/* Grid ligero inspirado en Bootstrap: breakpoints sm >=576px, lg >=992px */
+:root {
+  --container-padding: 16px;
+  --gutter: 12px;
+}
+
+.container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--container-padding);
+  padding-right: var(--container-padding);
+  max-width: 100%;
+}
+
+.container-fluid {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--container-padding);
+  padding-right: var(--container-padding);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-left: calc(var(--gutter) * -1);
+  margin-right: calc(var(--gutter) * -1);
+}
+
+.col {
+  flex: 1 0 0;
+  min-width: 0;
+  padding-left: var(--gutter);
+  padding-right: var(--gutter);
+}
+
+.col-12 { flex: 0 0 100%; max-width: 100%; padding-left: var(--gutter); padding-right: var(--gutter); }
+
+/* sm >= 576px */
+@media (min-width: 576px) {
+  .container { max-width: 540px; }
+  .col-sm-6 { flex: 0 0 50%; max-width: 50%; }
+  .col-sm-12 { flex: 0 0 100%; max-width: 100%; }
+}
+
+/* lg >= 992px */
+@media (min-width: 992px) {
+  .container { max-width: 960px; }
+  .col-lg-4 { flex: 0 0 33.3333%; max-width: 33.3333%; }
+  .col-lg-5 { flex: 0 0 41.6667%; max-width: 41.6667%; }
+  .col-lg-6 { flex: 0 0 50%; max-width: 50%; }
+  .col-lg-7 { flex: 0 0 58.3333%; max-width: 58.3333%; }
+  .col-lg-12 { flex: 0 0 100%; max-width: 100%; }
+}
+
+.align-items-center { align-items: center; }
+.justify-content-between { justify-content: space-between; }
+.g-3 { gap: 12px; }
+.g-4 { gap: 16px; }

@@ -8,12 +8,22 @@ const toolbarTemplate = `
       </a>
     </div>
   <nav class="toolbar-menu">
-      <button type="button" data-menu="portfolios" data-link="/Frontend/Portafolios.html">Portafolios</button>
-      <button type="button" data-menu="heatmap" data-link="/Frontend/heatmap.html">Heatmap</button>
-      <button type="button" id="stats-menu" data-menu="stats" data-link="/Frontend/estadistica.html">Estadística</button>
+      <button type="button" class="icon-btn" data-menu="portfolios" data-link="/Frontend/Portafolios.html" aria-label="Portafolios">
+        <span class="circle-icon">👜</span>
+      </button>
+      <button type="button" class="icon-btn" data-menu="heatmap" data-link="/Frontend/heatmap.html" aria-label="Heatmap">
+        <span class="circle-icon">🌡️</span>
+      </button>
+      <button type="button" class="icon-btn" id="stats-menu" data-menu="stats" data-link="/Frontend/estadistica.html" aria-label="Estadística">
+        <span class="circle-icon">📊</span>
+      </button>
+      <button type="button" class="icon-btn" id="signals-menu" data-menu="signals" data-link="/Frontend/trader-consejero.html" aria-label="Trader Consejero">
+        <span class="circle-icon">💹</span>
+      </button>
       <button type="button" id="datalake-menu" data-menu="datalake" data-link="/Frontend/datalake.html">DataLake</button>
       <select id="providers-select" aria-label="Proveedores">
         <option value="">Proveedores</option>
+        <option value="/Frontend/rava.html">Rava</option>
         <option value="/Frontend/eodhd.html">EODHD</option>
         <option value="/Frontend/twelvedata.html">TwelveData</option>
         <option value="/Frontend/alphavantage.html">Alpha Vantage</option>
@@ -21,8 +31,6 @@ const toolbarTemplate = `
         <option value="/Frontend/tiingo.html">Tiingo</option>
         <option value="/Frontend/stooq.html">Stooq</option>
       </select>
-      <button type="button" id="rava-menu" data-menu="rava" data-link="/Frontend/rava.html">RAVA</button>
-      <button type="button" id="signals-menu" data-menu="signals" data-link="/Frontend/trader-consejero.html">Trader Consejero</button>
     </nav>
     <div class="toolbar-user">
       <button id="user-menu-button" type="button">
@@ -46,6 +54,10 @@ const ensureToolbarStyles = () => {
   const style = document.createElement('style');
   style.id = 'toolbar-collapsible-style';
   style.textContent = `
+    #toolbar-root > header.toolbar {
+      padding: 10px 56px 10px 12px;
+      gap: 10px;
+    }
     .toolbar.has-toggle { position: sticky; top: 0; z-index: 15; padding-bottom: 28px; position: relative; }
     .toolbar-toggle {
       position: absolute;
@@ -67,6 +79,70 @@ const ensureToolbarStyles = () => {
     .toolbar.collapsed .toolbar-user,
     .toolbar.collapsed .toolbar-logo { display: none !important; }
     .toolbar.collapsed { padding-bottom: 16px; }
+    .toolbar-logo img { border: none; outline: none; box-shadow: none; margin: 0; padding: 0; height: 72px; }
+    .toolbar-menu .icon-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: none;
+      box-shadow: none;
+      background: rgba(15, 23, 42, 0.9);
+    }
+    .circle-icon { font-size: 1.1rem; line-height: 1; }
+    .toolbar-menu button,
+    .toolbar-menu select {
+      margin: 0;
+      border: none;
+      box-shadow: none;
+    }
+    @media (max-width: 768px) {
+      .toolbar {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-auto-rows: auto;
+        align-items: center;
+        gap: 6px 10px;
+        padding: 8px 56px 28px 12px;
+      }
+      .toolbar-logo {
+        grid-column: 1 / 2;
+        grid-row: 1;
+        display: flex;
+        align-items: center;
+        margin: 0;
+      }
+      .toolbar-user {
+        grid-column: 2 / 3;
+        grid-row: 1;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        min-width: 0;
+        margin: 0;
+      }
+      .toolbar-menu {
+        grid-column: 1 / 3;
+        grid-row: 2;
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        justify-content: flex-start;
+        margin-top: 4px;
+      }
+      .toolbar-menu button,
+      .toolbar-menu select {
+        padding: 8px 10px;
+        min-width: auto;
+        margin: 0;
+        border: none;
+        box-shadow: none;
+      }
+    }
   `;
   document.head.appendChild(style);
 };
