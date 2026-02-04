@@ -40,16 +40,18 @@ final class PortfolioSummaryService
         $result = [];
 
         foreach ($instruments as $instrument) {
-            $symbol = strtoupper((string) ($instrument['symbol'] ?? ''));
-            if ($symbol === '') {
+            $especie = strtoupper((string) ($instrument['especie'] ?? $instrument['symbol'] ?? ''));
+            if ($especie === '') {
                 continue;
             }
+            $symbolBase = $this->symbolBase($especie);
+            $symbolForFetch = $especie;
             try {
-                $quote = $this->fetchQuoteWithFallback($symbol);
-                $series = $this->dataLakeService->series($symbol, '3m')['points'] ?? [];
+                $quote = $this->fetchQuoteWithFallback($symbolForFetch, $symbolBase);
+                $series = $this->dataLakeService->series($symbolForFetch, '3m')['points'] ?? [];
                 $indicators = $this->buildIndicators($series);
                 $analysisSnapshot = [
-                    'symbol' => $symbol,
+                    'symbol' => $symbolForFetch,
                     'signal' => $indicators['signal'],
                     'sma20' => $indicators['sma20'],
                     'sma50' => $indicators['sma50'],
@@ -57,10 +59,11 @@ final class PortfolioSummaryService
                     'price' => $quote['close'],
                     'as_of' => $quote['asOf'] ?? $now->format(\DateTimeInterface::ATOM),
                 ];
-                $this->dataLakeService->storeAnalysisSnapshot($symbol, $analysisSnapshot);
+                $this->dataLakeService->storeAnalysisSnapshot($symbolForFetch, $analysisSnapshot);
                 $result[] = [
-                    'symbol' => $symbol,
-                    'name' => $instrument['name'] ?? $instrument['nombre'] ?? $symbol,
+                    'especie' => $especie,
+                    'symbol' => $symbolBase,
+                    'name' => $instrument['name'] ?? $instrument['nombre'] ?? $especie,
                     'type' => $instrument['type'] ?? $instrument['tipo'] ?? '',
                     'exchange' => $instrument['exchange'] ?? $instrument['mercado'] ?? '',
                     'currency' => $quote['currency'] ?? $instrument['currency'] ?? '',
@@ -83,7 +86,7 @@ final class PortfolioSummaryService
                 ];
             } catch (\Throwable $e) {
                 $this->logger->info('portfolio.summary.symbol_failed', [
-                    'symbol' => $symbol,
+                    'symbol' => $especie,
                     'message' => $e->getMessage(),
                 ]);
             }
@@ -92,21 +95,22 @@ final class PortfolioSummaryService
         return $result;
     }
 
-    private function fetchQuoteWithFallback(string $symbol): array
+    private function fetchQuoteWithFallback(string $especie, string $symbolBase): array
     {
         try {
-            return $this->dataLakeService->latestQuote($symbol);
+            return $this->dataLakeService->latestQuote($especie);
         } catch (\Throwable $e) {
             $this->logger->info('portfolio.summary.datalake_miss', [
-                'symbol' => $symbol,
+                'symbol' => $especie,
                 'message' => $e->getMessage(),
             ]);
         }
-        $request = new PriceRequest($symbol);
+        $symbolForProvider = $symbolBase !== '' ? $symbolBase : $especie;
+        $request = new PriceRequest($symbolForProvider);
         $quote = $this->priceService->getPrice($request);
         $close = $quote['close'] ?? $quote['price'] ?? $quote['c'] ?? null;
         return [
-            'symbol' => $symbol,
+            'symbol' => $symbolForProvider,
             'close' => $close,
             'open' => $quote['open'] ?? $quote['o'] ?? null,
             'high' => $quote['high'] ?? $quote['h'] ?? null,
@@ -120,6 +124,16 @@ final class PortfolioSummaryService
             'var_mtd' => $quote['var_mtd'] ?? null,
             'var_ytd' => $quote['var_ytd'] ?? null,
         ];
+    }
+
+    private function symbolBase(string $especie): string
+    {
+        $trimmed = strtoupper(trim($especie));
+        if ($trimmed === '') {
+            return '';
+        }
+        $parts = explode('-', $trimmed);
+        return $parts[0] ?? $trimmed;
     }
 
     /**

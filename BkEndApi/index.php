@@ -41,6 +41,7 @@ $userRepository = $container->get('user_repository');
 $userDeletionService = $container->get('user_deletion_service');
 $activationService = $container->get('activation_service');
 $signalService = $container->get('signal_service');
+$backtestService = $container->get('backtest_service');
 
 $traceId = generateTraceId();
 set_error_handler(fn ($severity, $message, $file, $line) => handleFatalError($logger, $traceId, $message, $file, $line));
@@ -72,7 +73,8 @@ $dispatcher = new ApiDispatcher(
     $ravaAccionesService,
     $ravaBonosService,
     $ravaHistoricosService,
-    $userDeletionService
+    $userDeletionService,
+    $backtestService
 );
 $dispatcher->dispatch($traceId);
 

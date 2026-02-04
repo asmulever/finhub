@@ -28,21 +28,33 @@ final class PdoPortfolioRepository implements PortfolioRepositoryInterface
         return (int) $this->pdo->lastInsertId();
     }
 
+    private function symbolBase(string $especie): string
+    {
+        $trimmed = strtoupper(trim($especie));
+        if ($trimmed === '') {
+            return '';
+        }
+        $parts = explode('-', $trimmed);
+        return $parts[0] ?? $trimmed;
+    }
+
     public function listInstruments(int $portfolioId): array
     {
         $query = <<<'SQL'
-SELECT id, symbol, name, exchange, currency, country, type, mic_code
+SELECT id, especie, name, exchange, currency, country, type, mic_code
 FROM portfolio_instruments
 WHERE portfolio_id = :portfolio_id
-ORDER BY symbol ASC
+ORDER BY especie ASC
 SQL;
         $statement = $this->pdo->prepare($query);
         $statement->execute(['portfolio_id' => $portfolioId]);
         $rows = $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        return array_map(static function (array $row): array {
+        return array_map(function (array $row): array {
             return [
                 'id' => (int) $row['id'],
-                'symbol' => (string) ($row['symbol'] ?? ''),
+                'especie' => (string) ($row['especie'] ?? ''),
+                // Compatibilidad: symbol deriva de la especie hasta el primer guion.
+                'symbol' => $this->symbolBase((string) ($row['especie'] ?? '')),
                 'name' => (string) ($row['name'] ?? ''),
                 'exchange' => (string) ($row['exchange'] ?? ''),
                 'currency' => (string) ($row['currency'] ?? ''),
@@ -55,9 +67,13 @@ SQL;
 
     public function addInstrument(int $portfolioId, array $payload): array
     {
+        $especie = strtoupper(trim((string) ($payload['especie'] ?? $payload['symbol'] ?? '')));
+        if ($especie === '') {
+            throw new \InvalidArgumentException('especie requerido');
+        }
         $insert = <<<'SQL'
-INSERT INTO portfolio_instruments (portfolio_id, symbol, name, exchange, currency, country, type, mic_code)
-VALUES (:portfolio_id, :symbol, :name, :exchange, :currency, :country, :type, :mic_code)
+INSERT INTO portfolio_instruments (portfolio_id, especie, name, exchange, currency, country, type, mic_code)
+VALUES (:portfolio_id, :especie, :name, :exchange, :currency, :country, :type, :mic_code)
 ON DUPLICATE KEY UPDATE
     name = VALUES(name),
     exchange = VALUES(exchange),
@@ -69,7 +85,7 @@ SQL;
         $statement = $this->pdo->prepare($insert);
         $statement->execute([
             'portfolio_id' => $portfolioId,
-            'symbol' => $payload['symbol'],
+            'especie' => $especie,
             'name' => $payload['name'] ?? '',
             'exchange' => $payload['exchange'] ?? '',
             'currency' => $payload['currency'] ?? '',
@@ -78,12 +94,13 @@ SQL;
             'mic_code' => $payload['mic_code'] ?? '',
         ]);
 
-        $select = $this->pdo->prepare('SELECT id, symbol, name, exchange, currency, country, type, mic_code FROM portfolio_instruments WHERE portfolio_id = :portfolio_id AND symbol = :symbol LIMIT 1');
-        $select->execute(['portfolio_id' => $portfolioId, 'symbol' => $payload['symbol']]);
+        $select = $this->pdo->prepare('SELECT id, especie, name, exchange, currency, country, type, mic_code FROM portfolio_instruments WHERE portfolio_id = :portfolio_id AND especie = :especie LIMIT 1');
+        $select->execute(['portfolio_id' => $portfolioId, 'especie' => $especie]);
         $row = $select->fetch(PDO::FETCH_ASSOC);
         return $row ? [
             'id' => (int) $row['id'],
-            'symbol' => (string) $row['symbol'],
+            'especie' => (string) $row['especie'],
+            'symbol' => $this->symbolBase((string) $row['especie']),
             'name' => (string) ($row['name'] ?? ''),
             'exchange' => (string) ($row['exchange'] ?? ''),
             'currency' => (string) ($row['currency'] ?? ''),
@@ -95,12 +112,21 @@ SQL;
 
     public function removeInstrument(int $portfolioId, string $symbol): bool
     {
-        $delete = $this->pdo->prepare('DELETE FROM portfolio_instruments WHERE portfolio_id = :portfolio_id AND symbol = :symbol');
-        $delete->execute([
+        $especie = strtoupper(trim($symbol));
+        $symbolBase = $this->symbolBase($especie);
+        $find = $this->pdo->prepare('SELECT id FROM portfolio_instruments WHERE portfolio_id = :portfolio_id AND (especie = :especie OR especie LIKE :prefix) LIMIT 1');
+        $find->execute([
             'portfolio_id' => $portfolioId,
-            'symbol' => $symbol,
+            'especie' => $especie,
+            'prefix' => $symbolBase !== '' ? $symbolBase . '-%' : $especie,
         ]);
-        return true;
+        $row = $find->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return false;
+        }
+        $delete = $this->pdo->prepare('DELETE FROM portfolio_instruments WHERE id = :id');
+        $delete->execute(['id' => $row['id']]);
+        return $delete->rowCount() > 0;
     }
 
     public function listPortfolios(int $userId): array
@@ -130,17 +156,17 @@ SQL;
 
     public function listSymbols(?int $userId = null): array
     {
-        $baseSql = 'SELECT DISTINCT pi.symbol FROM portfolio_instruments pi';
+        $baseSql = 'SELECT DISTINCT pi.especie FROM portfolio_instruments pi';
         $params = [];
         if ($userId !== null) {
             $baseSql .= ' INNER JOIN portfolios p ON pi.portfolio_id = p.id AND p.user_id = :user_id';
             $params[':user_id'] = $userId;
         }
-        $baseSql .= ' WHERE pi.symbol IS NOT NULL AND pi.symbol <> \'\' ORDER BY pi.symbol ASC';
+        $baseSql .= ' WHERE pi.especie IS NOT NULL AND pi.especie <> \'\' ORDER BY pi.especie ASC';
         $stmt = $this->pdo->prepare($baseSql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        return array_values(array_filter(array_map(static fn ($r) => (string) $r['symbol'], $rows ?: [])));
+        return array_values(array_filter(array_map(static fn ($r) => (string) $r['especie'], $rows ?: [])));
     }
 
     public function getBaseCurrency(int $portfolioId): string

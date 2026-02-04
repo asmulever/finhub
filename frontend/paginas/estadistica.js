@@ -1,5 +1,6 @@
 import { getJson, postJson } from '../apicliente.js';
 import { createLoadingOverlay } from '../components/loadingOverlay.js';
+import { collapseToolbar } from '../components/toolbar.js';
 
 const overlay = createLoadingOverlay();
 const state = {
@@ -514,6 +515,7 @@ const drawRsiChart = (points) => {
 };
 
 const openChart = async (symbol) => {
+  collapseToolbar();
   const overlayEl = document.getElementById('chart-overlay');
   if (!overlayEl) return;
   const rangeSelect = document.getElementById('chart-range');
@@ -543,6 +545,7 @@ const openChart = async (symbol) => {
     if (subtitle) subtitle.textContent = 'Sin datos en el rango seleccionado';
     overlayEl.classList.add('visible');
     overlayEl.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('no-scroll');
     return;
   }
 
@@ -561,6 +564,7 @@ const openChart = async (symbol) => {
 
   overlayEl.classList.add('visible');
   overlayEl.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('no-scroll');
 };
 
 const bindOverlayClose = () => {
@@ -570,6 +574,7 @@ const bindOverlayClose = () => {
   const close = () => {
     overlayEl.classList.remove('visible');
     overlayEl.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('no-scroll');
   };
   closeBtn.addEventListener('click', close);
   overlayEl.addEventListener('click', (event) => {

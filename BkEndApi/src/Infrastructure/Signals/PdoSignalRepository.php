@@ -147,4 +147,25 @@ final class PdoSignalRepository implements SignalRepositoryInterface
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([$threshold->format('Y-m-d H:i:s')]);
     }
+
+    public function attachBacktestRef(array $symbols, int $backtestId): void
+    {
+        $normalized = array_values(array_filter(array_map(static fn ($s) => strtoupper(trim((string) $s)), $symbols), static fn ($s) => $s !== ''));
+        if (empty($normalized)) {
+            return;
+        }
+        $placeholders = implode(',', array_fill(0, count($normalized), '?'));
+        $sql = "UPDATE signals SET backtest_ref = ? WHERE symbol IN ($placeholders)";
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $params = array_merge([$backtestId], $normalized);
+            $stmt->execute($params);
+        } catch (\Throwable $e) {
+            $this->logger->info('signals.attach_backtest.failed', [
+                'symbols' => $normalized,
+                'backtest_id' => $backtestId,
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
 }

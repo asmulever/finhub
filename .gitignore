@@ -4,10 +4,11 @@
 # Ignore logs
 *.log
 logs/
-# !finhub.log
+finhub.log
 
 # Ignore Docs
 *.md
+# !Datos_Endpoinst_Analisis.md
 docs/
 
 # EXCEPCIÓN: este archivo NO se ignora

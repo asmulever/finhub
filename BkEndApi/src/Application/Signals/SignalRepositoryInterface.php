@@ -31,4 +31,11 @@ interface SignalRepositoryInterface
      * Elimina señales más antiguas que la fecha dada (para retención).
      */
     public function deleteOlderThan(\DateTimeImmutable $threshold): void;
+
+    /**
+     * Asocia un backtest a los símbolos dados para enriquecer señales futuras.
+     *
+     * @param array<int,string> $symbols
+     */
+    public function attachBacktestRef(array $symbols, int $backtestId): void;
 }

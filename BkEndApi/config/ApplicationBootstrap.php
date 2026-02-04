@@ -6,6 +6,7 @@ namespace FinHub\Infrastructure\Config;
 use FinHub\Infrastructure\Config\Config;
 use FinHub\Infrastructure\Config\Container;
 use FinHub\Infrastructure\Logging\FileLogger;
+use FinHub\Application\Backtest\BacktestService;
 use FinHub\Application\MarketData\PriceService;
 use FinHub\Application\MarketData\ProviderUsageService;
 use FinHub\Application\Auth\ActivationService;
@@ -49,6 +50,7 @@ use FinHub\Infrastructure\Mail\BrevoMailSender;
 use FinHub\Infrastructure\Analytics\PdoPredictionRepository;
 use FinHub\Infrastructure\Analytics\PdoPredictionRunRepository;
 use FinHub\Infrastructure\Signals\PdoSignalRepository;
+use FinHub\Infrastructure\Backtest\PdoBacktestRepository;
 
 final class ApplicationBootstrap
 {
@@ -189,6 +191,8 @@ final class ApplicationBootstrap
         $predictionService = new PredictionService($predictionRepository, $predictionRunRepository, $portfolioService, $dataLakeService, $userRepository);
         $signalRepository = new PdoSignalRepository($pdo, $logger);
         $signalService = new SignalService($signalRepository, $dataLakeService, $logger);
+        $backtestRepository = new PdoBacktestRepository($pdo, $logger);
+        $backtestService = new BacktestService($backtestRepository, $logger);
 
         return new Container([
             'config' => $config,
@@ -220,6 +224,8 @@ final class ApplicationBootstrap
             'prediction_run_repository' => $predictionRunRepository,
             'signal_repository' => $signalRepository,
             'signal_service' => $signalService,
+            'backtest_repository' => $backtestRepository,
+            'backtest_service' => $backtestService,
             'datalake_service' => $dataLakeService,
             'instrument_catalog_service' => $instrumentCatalogService,
             'rava_cedears_service' => $ravaCedearsService,

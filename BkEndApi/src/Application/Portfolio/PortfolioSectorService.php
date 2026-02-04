@@ -36,32 +36,34 @@ final class PortfolioSectorService
         $instruments = $this->portfolioService->listInstruments($userId);
         $symbols = [];
         foreach ($instruments as $instrument) {
-            $symbol = strtoupper((string) ($instrument['symbol'] ?? ''));
-            if ($symbol === '') {
+            $especie = strtoupper((string) ($instrument['especie'] ?? $instrument['symbol'] ?? ''));
+            if ($especie === '') {
                 continue;
             }
-            $symbols[$symbol] = $symbol;
+            $symbols[$especie] = $especie;
         }
 
         $results = [];
-        foreach ($symbols as $symbol) {
+        foreach ($symbols as $especie) {
+            $symbolBase = $this->symbolBase($especie);
             $sector = null;
             $industry = null;
             $error = null;
             try {
-                $overview = $this->priceService->alphaOverview($symbol);
+                $overview = $this->priceService->alphaOverview($symbolBase !== '' ? $symbolBase : $especie);
                 $sector = $this->normalizeText($overview['Sector'] ?? $overview['sector'] ?? null);
                 $industry = $this->normalizeText($overview['Industry'] ?? $overview['industry'] ?? null);
             } catch (\Throwable $exception) {
                 $error = $exception->getMessage();
                 $this->logger->info('portfolio.sector_industry.fetch_failed', [
-                    'symbol' => $symbol,
+                    'symbol' => $especie,
                     'message' => $error,
                 ]);
             }
 
             $results[] = [
-                'symbol' => $symbol,
+                'especie' => $especie,
+                'symbol' => $symbolBase,
                 'sector' => $sector ?? 'Sin sector',
                 'industry' => $industry ?? 'Sin industry',
                 'provider' => 'alphavantage',
@@ -82,5 +84,15 @@ final class PortfolioSectorService
             return null;
         }
         return $trimmed;
+    }
+
+    private function symbolBase(string $especie): string
+    {
+        $trimmed = strtoupper(trim($especie));
+        if ($trimmed === '') {
+            return '';
+        }
+        $parts = explode('-', $trimmed);
+        return $parts[0] ?? $trimmed;
     }
 }

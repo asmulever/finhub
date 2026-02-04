@@ -26,6 +26,24 @@ final class SignalService
     }
 
     /**
+     * Enlaza un backtest con las señales existentes para los símbolos dados.
+     *
+     * @param array<int,string> $symbols
+     */
+    public function attachBacktestRef(array $symbols, int $backtestId): void
+    {
+        try {
+            $this->repository->attachBacktestRef($symbols, $backtestId);
+        } catch (\Throwable $e) {
+            $this->logger->info('signals.attach_backtest.failed', [
+                'symbols' => $symbols,
+                'backtest_id' => $backtestId,
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
      * Devuelve señales; si faltan o están vacías, recalcula desde Data Lake.
      *
      * @param array<int,string>|null $symbols

@@ -50,6 +50,7 @@
     .status { min-height: 22px; font-weight: 700; }
     .status.error { color: var(--red); }
     .status.info { color: var(--amber); }
+    .no-scroll { overflow: hidden; }
     .analysis-overlay {
       position: fixed; inset: 0; background: rgba(3, 7, 18, 0.8); color: var(--text);
       display: none; align-items: center; justify-content: center; z-index: 9000; backdrop-filter: blur(2px);
@@ -60,14 +61,14 @@
     .spinner { width: 42px; height: 42px; border-radius: 50%; border: 5px solid rgba(148,163,184,0.3); border-top-color: var(--accent); margin: 0 auto 12px auto; animation: spin 0.9s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     /* Overlay de gráfico */
-    .chart-overlay { position: fixed; inset: 0; background: rgba(4, 6, 15, 0.78); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 10000; padding: 24px; }
+    .chart-overlay { position: fixed; inset: 0; background: rgba(4, 6, 15, 0.78); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 10000; padding: 12px; overflow: hidden; }
     .chart-overlay.visible { display: flex; }
-    .chart-modal { width: min(1100px, 100%); background: linear-gradient(145deg, #0b1224, #0a172f); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,0.55); padding: 16px 18px; color: var(--text); }
-    .chart-modal header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .chart-modal { width: min(1100px, 100%); max-height: 90vh; height: min(820px, 90vh); background: linear-gradient(145deg, #0b1224, #0a172f); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,0.55); padding: 16px 18px; color: var(--text); overflow: hidden; display: flex; flex-direction: column; gap: 12px; }
+    .chart-modal header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 4px; flex-wrap: wrap; }
     .chart-modal h4 { margin: 0; }
     .chart-close { background: rgba(248, 113, 113, 0.18); border: 1px solid rgba(248, 113, 113, 0.4); color: #fecdd3; border-radius: 10px; padding: 6px 10px; cursor: pointer; }
-    .chart-canvas-wrap { background: radial-gradient(circle at 20% 20%, rgba(34,211,238,0.08), rgba(15,23,42,0.6)); border: 1px solid rgba(148,163,184,0.25); border-radius: 12px; padding: 10px; margin-top: 12px; }
-    canvas { max-width: 100%; border-radius: 10px; background: #0b1222; }
+    .chart-canvas-wrap { background: radial-gradient(circle at 20% 20%, rgba(34,211,238,0.08), rgba(15,23,42,0.6)); border: 1px solid rgba(148,163,184,0.25); border-radius: 12px; padding: 10px; flex: 1 1 auto; min-height: 0; }
+    canvas { max-width: 100%; border-radius: 10px; background: #0b1222; height: 100%; }
   </style>
 </head>
 <body>

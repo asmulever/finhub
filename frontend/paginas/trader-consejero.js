@@ -1,11 +1,18 @@
 import { getJson } from '../apicliente.js';
 import { createLoadingOverlay } from '../components/loadingOverlay.js';
+import { collapseToolbar } from '../components/toolbar.js';
 
 const overlay = createLoadingOverlay();
 const state = {
   signals: [],
   selected: null,
   lastChartSymbol: '',
+  chartControls: {
+    start: null,
+    end: null,
+    preset: '1y',
+    touchZoom: false,
+  },
 };
 
 const formatPct = (v, digits = 2) => (Number.isFinite(v) ? `${(v * 100).toFixed(digits)}%` : '—');
@@ -36,23 +43,23 @@ const renderTable = () => {
     const range = `${formatPct(s.range_p10_pct)} · ${formatPct(s.range_p90_pct)}`;
     const stopTake = `${formatNum(s.stop_price)} / ${formatNum(s.take_price)}`;
     return `
-      <tr data-symbol="${s.symbol}">
+      <tr data-symbol="${s.especie || s.symbol}">
         <td>${s.especie || s.symbol}</td>
-        <td data-action-symbol="${s.symbol}">${formatAction(s.action)}</td>
+        <td data-action-symbol="${s.especie || s.symbol}">${formatAction(s.action)}</td>
         <td>${formatPct(s.confidence, 1)}</td>
         <td>${s.horizon_days || '—'}d</td>
         <td>${formatPct(s.exp_return_pct)}</td>
         <td>${range}</td>
         <td>${stopTake}</td>
         <td>${s.rationale_short ?? '—'}</td>
-        <td><button class="icon-button" data-symbol="${s.symbol}">📈 Gráfico</button></td>
+        <td><button class="icon-button" data-symbol="${s.especie || s.symbol}">📈 Gráfico</button></td>
       </tr>
     `;
   }).join('');
   body.querySelectorAll('button[data-symbol]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const sym = btn.getAttribute('data-symbol') || '';
-      const signal = state.signals.find((x) => x.symbol === sym);
+      const signal = state.signals.find((x) => (x.especie || x.symbol) === sym);
       if (signal) {
         state.selected = signal;
         renderDetail();
@@ -65,7 +72,7 @@ const renderTable = () => {
     cell.title = 'Ver detalle de la señal';
     cell.addEventListener('click', () => {
       const sym = cell.getAttribute('data-action-symbol') || '';
-      const signal = state.signals.find((x) => x.symbol === sym);
+      const signal = state.signals.find((x) => (x.especie || x.symbol) === sym);
       if (signal) {
         state.selected = signal;
         renderDetail();
@@ -97,11 +104,42 @@ const renderDetail = () => {
   `;
 };
 
-const filterByRange = (points, days) => {
+const filterByRangeDays = (points, days) => {
   if (!Number.isFinite(days) || days <= 0) return points;
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
   return points.filter((p) => p.t >= cutoff);
+};
+
+const filterByDateRange = (points, start, end) => {
+  if (!(start instanceof Date) || !(end instanceof Date)) return points;
+  return points.filter((p) => p.t >= start && p.t <= end);
+};
+
+const computeRsi = (points, period = 14) => {
+  const closes = points.map((p) => p.close);
+  if (closes.length <= period) return points.map((p) => ({ t: p.t, v: null }));
+  const rsis = [];
+  let gains = 0;
+  let losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff >= 0) gains += diff; else losses -= diff;
+  }
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+  const firstRsi = 100 - (100 / (1 + (avgLoss === 0 ? Infinity : avgGain / avgLoss)));
+  rsis[period] = firstRsi;
+  for (let i = period + 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    const gain = diff > 0 ? diff : 0;
+    const loss = diff < 0 ? -diff : 0;
+    avgGain = ((avgGain * (period - 1)) + gain) / period;
+    avgLoss = ((avgLoss * (period - 1)) + loss) / period;
+    const rs = avgLoss === 0 ? Infinity : avgGain / avgLoss;
+    rsis[i] = 100 - (100 / (1 + rs));
+  }
+  return points.map((p, idx) => ({ t: p.t, v: rsis[idx] ?? null }));
 };
 
 const buildTicks = (min, max, count = 4) => {
@@ -156,43 +194,58 @@ const drawPriceChart = (points) => {
     ctx.fillText('Sin datos para graficar', 20, 30);
     return;
   }
-  const margin = { top: 20, right: 20, bottom: 30, left: 70 };
+  const margin = { top: 20, right: 20, bottom: 60, left: 70 };
   const width = canvas.width - margin.left - margin.right;
   const height = canvas.height - margin.top - margin.bottom;
   const xs = points.map((p) => p.t.getTime());
-  const closes = points.map((p) => p.close);
-  const ema20s = points.map((p) => p.ema20).filter(Number.isFinite);
-  const ema50s = points.map((p) => p.ema50).filter(Number.isFinite);
-  const bbUpper = points.map((p) => p.bb_upper).filter(Number.isFinite);
-  const bbLower = points.map((p) => p.bb_lower).filter(Number.isFinite);
-  const ys = closes.concat(ema20s, ema50s, bbUpper, bbLower).filter(Number.isFinite);
-  const minX = Math.min(...xs);
+  const highs = points.map((p) => p.high ?? p.close);
+  const lows = points.map((p) => p.low ?? p.close);
   const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
+  const minX = Math.min(...xs);
+  const maxY = Math.max(...highs);
+  const minY = Math.min(...lows);
   drawAxes(ctx, margin, width, height, minX, maxX, minY, maxY);
   const scaleX = (t) => margin.left + ((t - minX) / Math.max(1, maxX - minX)) * width;
   const scaleY = (v) => margin.top + height - ((v - minY) / Math.max(1e-6, maxY - minY)) * height;
 
-  const line = (arr, color) => {
+  // Volumen
+  const volHeight = 60;
+  const volTop = margin.top + height - volHeight;
+  const maxVol = Math.max(...points.map((p) => p.volume ?? 0), 1);
+  ctx.fillStyle = 'rgba(56,189,248,0.12)';
+  points.forEach((p) => {
+    const x = scaleX(p.t.getTime());
+    const barWidth = Math.max(2, width / points.length * 0.8);
+    const vol = p.volume ?? 0;
+    const vh = (vol / maxVol) * volHeight;
+    ctx.fillRect(x - barWidth / 2, volTop + volHeight - vh, barWidth, vh);
+  });
+
+  // Velas
+  points.forEach((p) => {
+    const x = scaleX(p.t.getTime());
+    const w = Math.max(3, width / points.length * 0.7);
+    const open = Number.isFinite(p.open) ? p.open : p.close;
+    const close = Number.isFinite(p.close) ? p.close : open;
+    const high = Number.isFinite(p.high) ? p.high : Math.max(open, close);
+    const low = Number.isFinite(p.low) ? p.low : Math.min(open, close);
+    const color = close >= open ? '#22c55e' : '#ef4444';
     ctx.strokeStyle = color;
     ctx.beginPath();
-    arr.forEach((p, idx) => {
-      if (!Number.isFinite(p.v)) return;
-      const x = scaleX(p.t.getTime());
-      const y = scaleY(p.v);
-      if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    });
+    ctx.moveTo(x, scaleY(high));
+    ctx.lineTo(x, scaleY(low));
     ctx.stroke();
-  };
-  line(points.map((p) => ({ t: p.t, v: p.close })), '#22d3ee');
-  line(points.map((p) => ({ t: p.t, v: p.ema20 })), '#fbbf24');
-  line(points.map((p) => ({ t: p.t, v: p.ema50 })), '#a855f7');
-  line(points.map((p) => ({ t: p.t, v: p.bb_upper })), 'rgba(14,165,233,0.5)');
-  line(points.map((p) => ({ t: p.t, v: p.bb_lower })), 'rgba(14,165,233,0.5)');
+    ctx.fillStyle = color;
+    const yOpen = scaleY(open);
+    const yClose = scaleY(close);
+    const rectY = Math.min(yOpen, yClose);
+    const rectH = Math.max(2, Math.abs(yOpen - yClose));
+    ctx.fillRect(x - w / 2, rectY, w, rectH);
+  });
+
   ctx.fillStyle = '#22d3ee';
   ctx.font = '12px Inter, system-ui, sans-serif';
-  ctx.fillText('Precio + EMAs + Bollinger', margin.left + 8, margin.top + 14);
+  ctx.fillText('Velas + Volumen', margin.left + 8, margin.top + 14);
 };
 
 const drawRsiChart = (points) => {
@@ -244,21 +297,54 @@ const drawRsiChart = (points) => {
 };
 
 const openChart = async (signal) => {
+  collapseToolbar();
   const overlayEl = document.getElementById('chart-overlay');
   if (!overlayEl) return;
-  const rangeSelect = document.getElementById('chart-range');
-  const rangeVal = rangeSelect?.value || 'all';
-  const days = rangeVal === 'all' ? null : Number(rangeVal);
-  state.lastChartSymbol = signal.symbol;
+  const presetSel = document.getElementById('chart-preset');
+  const startInput = document.getElementById('chart-start');
+  const endInput = document.getElementById('chart-end');
+  const touchZoom = document.getElementById('chart-touch-zoom');
+
+  state.lastChartSymbol = signal.especie || signal.symbol;
+  state.chartControls.preset = presetSel?.value || '1y';
+  state.chartControls.touchZoom = !!touchZoom?.checked;
+
+  const applyPreset = (preset) => {
+    const end = new Date();
+    let start = new Date(end);
+    switch (preset) {
+      case '1m': start.setMonth(end.getMonth() - 1); break;
+      case '6m': start.setMonth(end.getMonth() - 6); break;
+      case '1y': start.setFullYear(end.getFullYear() - 1); break;
+      default: start = null;
+    }
+    return { start, end };
+  };
+
+  if (state.chartControls.preset !== 'custom') {
+    const { start, end } = applyPreset(state.chartControls.preset);
+    if (start && startInput) startInput.value = start.toISOString().slice(0, 10);
+    if (end && endInput) endInput.value = end.toISOString().slice(0, 10);
+    state.chartControls.start = start;
+    state.chartControls.end = end;
+  } else {
+    state.chartControls.start = startInput?.value ? new Date(startInput.value) : null;
+    state.chartControls.end = endInput?.value ? new Date(endInput.value) : null;
+  }
 
   let series = Array.isArray(signal.series_json) ? signal.series_json : [];
   if (!series.length) {
-    const period = days === null ? '12m' : (days <= 30 ? '1m' : (days <= 90 ? '3m' : '6m'));
+    const preset = state.chartControls.preset;
+    const period = preset === 'custom' ? '12m' : (preset === 'all' ? '12m' : preset);
     const resp = await getJson(`/datalake/prices/series?symbol=${encodeURIComponent(signal.especie || signal.symbol)}&period=${period}`);
     const points = Array.isArray(resp?.points) ? resp.points : [];
     series = points.map((p) => ({
       t: p.t ? new Date(p.t) : new Date(),
+      open: Number(p.open ?? p.o ?? p.close ?? p.price ?? 0),
+      high: Number(p.high ?? p.h ?? p.close ?? p.price ?? 0),
+      low: Number(p.low ?? p.l ?? p.close ?? p.price ?? 0),
       close: Number(p.close ?? p.price ?? 0),
+      volume: Number(p.volume ?? p.v ?? 0),
       ema20: null,
       ema50: null,
       rsi14: null,
@@ -268,7 +354,11 @@ const openChart = async (signal) => {
   } else {
     series = series.map((p) => ({
       t: p.t ? new Date(p.t) : new Date(),
+      open: Number(p.open ?? p.o ?? p.close ?? 0),
+      high: Number(p.high ?? p.h ?? p.close ?? 0),
+      low: Number(p.low ?? p.l ?? p.close ?? 0),
       close: Number(p.close ?? 0),
+      volume: Number(p.volume ?? p.v ?? 0),
       ema20: Number.isFinite(p.ema20) ? Number(p.ema20) : null,
       ema50: Number.isFinite(p.ema50) ? Number(p.ema50) : null,
       rsi14: Number.isFinite(p.rsi14) ? Number(p.rsi14) : null,
@@ -277,7 +367,22 @@ const openChart = async (signal) => {
     }));
   }
 
-  const filtered = days ? filterByRange(series, days) : series;
+  let filtered = series;
+  if (state.chartControls.start && state.chartControls.end) {
+    filtered = filterByDateRange(series, state.chartControls.start, state.chartControls.end);
+  } else if (state.chartControls.preset !== 'all') {
+    const days = (() => {
+      switch (state.chartControls.preset) {
+        case '1m': return 30;
+        case '3m': return 90;
+        case '6m': return 180;
+        case '1y': return 365;
+        case '2y': return 730;
+        default: return null;
+      }
+    })();
+    filtered = days ? filterByRangeDays(series, days) : series;
+  }
   if (!filtered.length) {
     const title = document.getElementById('chart-title');
     const subtitle = document.getElementById('chart-subtitle');
@@ -288,17 +393,32 @@ const openChart = async (signal) => {
     return;
   }
 
-  const rsiPoints = filtered.map((p) => ({ t: p.t, v: p.rsi14 ?? null })).filter((p) => Number.isFinite(p.v));
+  const rsiPoints = filtered.some((p) => Number.isFinite(p.rsi14))
+    ? filtered.map((p) => ({ t: p.t, v: p.rsi14 ?? null })).filter((p) => Number.isFinite(p.v))
+    : computeRsi(filtered, 14);
   drawPriceChart(filtered);
   drawRsiChart(rsiPoints);
 
   const title = document.getElementById('chart-title');
   const subtitle = document.getElementById('chart-subtitle');
   if (title) title.textContent = signal.especie || signal.symbol;
-  if (subtitle) subtitle.textContent = days ? `Histórico ${days}d + Indicadores` : 'Histórico completo + Indicadores';
+  if (subtitle) {
+    let label = 'Histórico + Indicadores';
+    if (state.chartControls.start && state.chartControls.end) {
+      label = `Histórico ${state.chartControls.start.toISOString().slice(0,10)} a ${state.chartControls.end.toISOString().slice(0,10)}`;
+    } else if (state.chartControls.preset && state.chartControls.preset !== 'all') {
+      label = `Histórico ${state.chartControls.preset}`;
+    }
+    subtitle.textContent = label;
+  }
+
+  document.querySelectorAll('.chart-canvas-wrap').forEach((wrap) => {
+    wrap.style.touchAction = state.chartControls.touchZoom ? 'pan-y pinch-zoom' : 'auto';
+  });
 
   overlayEl.classList.add('visible');
   overlayEl.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('no-scroll');
 };
 
 const closeOverlay = () => {
@@ -306,23 +426,46 @@ const closeOverlay = () => {
   if (!overlayEl) return;
   overlayEl.classList.remove('visible');
   overlayEl.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('no-scroll');
 };
 
 const fetchSignals = async ({ force = false, collect = false } = {}) => {
   const label = force ? 'Recalculando tendencias...' : 'Cargando señales...';
   setStatus(label, 'info');
-  const params = [];
-  if (force) params.push('force=1');
-  if (collect) params.push('collect=1');
-  const query = params.length ? `?${params.join('&')}` : '';
-  const resp = await getJson(`/signals/latest${query}`);
-  const data = Array.isArray(resp?.data) ? resp.data : [];
+  const buildQuery = (opts) => {
+    const params = [];
+    if (opts.force) params.push('force=1');
+    if (opts.collect) params.push('collect=1');
+    return params.length ? `?${params.join('&')}` : '';
+  };
+
+  const load = async (opts) => {
+    const resp = await getJson(`/signals/latest${buildQuery(opts)}`);
+    return Array.isArray(resp?.data) ? resp.data : [];
+  };
+
+  let data = [];
+  try {
+    data = await load({ force, collect });
+  } catch (error) {
+    console.info('[trader-consejero] Reintento sin collect', error);
+    if (collect) {
+      data = await load({ force, collect: false });
+    } else if (force) {
+      console.info('[trader-consejero] Reintento sin force', error);
+      data = await load({ force: false, collect: false });
+    } else {
+      throw error;
+    }
+  }
+
   state.signals = data.map((s) => ({
     ...s,
     symbol: (s.symbol ?? '').toUpperCase(),
     especie: (s.especie ?? s.symbol ?? '').toUpperCase(),
     rationale_tags: Array.isArray(s.rationale_tags) ? s.rationale_tags : [],
   }));
+
   document.getElementById('badge-count').textContent = `${state.signals.length} señales`;
   document.getElementById('badge-updated').textContent = `Actualizado: ${new Date().toISOString().slice(0,16)}`;
   renderTable();
@@ -341,16 +484,26 @@ const bindUi = () => {
   document.getElementById('chart-overlay')?.addEventListener('click', (e) => {
     if (e.target?.id === 'chart-overlay') closeOverlay();
   });
-  document.getElementById('chart-range')?.addEventListener('change', () => {
-    const signal = state.signals.find((s) => s.symbol === state.lastChartSymbol);
-    if (signal) {
-      overlay.withLoader(() => openChart(signal)).catch(() => setStatus('No se pudo recargar gráfico', 'error'));
-    }
+  ['chart-preset', 'chart-start', 'chart-end', 'chart-touch-zoom'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('change', () => {
+      const signal = state.signals.find((s) => (s.especie || s.symbol) === state.lastChartSymbol);
+      if (signal) {
+        overlay.withLoader(() => openChart(signal)).catch(() => setStatus('No se pudo recargar gráfico', 'error'));
+      }
+    });
   });
 };
 
 const init = async () => {
   bindUi();
+  // Default fechas 1 año
+  const end = new Date();
+  const start = new Date();
+  start.setFullYear(end.getFullYear() - 1);
+  const startInput = document.getElementById('chart-start');
+  const endInput = document.getElementById('chart-end');
+  if (startInput) startInput.value = start.toISOString().slice(0, 10);
+  if (endInput) endInput.value = end.toISOString().slice(0, 10);
   try {
     await overlay.withLoader(() => fetchSignals({ force: true, collect: true }));
   } catch (error) {

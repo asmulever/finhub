@@ -46,11 +46,11 @@ final class PortfolioHeatmapService
         $instruments = $this->portfolioService->listInstruments($userId);
         $uniqueSymbols = [];
         foreach ($instruments as $instrument) {
-            $symbol = strtoupper((string) ($instrument['symbol'] ?? ''));
-            if ($symbol === '') {
+            $especie = strtoupper((string) ($instrument['especie'] ?? $instrument['symbol'] ?? ''));
+            if ($especie === '') {
                 continue;
             }
-            $uniqueSymbols[$symbol] = true;
+            $uniqueSymbols[$especie] = true;
         }
 
         $quotes = $this->fetchQuotes(array_keys($uniqueSymbols));
@@ -65,39 +65,40 @@ final class PortfolioHeatmapService
         $fxMeta = ['source' => null, 'fx_at' => null];
 
         foreach ($instruments as $instrument) {
-            $symbol = strtoupper((string) ($instrument['symbol'] ?? ''));
-            if ($symbol === '') {
+            $especie = strtoupper((string) ($instrument['especie'] ?? $instrument['symbol'] ?? ''));
+            if ($especie === '') {
                 continue;
             }
+            $symbol = $this->symbolBase($especie);
             $quantity = $this->floatOrNull($instrument['quantity'] ?? $instrument['qty'] ?? null);
             $quantityFallback = false;
             if ($quantity === null || $quantity <= 0) {
                 $quantity = 1.0; // fallback para no dejar vacío el heatmap
                 $quantityFallback = true;
                 $this->logger->info('portfolio.heatmap.quantity_fallback', [
-                    'symbol' => $symbol,
+                    'symbol' => $especie,
                     'reason' => 'missing_quantity',
                 ]);
             }
-            $quote = $quotes[$symbol] ?? ($summaryMap[$symbol] ?? null);
+            $quote = $quotes[$especie] ?? ($summaryMap[$especie] ?? null);
             if ($quote === null) {
                 $this->logger->info('portfolio.heatmap.excluded', [
-                    'symbol' => $symbol,
+                    'symbol' => $especie,
                     'reason' => 'missing_quote',
                 ]);
                 continue;
             }
             $lastPrice = $this->floatOrNull($quote['close'] ?? $quote['price'] ?? null);
             if ($lastPrice === null) {
-                $lastPrice = $this->floatOrNull($summaryMap[$symbol]['close'] ?? $summaryMap[$symbol]['price'] ?? null);
+                $lastPrice = $this->floatOrNull($summaryMap[$especie]['close'] ?? $summaryMap[$especie]['price'] ?? null);
             }
             $prevClose = $this->floatOrNull($quote['previous_close'] ?? $quote['previousClose'] ?? null);
             if ($prevClose === null) {
-                $prevClose = $this->floatOrNull($summaryMap[$symbol]['previous_close'] ?? $summaryMap[$symbol]['previousClose'] ?? null);
+                $prevClose = $this->floatOrNull($summaryMap[$especie]['previous_close'] ?? $summaryMap[$especie]['previousClose'] ?? null);
             }
             if ($lastPrice === null) {
                 $this->logger->info('portfolio.heatmap.excluded', [
-                    'symbol' => $symbol,
+                    'symbol' => $especie,
                     'reason' => 'missing_price',
                 ]);
                 continue;
@@ -107,20 +108,20 @@ final class PortfolioHeatmapService
                 $ts = strtotime((string) $priceAt);
                 if ($ts !== false && $ts < $cutoff) {
                     $this->logger->info('portfolio.heatmap.excluded', [
-                        'symbol' => $symbol,
+                        'symbol' => $especie,
                         'reason' => 'stale_price',
                     ]);
                     continue;
                 }
             }
 
-            $instrumentCurrency = strtoupper((string) ($quote['currency'] ?? $instrument['currency'] ?? ($summaryMap[$symbol]['currency'] ?? $baseCurrency)));
+            $instrumentCurrency = strtoupper((string) ($quote['currency'] ?? $instrument['currency'] ?? ($summaryMap[$especie]['currency'] ?? $baseCurrency)));
             $fx = $this->resolveFx($instrumentCurrency, $baseCurrency);
             if ($fx['rate'] === null) {
                 // fallback: asumir 1:1 en base
                 $fx = ['rate' => 1.0, 'source' => 'assumed', 'at' => null];
                 $this->logger->info('portfolio.heatmap.fx.assumed', [
-                    'symbol' => $symbol,
+                    'symbol' => $especie,
                     'instrument_currency' => $instrumentCurrency,
                     'base_currency' => $baseCurrency,
                 ]);
@@ -132,11 +133,12 @@ final class PortfolioHeatmapService
 
             $marketValueBase = $quantity * $lastPrice * $fx['rate'];
             $changePct = ($prevClose !== null && $prevClose != 0.0) ? (($lastPrice / $prevClose) - 1) * 100 : 0.0;
-            $sectorRow = $sectorMap[$symbol] ?? ['sector' => 'Sin sector', 'industry' => 'Sin industry'];
+            $sectorRow = $sectorMap[$especie] ?? ['sector' => 'Sin sector', 'industry' => 'Sin industry'];
 
             $items[] = [
                 'symbol' => $symbol,
-                'name' => $instrument['name'] ?? $instrument['nombre'] ?? $symbol,
+                'especie' => $especie,
+                'name' => $instrument['name'] ?? $instrument['nombre'] ?? $especie,
                 'price' => $lastPrice,
                 'currency' => $instrumentCurrency !== '' ? $instrumentCurrency : null,
                 'market_value' => $marketValueBase,
@@ -264,11 +266,11 @@ final class PortfolioHeatmapService
     {
         $map = [];
         foreach ($rows as $row) {
-            $symbol = strtoupper((string) ($row['symbol'] ?? ''));
-            if ($symbol === '') {
+            $especie = strtoupper((string) ($row['especie'] ?? $row['symbol'] ?? ''));
+            if ($especie === '') {
                 continue;
             }
-            $map[$symbol] = [
+            $map[$especie] = [
                 'sector' => $row['sector'] ?? 'Sin sector',
                 'industry' => $row['industry'] ?? 'Sin industry',
             ];
@@ -287,11 +289,11 @@ final class PortfolioHeatmapService
         try {
             $summary = $this->portfolioSummaryService->summaryForUser($userId);
             foreach ($summary as $row) {
-                $symbol = strtoupper((string) ($row['symbol'] ?? ''));
-                if ($symbol === '') {
+                $especie = strtoupper((string) ($row['especie'] ?? $row['symbol'] ?? ''));
+                if ($especie === '') {
                     continue;
                 }
-                $map[$symbol] = [
+                $map[$especie] = [
                     'close' => $row['price'] ?? $row['close'] ?? null,
                     'previous_close' => $row['previous_close'] ?? $row['previousClose'] ?? null,
                     'currency' => $row['currency'] ?? null,
@@ -351,6 +353,16 @@ final class PortfolioHeatmapService
         }
 
         return ['rate' => null, 'source' => null, 'at' => null];
+    }
+
+    private function symbolBase(string $especie): string
+    {
+        $trimmed = strtoupper(trim($especie));
+        if ($trimmed === '') {
+            return '';
+        }
+        $parts = explode('-', $trimmed);
+        return $parts[0] ?? $trimmed;
     }
 
     private function floatOrNull($value): ?float

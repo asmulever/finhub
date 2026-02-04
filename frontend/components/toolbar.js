@@ -20,6 +20,9 @@ const toolbarTemplate = `
       <button type="button" class="icon-btn" id="signals-menu" data-menu="signals" data-link="/Frontend/trader-consejero.html" aria-label="Trader Consejero">
         <span class="circle-icon">💹</span>
       </button>
+      <button type="button" class="icon-btn" id="oracle-menu" data-menu="oracle" data-link="/Frontend/oraculo.html" aria-label="Oráculo">
+        <span class="circle-icon">🔮</span>
+      </button>
       <button type="button" id="datalake-menu" data-menu="datalake" data-link="/Frontend/datalake.html">DataLake</button>
       <select id="providers-select" aria-label="Proveedores">
         <option value="">Proveedores</option>
@@ -73,6 +76,10 @@ const ensureToolbarStyles = () => {
       display: grid;
       place-items: center;
       box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+    /* Cuando la barra está colapsada, dejamos el botón sobresalir >50% hacia abajo */
+    .toolbar.collapsed .toolbar-toggle {
+      bottom: -20px;
     }
     .toolbar-toggle:focus-visible { outline: 2px solid rgba(14, 165, 233, 0.6); outline-offset: 2px; }
     .toolbar.collapsed .toolbar-menu,
@@ -197,6 +204,16 @@ const updateToggleVisual = (toolbar, toggle) => {
   toggle.setAttribute('aria-expanded', String(!collapsed));
   toggle.setAttribute('aria-label', collapsed ? 'Mostrar barra' : 'Ocultar barra');
   toggle.title = collapsed ? 'Mostrar barra' : 'Ocultar barra';
+};
+
+export const collapseToolbar = () => {
+  const toolbar = document.querySelector('.toolbar');
+  if (!toolbar) return;
+  toolbar.classList.add('collapsed');
+  const toggle = document.querySelector('.toolbar-toggle');
+  if (toggle) {
+    updateToggleVisual(toolbar, toggle);
+  }
 };
 
 const bindToolbarToggle = () => {

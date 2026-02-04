@@ -23,6 +23,8 @@ use FinHub\Application\Analytics\PredictionService;
 use FinHub\Application\DataLake\DataLakeService;
 use FinHub\Application\DataLake\InstrumentCatalogService;
 use FinHub\Application\Signals\SignalService;
+use FinHub\Application\Backtest\BacktestRequest;
+use FinHub\Application\Backtest\BacktestService;
 use FinHub\Domain\User\UserRepositoryInterface;
 use FinHub\Infrastructure\Config\Config;
 use FinHub\Infrastructure\Logging\LoggerInterface;
@@ -51,6 +53,7 @@ final class ApiDispatcher
     private DataLakeService $dataLakeService;
     private InstrumentCatalogService $instrumentCatalogService;
     private SignalService $signalService;
+    private BacktestService $backtestService;
     private PolygonService $polygonService;
     private TiingoService $tiingoService;
     private StooqService $stooqService;
@@ -88,7 +91,8 @@ final class ApiDispatcher
         RavaAccionesService $ravaAccionesService,
         RavaBonosService $ravaBonosService,
         RavaHistoricosService $ravaHistoricosService,
-        UserDeletionService $userDeletionService
+        UserDeletionService $userDeletionService,
+        BacktestService $backtestService
     )
     {
         $this->config = $config;
@@ -110,6 +114,7 @@ final class ApiDispatcher
         $this->dataLakeService = $dataLakeService;
         $this->instrumentCatalogService = $instrumentCatalogService;
         $this->signalService = $signalService;
+        $this->backtestService = $backtestService;
         $this->polygonService = $polygonService;
         $this->tiingoService = $tiingoService;
         $this->stooqService = $stooqService;
@@ -198,6 +203,31 @@ final class ApiDispatcher
             $this->requireUser();
             $metrics = $this->providerUsage->getUsage();
             $this->sendJson($metrics);
+            return;
+        }
+        if ($method === 'POST' && $path === '/backtests/run') {
+            $user = $this->requireUser();
+            $this->handleBacktestRun($user);
+            return;
+        }
+        if ($method === 'GET' && preg_match('#^/backtests/(\\d+)$#', $path, $m) === 1) {
+            $this->requireUser();
+            $this->handleBacktestGet((int) $m[1]);
+            return;
+        }
+        if ($method === 'GET' && preg_match('#^/backtests/(\\d+)/metrics$#', $path, $m) === 1) {
+            $this->requireUser();
+            $this->handleBacktestMetrics((int) $m[1]);
+            return;
+        }
+        if ($method === 'GET' && preg_match('#^/backtests/(\\d+)/equity$#', $path, $m) === 1) {
+            $this->requireUser();
+            $this->handleBacktestEquity((int) $m[1]);
+            return;
+        }
+        if ($method === 'GET' && preg_match('#^/backtests/(\\d+)/trades$#', $path, $m) === 1) {
+            $this->requireUser();
+            $this->handleBacktestTrades((int) $m[1]);
             return;
         }
         if ($method === 'GET' && $path === '/signals/latest') {
@@ -1606,13 +1636,13 @@ HTML;
     private function handleAddInstrument(\FinHub\Domain\User\User $user): void
     {
         $data = $this->parseJsonBody();
-        $symbol = trim((string) ($data['symbol'] ?? ''));
-        if ($symbol === '') {
-            throw new \RuntimeException('Símbolo requerido', 422);
+        $especie = trim((string) ($data['especie'] ?? $data['symbol'] ?? ''));
+        if ($especie === '') {
+            throw new \RuntimeException('Especie requerida', 422);
         }
 
         $payload = [
-            'symbol' => $symbol,
+            'especie' => $especie,
             'name' => substr(trim((string) ($data['name'] ?? '')), 0, 191),
             'exchange' => substr(trim((string) ($data['exchange'] ?? '')), 0, 64),
             'currency' => substr(trim((string) ($data['currency'] ?? '')), 0, 16),
@@ -1676,6 +1706,112 @@ HTML;
             }
         }
         return array_values(array_filter(array_unique($symbols), static fn ($s) => $s !== ''));
+    }
+
+    /**
+     * Ejecuta un backtest y devuelve el id.
+     */
+    private function handleBacktestRun(\FinHub\Domain\User\User $user): void
+    {
+        $body = $this->parseJsonBody();
+        $universe = isset($body['universe']) && is_array($body['universe']) ? array_values($body['universe']) : [];
+        if (empty($universe)) {
+            throw new \RuntimeException('universe requerido (array de instrumentos)', 422);
+        }
+        $strategyId = (string) ($body['strategy_id'] ?? 'trend_breakout');
+        $startStr = (string) ($body['start'] ?? '');
+        $endStr = (string) ($body['end'] ?? '');
+        if ($startStr === '' || $endStr === '') {
+            throw new \RuntimeException('start y end requeridos (YYYY-MM-DD)', 422);
+        }
+        try {
+            $start = new \DateTimeImmutable($startStr);
+            $end = new \DateTimeImmutable($endStr);
+        } catch (\Exception $e) {
+            throw new \RuntimeException('Fechas inválidas', 422);
+        }
+        $today = new \DateTimeImmutable('today');
+        if ($end > $today) {
+            $end = $today;
+        }
+        if ($start > $today) {
+            throw new \RuntimeException('start no puede ser en el futuro', 422);
+        }
+        if ($end < $start) {
+            throw new \RuntimeException('end debe ser mayor o igual a start', 422);
+        }
+        $initialCapital = (float) ($body['initial_capital'] ?? 100000);
+        if ($initialCapital <= 0) {
+            throw new \RuntimeException('initial_capital debe ser > 0', 422);
+        }
+        $request = new BacktestRequest(
+            $strategyId,
+            $universe,
+            $start,
+            $end,
+            $initialCapital,
+            (float) ($body['risk_per_trade_pct'] ?? 1.0),
+            (float) ($body['commission_pct'] ?? 0.6),
+            (float) ($body['min_fee'] ?? 0.0),
+            (float) ($body['slippage_bps'] ?? 8.0),
+            (float) ($body['spread_bps'] ?? 5.0),
+            (int) ($body['breakout_lookback_buy'] ?? 55),
+            (int) ($body['breakout_lookback_sell'] ?? 20),
+            (float) ($body['atr_multiplier'] ?? 2.0),
+            $user->getId()
+        );
+        try {
+            $id = $this->backtestService->run($request);
+            // Enlazar backtest a señales existentes del universo.
+            try {
+                $this->signalService->attachBacktestRef($universe, $id);
+            } catch (\Throwable $e) {
+                $this->logger->info('backtest.attach_signal.failed', [
+                    'backtest_id' => $id,
+                    'symbols' => $universe,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+            $this->sendJson(['id' => $id, 'status' => 'completed'], 201);
+        } catch (\Throwable $e) {
+            $this->logger->error('backtest.run.error', [
+                'user_id' => $user->getId(),
+                'message' => $e->getMessage(),
+            ]);
+            $code = (int) ($e->getCode() ?: 500);
+            $message = $e->getMessage() ?: 'No se pudo ejecutar el backtest';
+            throw new \RuntimeException($message, $code);
+        }
+    }
+
+    private function handleBacktestGet(int $id): void
+    {
+        $row = $this->backtestService->getBacktest($id);
+        if ($row === null) {
+            throw new \RuntimeException('Backtest no encontrado', 404);
+        }
+        $this->sendJson($row);
+    }
+
+    private function handleBacktestMetrics(int $id): void
+    {
+        $metrics = $this->backtestService->getMetrics($id);
+        if ($metrics === null) {
+            throw new \RuntimeException('Métricas no encontradas', 404);
+        }
+        $this->sendJson($metrics);
+    }
+
+    private function handleBacktestEquity(int $id): void
+    {
+        $equity = $this->backtestService->getEquity($id);
+        $this->sendJson(['data' => $equity]);
+    }
+
+    private function handleBacktestTrades(int $id): void
+    {
+        $trades = $this->backtestService->getTrades($id);
+        $this->sendJson(['data' => $trades]);
     }
 
     private function requireUser(): \FinHub\Domain\User\User
