@@ -20,28 +20,22 @@ $logger = $container->get('logger');
 $pdo = $container->get('pdo');
 $jwt = $container->get('jwt');
 $passwordHasher = $container->get('password_hasher');
-$priceService = $container->get('price_service');
-$eodhdClient = $container->get('eodhd_client');
-$providerUsage = $container->get('provider_usage');
 $portfolioService = $container->get('portfolio_service');
 $portfolioSummaryService = $container->get('portfolio_summary_service');
-$portfolioSectorService = $container->get('portfolio_sector_service');
 $portfolioHeatmapService = $container->get('portfolio_heatmap_service');
 $predictionService = $container->get('prediction_service');
+$predictionMarketService = $container->get('prediction_market_service');
 $dataLakeService = $container->get('datalake_service');
+$openRouterClient = $container->get('openrouter_client');
+$moonshotClient = $container->get('moonshot_client');
 $instrumentCatalogService = $container->get('instrument_catalog_service');
-$polygonService = $container->get('polygon_service');
-$tiingoService = $container->get('tiingo_service');
-$stooqService = $container->get('stooq_service');
-$ravaCedearsService = $container->get('rava_cedears_service');
-$ravaAccionesService = $container->get('rava_acciones_service');
-$ravaBonosService = $container->get('rava_bonos_service');
-$ravaHistoricosService = $container->get('rava_historicos_service');
+$ravaViewsService = $container->get('rava_views_service');
 $userRepository = $container->get('user_repository');
 $userDeletionService = $container->get('user_deletion_service');
 $activationService = $container->get('activation_service');
 $signalService = $container->get('signal_service');
 $backtestService = $container->get('backtest_service');
+$dataReadinessService = $container->get('data_readiness_service');
 
 $traceId = generateTraceId();
 set_error_handler(fn ($severity, $message, $file, $line) => handleFatalError($logger, $traceId, $message, $file, $line));
@@ -52,27 +46,21 @@ $dispatcher = new ApiDispatcher(
     $logger,
     $authService,
     $activationService,
-    $priceService,
     $userRepository,
     $jwt,
     $passwordHasher,
-    $eodhdClient,
-    $providerUsage,
     $portfolioService,
     $portfolioSummaryService,
-    $portfolioSectorService,
     $portfolioHeatmapService,
     $predictionService,
+    $predictionMarketService,
+    $moonshotClient,
+    $openRouterClient,
     $dataLakeService,
     $instrumentCatalogService,
+    $ravaViewsService,
     $signalService,
-    $polygonService,
-    $tiingoService,
-    $stooqService,
-    $ravaCedearsService,
-    $ravaAccionesService,
-    $ravaBonosService,
-    $ravaHistoricosService,
+    $dataReadinessService,
     $userDeletionService,
     $backtestService
 );

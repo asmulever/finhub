@@ -127,6 +127,36 @@ SQL;
         }, $rows);
     }
 
+    public function searchLatest(?string $query, ?string $tipo, ?string $panel, ?string $mercado, ?string $currency, int $limit, int $offset = 0): array
+    {
+        $params = [];
+        $whereSub = $this->buildSearchWhere($query, $tipo, $panel, $mercado, $currency, 's', $params);
+        $whereOuter = $this->buildSearchWhere($query, $tipo, $panel, $mercado, $currency, 'c', $params);
+        $limit = max(1, $limit);
+        $offset = max(0, $offset);
+        $baseSql = 'SELECT c.* FROM dl_instrument_catalog c JOIN (SELECT symbol, MAX(%s) AS max_captured FROM dl_instrument_catalog s %s GROUP BY symbol) latest ON c.symbol = latest.symbol AND c.%s = latest.max_captured %s ORDER BY c.symbol ASC LIMIT :limit OFFSET :offset';
+        $candidates = [
+            sprintf($baseSql, 'captured_at', $whereSub, 'captured_at', $whereOuter),
+            sprintf($baseSql, 'updated_at', $whereSub, 'updated_at', $whereOuter),
+        ];
+        foreach ($candidates as $sql) {
+            try {
+                $stmt = $this->pdo->prepare($sql);
+                $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+                $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+                foreach ($params as $key => $value) {
+                    $stmt->bindValue($key, $value);
+                }
+                $stmt->execute();
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                return array_map(fn (array $row) => $this->hydrate($row), $rows);
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+        return [];
+    }
+
     public function findBySymbol(string $symbol): ?array
     {
         try {
@@ -272,5 +302,34 @@ SQL;
         }
         $normalized = str_replace(',', '.', (string) $value);
         return is_numeric($normalized) ? (float) $normalized : null;
+    }
+
+    private function buildSearchWhere(?string $query, ?string $tipo, ?string $panel, ?string $mercado, ?string $currency, string $alias, array &$params): string
+    {
+        $where = [];
+        if ($query !== null && $query !== '') {
+            $params[':q'] = '%' . strtoupper($query) . '%';
+            $where[] = sprintf('(UPPER(%s.symbol) LIKE :q OR UPPER(%s.name) LIKE :q)', $alias, $alias);
+        }
+        if ($tipo !== null && $tipo !== '') {
+            $params[':tipo'] = strtoupper($tipo);
+            $where[] = sprintf('UPPER(%s.tipo) = :tipo', $alias);
+        }
+        if ($panel !== null && $panel !== '') {
+            $params[':panel'] = strtoupper($panel);
+            $where[] = sprintf('UPPER(%s.panel) = :panel', $alias);
+        }
+        if ($mercado !== null && $mercado !== '') {
+            $params[':mercado'] = strtoupper($mercado);
+            $where[] = sprintf('UPPER(%s.mercado) = :mercado', $alias);
+        }
+        if ($currency !== null && $currency !== '') {
+            $params[':currency'] = strtoupper($currency);
+            $where[] = sprintf('UPPER(%s.currency) = :currency', $alias);
+        }
+        if (empty($where)) {
+            return '';
+        }
+        return 'WHERE ' . implode(' AND ', $where);
     }
 }

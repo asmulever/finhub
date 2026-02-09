@@ -25,7 +25,7 @@ final class PdoPriceSnapshotRepository implements PriceSnapshotRepositoryInterfa
 CREATE TABLE IF NOT EXISTS dl_price_snapshots (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   symbol VARCHAR(32) NOT NULL,
-  provider VARCHAR(32) NOT NULL DEFAULT 'twelvedata',
+  provider VARCHAR(32) NOT NULL DEFAULT 'ingestion',
   as_of DATETIME(6) NOT NULL,
   payload_json JSON NOT NULL,
   payload_hash BINARY(32) NOT NULL,
@@ -44,7 +44,7 @@ SQL
             <<<'SQL'
 CREATE TABLE IF NOT EXISTS dl_price_latest (
   symbol VARCHAR(32) NOT NULL,
-  provider VARCHAR(32) NOT NULL DEFAULT 'twelvedata',
+  provider VARCHAR(32) NOT NULL DEFAULT 'ingestion',
   as_of DATETIME(6) NOT NULL,
   payload_json JSON NOT NULL,
   updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
@@ -58,7 +58,7 @@ SQL
     {
         // No persistir registros con código de error informado
         if (isset($snapshot['error_code']) && $snapshot['error_code'] !== null && $snapshot['error_code'] !== '') {
-            return ['success' => false, 'reason' => sprintf('Error del proveedor: %s', $snapshot['error_code'])];
+            return ['success' => false, 'reason' => sprintf('Error de fuente: %s', $snapshot['error_code'])];
         }
 
         try {

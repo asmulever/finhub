@@ -3,10 +3,6 @@ declare(strict_types=1);
 
 namespace FinHub\Application\DataLake;
 
-use FinHub\Application\MarketData\PriceService;
-use FinHub\Application\MarketData\RavaAccionesService;
-use FinHub\Application\MarketData\RavaBonosService;
-use FinHub\Application\MarketData\RavaCedearsService;
 use FinHub\Infrastructure\Logging\LoggerInterface;
 
 /**
@@ -15,237 +11,54 @@ use FinHub\Infrastructure\Logging\LoggerInterface;
 final class DataLakeService
 {
     private PriceSnapshotRepositoryInterface $repository;
-    private PriceService $priceService;
     private LoggerInterface $logger;
     private int $batchSize;
-    private ?RavaCedearsService $ravaCedearsService;
-    private ?RavaAccionesService $ravaAccionesService;
-    private ?RavaBonosService $ravaBonosService;
 
     public function __construct(
         PriceSnapshotRepositoryInterface $repository,
-        PriceService $priceService,
         LoggerInterface $logger,
-        int $batchSize = 10,
-        ?RavaCedearsService $ravaCedearsService = null,
-        ?RavaAccionesService $ravaAccionesService = null,
-        ?RavaBonosService $ravaBonosService = null
+        int $batchSize = 10
     ) {
         $this->repository = $repository;
-        $this->priceService = $priceService;
         $this->logger = $logger;
         $this->batchSize = $batchSize > 0 ? $batchSize : 10;
-        $this->ravaCedearsService = $ravaCedearsService;
-        $this->ravaAccionesService = $ravaAccionesService;
-        $this->ravaBonosService = $ravaBonosService;
     }
 
     public function collect(array $symbols): array
     {
-        $symbols = $this->normalizeSymbolsToSpecies($symbols);
-        $this->repository->ensureTables();
-        $startedAt = microtime(true);
-        $total = count($symbols);
-        $this->logger->info('datalake.collect.start', [
-            'total_symbols' => $total,
-        ]);
-        $results = [
-            'started_at' => date('c', (int) $startedAt),
-            'finished_at' => null,
-            'total_symbols' => $total,
-            'ok' => 0,
-            'failed' => 0,
-            'errors' => [],
-            'steps' => [],
-        ];
-
-        $this->appendStep($results['steps'], '', 'init', 'running', 'Iniciando proceso de ingesta', ['current' => 0, 'total' => $total]);
-
-        $processed = 0;
-        $batchSize = max(1, $this->batchSize);
-
-        $ravaMap = $this->buildRavaMap();
-
-        foreach (array_chunk($symbols, $batchSize) as $chunkIndex => $chunk) {
-            $batchSnapshots = [];
-            $symbolsToFetch = [];
-            foreach ($chunk as $symbol) {
-                $key = strtoupper($symbol);
-                if (isset($ravaMap[$key])) {
-                    $batchSnapshots[$symbol] = $ravaMap[$key];
-                    continue;
-                }
-                $symbolsToFetch[] = $symbol;
-            }
-
-            try {
-                if (!empty($symbolsToFetch)) {
-                    $fetched = $this->priceService->fetchSnapshotsBulk($symbolsToFetch);
-                    foreach ($fetched as $sym => $snapshot) {
-                        $batchSnapshots[$sym] = $snapshot;
-                    }
-                }
-            } catch (\Throwable $e) {
-                $this->logger->info('datalake.collect.batch_failed', [
-                    'batch_index' => $chunkIndex,
-                    'count' => count($symbolsToFetch),
-                    'message' => $e->getMessage(),
-                ]);
-            }
-
-            foreach ($chunk as $symbol) {
-                $processed++;
-                $progress = ['current' => $processed, 'total' => $total];
-                $this->appendStep($results['steps'], $symbol, 'start', 'running', 'Iniciando ingesta de símbolo', $progress);
-
-                $key = strtoupper($symbol);
-                $snapshot = $batchSnapshots[$symbol] ?? null;
-                $usedRava = false;
-                if ($snapshot === null && isset($ravaMap[$key])) {
-                    $snapshot = $ravaMap[$key];
-                }
-                if ($snapshot === null) {
-                    try {
-                        $snapshot = $this->priceService->fetchSnapshot($symbol);
-                    } catch (\Throwable $e) {
-                        $results['failed']++;
-                        $results['errors'][] = ['symbol' => $symbol, 'reason' => $e->getMessage()];
-                        $this->appendStep($results['steps'], $symbol, 'fetch', 'error', $e->getMessage(), $progress);
-                        $this->logger->info('datalake.collect.fetch_failed', [
-                            'symbol' => $symbol,
-                            'message' => $e->getMessage(),
-                        ]);
-                        continue;
-                    }
-                } else {
-                    $usedRava = ($snapshot['provider'] ?? '') === 'rava';
-                }
-
-                if (!isset($snapshot['provider']) || $snapshot['provider'] === null || $snapshot['provider'] === '') {
-                    $snapshot['provider'] = $snapshot['source'] ?? 'unknown';
-                }
-                $this->appendStep($results['steps'], $symbol, 'fetch', 'ok', $usedRava ? 'Snapshot obtenido desde RAVA' : 'Snapshot obtenido del proveedor', $progress);
-
-                // Validar que el payload contenga precio antes de persistir
-                $price = $this->extractPrice($snapshot['payload'] ?? []);
-                if ($price === null && $usedRava) {
-                    try {
-                        $fallback = $this->priceService->fetchSnapshot($symbol);
-                        $snapshot = $fallback;
-                        $this->appendStep($results['steps'], $symbol, 'fetch_fallback', 'ok', 'Snapshot obtenido por proveedores alternativos', $progress);
-                        $price = $this->extractPrice($snapshot['payload'] ?? []);
-                    } catch (\Throwable $e) {
-                        $results['failed']++;
-                        $results['errors'][] = ['symbol' => $symbol, 'reason' => $e->getMessage()];
-                        $this->appendStep($results['steps'], $symbol, 'fetch_fallback', 'error', $e->getMessage(), $progress);
-                        continue;
-                    }
-                }
-                if ($price === null) {
-                    $results['failed']++;
-                    $results['errors'][] = ['symbol' => $symbol, 'reason' => 'Precio no disponible en payload'];
-                    $this->appendStep($results['steps'], $symbol, 'validate', 'error', 'Precio no disponible en payload', $progress);
-                    continue;
-                }
-
-                $stored = $this->repository->storeSnapshot($snapshot);
-                if ($stored['success']) {
-                    $results['ok']++;
-                    $this->appendStep($results['steps'], $symbol, 'store', 'ok', 'Snapshot almacenado', $progress);
-                } else {
-                    $results['failed']++;
-                    $results['errors'][] = ['symbol' => $symbol, 'reason' => $stored['reason'] ?? 'unknown'];
-                    $this->appendStep($results['steps'], $symbol, 'store', 'error', $stored['reason'] ?? 'Error al almacenar', $progress);
-                    $this->logger->info('datalake.collect.store_failed', [
-                        'symbol' => $symbol,
-                        'message' => $stored['reason'] ?? 'Error al almacenar snapshot',
-                    ]);
-                }
-            }
-        }
-
-        $results['finished_at'] = date('c');
-        $results['duration_seconds'] = round(microtime(true) - $startedAt, 3);
-        $this->appendStep($results['steps'], '', 'complete', 'ok', 'Proceso finalizado', ['current' => $results['ok'] + $results['failed'], 'total' => $total]);
-        $errorSymbols = array_map(static fn ($e) => $e['symbol'] ?? '', $results['errors']);
-        $results['summary'] = sprintf(
-            'OK: %d | Fallidos: %d | Total: %d | Errores: %s',
-            $results['ok'],
-            $results['failed'],
-            $results['total_symbols'],
-            empty($errorSymbols) ? 'ninguno' : implode(',', array_filter($errorSymbols))
-        );
-        $this->logger->info('datalake.collect.done', [
-            'ok' => $results['ok'],
-            'failed' => $results['failed'],
-            'total' => $results['total_symbols'],
-            'duration' => $results['duration_seconds'],
-        ]);
-        return $results;
-    }
-
-    /**
-     * Normaliza la lista de insumos para ingesta priorizando especie (RAVA).
-     * Si encuentra un mapeo símbolo -> especie en el catálogo RAVA, reemplaza por especie.
-     * Si no hay mapeo, deja el valor original pero registra un log informativo.
-     *
-     * @param array<int,string> $symbols
-     * @return array<int,string>
-     */
-    private function normalizeSymbolsToSpecies(array $symbols): array
-    {
-        $normalized = [];
-        $ravaMap = $this->buildRavaMap();
-        foreach ($symbols as $sym) {
-            $key = strtoupper((string) $sym);
-            if ($key === '') {
-                continue;
-            }
-            $snapshot = $ravaMap[$key] ?? null;
-            $payload = is_array($snapshot) ? ($snapshot['payload'] ?? []) : [];
-            $especie = is_array($payload) ? ($payload['especie'] ?? null) : null;
-            if (is_string($especie) && $especie !== '' && $especie !== $key) {
-                $normalized[] = strtoupper($especie);
-                $this->logger->info('datalake.collect.normalize_especie', [
-                    'input' => $key,
-                    'especie' => strtoupper($especie),
-                ]);
-                continue;
-            }
-            if (!isset($ravaMap[$key])) {
-                $this->logger->info('datalake.collect.symbol_without_especie_map', ['symbol' => $key]);
-            }
-            $normalized[] = $key;
-        }
-        return $normalized;
+        throw new \RuntimeException('Recolección deshabilitada: proveedores externos removidos.', 501);
     }
 
     public function latestQuote(string $symbol): array
     {
         $this->repository->ensureTables();
         $snapshot = $this->repository->fetchLatest($symbol);
-        if ($snapshot === null) {
-            throw new \RuntimeException('Precio no disponible en Data Lake', 404);
+        if ($snapshot !== null) {
+            $provider = (string) ($snapshot['provider'] ?? '');
+            $quote = $this->normalizeSnapshotPayload($snapshot['payload'], $snapshot['symbol'], $provider, $snapshot['as_of']);
+            $currency = $quote['currency'] ?? null;
+            if ($quote['close'] !== null && $provider !== 'analysis' && $currency !== null && $currency !== '') {
+                return $quote;
+            }
         }
-        $quote = $this->normalizeSnapshotPayload($snapshot['payload'], $snapshot['symbol'], $snapshot['provider'], $snapshot['as_of']);
-        if ($quote['close'] !== null) {
-            return $quote;
-        }
-        // Fallback: buscar último snapshot con precio válido
+
+        // Fallback: buscar último snapshot válido (no analysis y con currency)
         $series = array_reverse($this->repository->fetchSeries($symbol, null));
         foreach ($series as $row) {
-            $price = $this->extractPrice($row['payload']);
-            if ($price === null) {
+            $provider = (string) ($row['provider'] ?? '');
+            if ($provider === 'analysis') {
                 continue;
             }
-            $quote['close'] = $price;
-            $quote['asOf'] = $row['as_of'];
-            break;
+            $normalized = $this->normalizeSnapshotPayload($row['payload'], $symbol, $provider, (string) $row['as_of']);
+            $currency = $normalized['currency'] ?? null;
+            $price = $normalized['close'];
+            if ($price === null || $currency === null || $currency === '') {
+                continue;
+            }
+            return $normalized;
         }
-        if ($quote['close'] === null) {
-            throw new \RuntimeException('Precio no disponible en Data Lake', 404);
-        }
-        return $quote;
+
+        throw new \RuntimeException('Precio no disponible en Data Lake', 404);
     }
 
     /**
@@ -394,108 +207,4 @@ final class DataLakeService
         ];
     }
 
-    /**
-     * Construye un map símbolo => snapshot a partir de RAVA (cedears/acciones/bonos).
-     *
-     * @return array<string,array<string,mixed>>
-     */
-    private function buildRavaMap(): array
-    {
-        $map = [];
-        try {
-            if ($this->ravaCedearsService !== null) {
-                $ced = $this->ravaCedearsService->listCedears();
-                foreach (($ced['items'] ?? []) as $item) {
-                    $snap = $this->ravaToSnapshot($item, 'rava', 'cedear');
-                    $this->registerRavaSnapshot($map, $snap, $item);
-                }
-            }
-            if ($this->ravaAccionesService !== null) {
-                $acc = $this->ravaAccionesService->listAcciones();
-                foreach (($acc['items'] ?? []) as $item) {
-                    $snap = $this->ravaToSnapshot($item, 'rava', 'accion');
-                    $this->registerRavaSnapshot($map, $snap, $item);
-                }
-            }
-            if ($this->ravaBonosService !== null) {
-                $bon = $this->ravaBonosService->listBonos();
-                foreach (($bon['items'] ?? []) as $item) {
-                    $snap = $this->ravaToSnapshot($item, 'rava', 'bono');
-                    $this->registerRavaSnapshot($map, $snap, $item);
-                }
-            }
-        } catch (\Throwable $e) {
-            $this->logger->info('datalake.rava_map.failed', ['message' => $e->getMessage()]);
-        }
-        return $map;
-    }
-
-    /**
-     * Registra un snapshot de RAVA usando múltiples claves (símbolo y especie) sin sobrescribir existentes.
-     *
-     * @param array<string,array<string,mixed>> $map
-     * @param array<string,mixed>|null $snapshot
-     * @param array<string,mixed> $item
-     */
-    private function registerRavaSnapshot(array &$map, ?array $snapshot, array $item): void
-    {
-        if ($snapshot === null) {
-            return;
-        }
-        $symbolKey = strtoupper((string) ($snapshot['symbol'] ?? ''));
-        if ($symbolKey !== '' && !isset($map[$symbolKey])) {
-            $map[$symbolKey] = $snapshot;
-        }
-        $especieKey = isset($item['especie']) ? strtoupper((string) $item['especie']) : null;
-        if ($especieKey !== null && $especieKey !== '' && !isset($map[$especieKey])) {
-            $map[$especieKey] = $snapshot;
-        }
-    }
-
-    /**
-     * Normaliza item de RAVA a snapshot esperado por repositorio.
-     *
-     * @param array<string,mixed> $item
-     */
-    private function ravaToSnapshot(array $item, string $provider, string $category): ?array
-    {
-        $symbol = strtoupper((string) ($item['symbol'] ?? $item['especie'] ?? ''));
-        if ($symbol === '') {
-            return null;
-        }
-        $especie = strtoupper((string) ($item['especie'] ?? ''));
-        $payload = [
-            'symbol' => $symbol,
-            'especie' => $especie !== '' ? $especie : null,
-            'close' => $item['ultimo'] ?? $item['price'] ?? null,
-            'open' => $item['apertura'] ?? null,
-            'high' => $item['maximo'] ?? null,
-            'low' => $item['minimo'] ?? null,
-            'currency' => $item['currency'] ?? $item['moneda'] ?? null,
-            'previous_close' => $item['anterior'] ?? null,
-            'type' => $category,
-            'panel' => $item['panel'] ?? null,
-            'mercado' => $item['mercado'] ?? null,
-            'source' => $item['source'] ?? 'rava',
-        ];
-        $asOf = $item['as_of'] ?? $item['fecha'] ?? null;
-        $dt = null;
-        if ($asOf !== null) {
-            try {
-                $dt = new \DateTimeImmutable((string) $asOf);
-            } catch (\Throwable $e) {
-                $this->logger->info('datalake.rava_map.as_of_parse_failed', ['value' => $asOf, 'message' => $e->getMessage()]);
-            }
-        }
-        $dt = $dt ?? new \DateTimeImmutable();
-        return [
-            'symbol' => $symbol,
-            'provider' => $provider,
-            'as_of' => $dt,
-            'payload' => $payload,
-            'http_status' => 200,
-            'error_code' => null,
-            'error_msg' => null,
-        ];
-    }
 }

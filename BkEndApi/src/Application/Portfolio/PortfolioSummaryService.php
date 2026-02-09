@@ -4,8 +4,6 @@ declare(strict_types=1);
 namespace FinHub\Application\Portfolio;
 
 use FinHub\Application\DataLake\DataLakeService;
-use FinHub\Application\MarketData\Dto\PriceRequest;
-use FinHub\Application\MarketData\PriceService;
 use FinHub\Infrastructure\Logging\LoggerInterface;
 
 /**
@@ -15,18 +13,15 @@ final class PortfolioSummaryService
 {
     private PortfolioService $portfolioService;
     private DataLakeService $dataLakeService;
-    private PriceService $priceService;
     private LoggerInterface $logger;
 
     public function __construct(
         PortfolioService $portfolioService,
         DataLakeService $dataLakeService,
-        PriceService $priceService,
         LoggerInterface $logger
     ) {
         $this->portfolioService = $portfolioService;
         $this->dataLakeService = $dataLakeService;
-        $this->priceService = $priceService;
         $this->logger = $logger;
     }
 
@@ -47,7 +42,7 @@ final class PortfolioSummaryService
             $symbolBase = $this->symbolBase($especie);
             $symbolForFetch = $especie;
             try {
-                $quote = $this->fetchQuoteWithFallback($symbolForFetch, $symbolBase);
+                $quote = $this->fetchQuote($symbolForFetch);
                 $series = $this->dataLakeService->series($symbolForFetch, '3m')['points'] ?? [];
                 $indicators = $this->buildIndicators($series);
                 $analysisSnapshot = [
@@ -95,45 +90,9 @@ final class PortfolioSummaryService
         return $result;
     }
 
-    private function fetchQuoteWithFallback(string $especie, string $symbolBase): array
+    private function fetchQuote(string $especie): array
     {
-        try {
-            return $this->dataLakeService->latestQuote($especie);
-        } catch (\Throwable $e) {
-            $this->logger->info('portfolio.summary.datalake_miss', [
-                'symbol' => $especie,
-                'message' => $e->getMessage(),
-            ]);
-        }
-        $symbolForProvider = $symbolBase !== '' ? $symbolBase : $especie;
-        $request = new PriceRequest($symbolForProvider);
-        $quote = $this->priceService->getPrice($request);
-        $close = $quote['close'] ?? $quote['price'] ?? $quote['c'] ?? null;
-        return [
-            'symbol' => $symbolForProvider,
-            'close' => $close,
-            'open' => $quote['open'] ?? $quote['o'] ?? null,
-            'high' => $quote['high'] ?? $quote['h'] ?? null,
-            'low' => $quote['low'] ?? $quote['l'] ?? null,
-            'previousClose' => $quote['previousClose'] ?? $quote['pc'] ?? null,
-            'currency' => $quote['currency'] ?? null,
-            'asOf' => $quote['asOf'] ?? null,
-            'source' => $quote['source'] ?? $quote['provider'] ?? null,
-            'volume_nominal' => $quote['volumen_nominal'] ?? $quote['volume_nominal'] ?? null,
-            'volume_efectivo' => $quote['volumen_efectivo'] ?? $quote['volume_efectivo'] ?? null,
-            'var_mtd' => $quote['var_mtd'] ?? null,
-            'var_ytd' => $quote['var_ytd'] ?? null,
-        ];
-    }
-
-    private function symbolBase(string $especie): string
-    {
-        $trimmed = strtoupper(trim($especie));
-        if ($trimmed === '') {
-            return '';
-        }
-        $parts = explode('-', $trimmed);
-        return $parts[0] ?? $trimmed;
+        return $this->dataLakeService->latestQuote($especie);
     }
 
     /**
@@ -211,5 +170,35 @@ final class PortfolioSummaryService
             return null;
         }
         return ((float) $close - (float) $previous) / (float) $previous * 100;
+    }
+
+    private function symbolBase(string $especie): string
+    {
+        $especie = strtoupper(trim($especie));
+        if ($especie === '') {
+            return '';
+        }
+        if (strpos($especie, '-') === false) {
+            return $especie;
+        }
+        $parts = explode('-', $especie);
+        $left = $parts[0] ?? '';
+        if ($left === '') {
+            return $especie;
+        }
+        $suffix = implode('-', array_slice($parts, 1));
+        if ($suffix === '') {
+            return $especie;
+        }
+        if (preg_match('/\\d/', $suffix) === 1 || count($parts) > 2) {
+            return $left;
+        }
+        if (strlen($suffix) === 1 && ctype_alpha($suffix)) {
+            return $especie;
+        }
+        if (strlen($suffix) >= 2 && strlen($suffix) <= 4 && ctype_alpha($suffix)) {
+            return $left;
+        }
+        return $especie;
     }
 }

@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>FinHub | Dashboard</title>
   <link rel="icon" href="/logo/favicon.png" />
   <script>
@@ -121,6 +124,32 @@
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
+    }
+    .table-wrapper {
+      width: 100%;
+      overflow-x: auto;
+      margin-top: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      color: #cbd5f5;
+    }
+    th, td {
+      border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+      padding: 10px 8px;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+    th {
+      color: #e2e8f0;
+      font-weight: 700;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .muted {
+      color: #94a3b8;
     }
     .user-dropdown {
       position: fixed;

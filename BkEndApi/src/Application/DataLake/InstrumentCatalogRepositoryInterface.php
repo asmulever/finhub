@@ -35,6 +35,13 @@ interface InstrumentCatalogRepositoryInterface
     public function listAll(): array;
 
     /**
+     * Busca instrumentos filtrando por texto y metadatos, devolviendo el último snapshot por símbolo.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public function searchLatest(?string $query, ?string $tipo, ?string $panel, ?string $mercado, ?string $currency, int $limit, int $offset = 0): array;
+
+    /**
      * Busca un símbolo puntual.
      *
      * @return array<string,mixed>|null

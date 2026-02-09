@@ -3,8 +3,6 @@ declare(strict_types=1);
 
 namespace FinHub\Application\Portfolio;
 
-use FinHub\Application\MarketData\PriceService;
-use FinHub\Application\MarketData\TiingoService;
 use FinHub\Infrastructure\Logging\LoggerInterface;
 use FinHub\Application\Portfolio\PortfolioSummaryService;
 
@@ -16,24 +14,15 @@ final class PortfolioHeatmapService
 {
     private PortfolioService $portfolioService;
     private PortfolioSummaryService $portfolioSummaryService;
-    private PortfolioSectorService $sectorService;
-    private PriceService $priceService;
-    private TiingoService $tiingoService;
     private LoggerInterface $logger;
 
     public function __construct(
         PortfolioService $portfolioService,
         PortfolioSummaryService $portfolioSummaryService,
-        PortfolioSectorService $sectorService,
-        PriceService $priceService,
-        TiingoService $tiingoService,
         LoggerInterface $logger
     ) {
         $this->portfolioService = $portfolioService;
         $this->portfolioSummaryService = $portfolioSummaryService;
-        $this->sectorService = $sectorService;
-        $this->priceService = $priceService;
-        $this->tiingoService = $tiingoService;
         $this->logger = $logger;
     }
 
@@ -53,11 +42,7 @@ final class PortfolioHeatmapService
             $uniqueSymbols[$especie] = true;
         }
 
-        $quotes = $this->fetchQuotes(array_keys($uniqueSymbols));
-        // Fallback: summary ya normalizado (incluye precio desde DataLake o providers)
         $summaryMap = $this->mapSummary($userId);
-        $sectors = $this->sectorService->listSectorIndustry($userId);
-        $sectorMap = $this->mapSectors($sectors);
         $now = new \DateTimeImmutable();
         $cutoff = $now->modify('-24 hours')->getTimestamp();
 
@@ -80,7 +65,7 @@ final class PortfolioHeatmapService
                     'reason' => 'missing_quantity',
                 ]);
             }
-            $quote = $quotes[$especie] ?? ($summaryMap[$especie] ?? null);
+            $quote = $summaryMap[$especie] ?? null;
             if ($quote === null) {
                 $this->logger->info('portfolio.heatmap.excluded', [
                     'symbol' => $especie,
@@ -89,13 +74,7 @@ final class PortfolioHeatmapService
                 continue;
             }
             $lastPrice = $this->floatOrNull($quote['close'] ?? $quote['price'] ?? null);
-            if ($lastPrice === null) {
-                $lastPrice = $this->floatOrNull($summaryMap[$especie]['close'] ?? $summaryMap[$especie]['price'] ?? null);
-            }
             $prevClose = $this->floatOrNull($quote['previous_close'] ?? $quote['previousClose'] ?? null);
-            if ($prevClose === null) {
-                $prevClose = $this->floatOrNull($summaryMap[$especie]['previous_close'] ?? $summaryMap[$especie]['previousClose'] ?? null);
-            }
             if ($lastPrice === null) {
                 $this->logger->info('portfolio.heatmap.excluded', [
                     'symbol' => $especie,
@@ -115,8 +94,8 @@ final class PortfolioHeatmapService
                 }
             }
 
-            $instrumentCurrency = strtoupper((string) ($quote['currency'] ?? $instrument['currency'] ?? ($summaryMap[$especie]['currency'] ?? $baseCurrency)));
-            $fx = $this->resolveFx($instrumentCurrency, $baseCurrency);
+            $instrumentCurrency = strtoupper((string) ($quote['currency'] ?? $instrument['currency'] ?? $baseCurrency));
+            $fx = $this->resolveFxAssumed($instrumentCurrency, $baseCurrency);
             if ($fx['rate'] === null) {
                 // fallback: asumir 1:1 en base
                 $fx = ['rate' => 1.0, 'source' => 'assumed', 'at' => null];
@@ -133,7 +112,7 @@ final class PortfolioHeatmapService
 
             $marketValueBase = $quantity * $lastPrice * $fx['rate'];
             $changePct = ($prevClose !== null && $prevClose != 0.0) ? (($lastPrice / $prevClose) - 1) * 100 : 0.0;
-            $sectorRow = $sectorMap[$especie] ?? ['sector' => 'Sin sector', 'industry' => 'Sin industry'];
+            $sectorRow = ['sector' => 'Sin sector', 'industry' => 'Sin industry'];
 
             $items[] = [
                 'symbol' => $symbol,
@@ -208,35 +187,6 @@ final class PortfolioHeatmapService
     }
 
     /**
-     * @param array<int,string> $symbols
-     * @return array<string,array<string,mixed>>
-     */
-    private function fetchQuotes(array $symbols): array
-    {
-        if (empty($symbols)) {
-            return [];
-        }
-        try {
-            return $this->priceService->searchQuotes($symbols, null, 'twelvedata', false);
-        } catch (\Throwable $e) {
-            $this->logger->info('portfolio.heatmap.quotes_failed', ['message' => $e->getMessage()]);
-        }
-
-        $results = [];
-        foreach ($symbols as $symbol) {
-            try {
-                $results[$symbol] = $this->priceService->searchQuote($symbol, null, 'twelvedata', false);
-            } catch (\Throwable $e) {
-                $this->logger->info('portfolio.heatmap.quote_failed', [
-                    'symbol' => $symbol,
-                    'message' => $e->getMessage(),
-                ]);
-            }
-        }
-        return $results;
-    }
-
-    /**
      * @param array<int,array<string,mixed>> $items
      */
     private function maxAsOf(array $items): ?string
@@ -258,25 +208,6 @@ final class PortfolioHeatmapService
         return (new \DateTimeImmutable('@' . max($timestamps)))->format(DATE_ATOM);
     }
 
-    /**
-     * @param array<int,array<string,mixed>> $rows
-     * @return array<string,array{sector:string,industry:string}>
-     */
-    private function mapSectors(array $rows): array
-    {
-        $map = [];
-        foreach ($rows as $row) {
-            $especie = strtoupper((string) ($row['especie'] ?? $row['symbol'] ?? ''));
-            if ($especie === '') {
-                continue;
-            }
-            $map[$especie] = [
-                'sector' => $row['sector'] ?? 'Sin sector',
-                'industry' => $row['industry'] ?? 'Sin industry',
-            ];
-        }
-        return $map;
-    }
 
     /**
      * Mapea summary (precio, prev close, currency) por símbolo.
@@ -309,7 +240,7 @@ final class PortfolioHeatmapService
     /**
      * @return array{rate:?float,source:?string,at:?string}
      */
-    private function resolveFx(string $instrumentCurrency, string $baseCurrency): array
+    private function resolveFxAssumed(string $instrumentCurrency, string $baseCurrency): array
     {
         $instrumentCurrency = strtoupper(trim($instrumentCurrency));
         $baseCurrency = strtoupper(trim($baseCurrency));
@@ -319,40 +250,7 @@ final class PortfolioHeatmapService
         if ($instrumentCurrency === $baseCurrency) {
             return ['rate' => 1.0, 'source' => 'identity', 'at' => null];
         }
-        $pair = sprintf('%s/%s', $baseCurrency, $instrumentCurrency);
-        try {
-            $fx = $this->priceService->twelveExchangeRate($pair);
-            $rate = $this->floatOrNull($fx['rate'] ?? $fx['value'] ?? $fx['price'] ?? null);
-            if ($rate !== null) {
-                $at = $fx['timestamp'] ?? $fx['datetime'] ?? null;
-                return ['rate' => $rate, 'source' => 'twelvedata', 'at' => is_string($at) ? $at : null];
-            }
-        } catch (\Throwable $e) {
-            $this->logger->info('portfolio.heatmap.fx.twelvedata_failed', [
-                'pair' => $pair,
-                'message' => $e->getMessage(),
-            ]);
-        }
-
-        try {
-            $ticker = strtolower($baseCurrency . $instrumentCurrency);
-            $resp = $this->tiingoService->fxPrices([$ticker]);
-            if (is_array($resp) && !empty($resp)) {
-                $row = is_array(reset($resp)) ? reset($resp) : null;
-                $rate = $this->floatOrNull($row['midPrice'] ?? $row['rate'] ?? $row['close'] ?? $row['price'] ?? null);
-                if ($rate !== null) {
-                    $at = $row['quoteTimestamp'] ?? $row['timestamp'] ?? null;
-                    return ['rate' => $rate, 'source' => 'tiingo', 'at' => is_string($at) ? $at : null];
-                }
-            }
-        } catch (\Throwable $e) {
-            $this->logger->info('portfolio.heatmap.fx.tiingo_failed', [
-                'pair' => $pair,
-                'message' => $e->getMessage(),
-            ]);
-        }
-
-        return ['rate' => null, 'source' => null, 'at' => null];
+        return ['rate' => 1.0, 'source' => 'assumed', 'at' => null];
     }
 
     private function symbolBase(string $especie): string

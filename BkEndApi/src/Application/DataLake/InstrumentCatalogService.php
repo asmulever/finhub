@@ -3,92 +3,36 @@ declare(strict_types=1);
 
 namespace FinHub\Application\DataLake;
 
-use FinHub\Application\MarketData\RavaAccionesService;
-use FinHub\Application\MarketData\RavaBonosService;
-use FinHub\Application\MarketData\RavaCedearsService;
 use FinHub\Infrastructure\Logging\LoggerInterface;
 
 /**
  * Servicio de catálogo de instrumentos (DataLake SERVING).
- * Construye/lee el índice desde fuentes RAVA unificadas.
+ * Lee y mantiene el índice de instrumentos disponible en DataLake.
  */
 final class InstrumentCatalogService
 {
-    private RavaCedearsService $ravaCedearsService;
-    private RavaAccionesService $ravaAccionesService;
-    private RavaBonosService $ravaBonosService;
     private InstrumentCatalogRepositoryInterface $repository;
     private LoggerInterface $logger;
     private ?\FinHub\Application\Portfolio\PortfolioService $portfolioService = null;
-    private \FinHub\Application\MarketData\PriceService $priceService;
 
     public function __construct(
-        RavaCedearsService $ravaCedearsService,
-        RavaAccionesService $ravaAccionesService,
-        RavaBonosService $ravaBonosService,
         InstrumentCatalogRepositoryInterface $repository,
         LoggerInterface $logger,
-        ?\FinHub\Application\Portfolio\PortfolioService $portfolioService = null,
-        ?\FinHub\Application\MarketData\PriceService $priceService = null
+        ?\FinHub\Application\Portfolio\PortfolioService $portfolioService = null
     ) {
-        $this->ravaCedearsService = $ravaCedearsService;
-        $this->ravaAccionesService = $ravaAccionesService;
-        $this->ravaBonosService = $ravaBonosService;
         $this->repository = $repository;
         $this->logger = $logger;
         $this->portfolioService = $portfolioService;
-        $this->priceService = $priceService ?? new \FinHub\Application\MarketData\PriceService(null, null, new \FinHub\Infrastructure\MarketData\ProviderMetrics('/tmp', 0, 0, 0));
     }
 
     /**
-     * Sincroniza catálogo desde RAVA (cedears/acciones/bonos) y persiste en DataLake.
+     * Sincroniza catálogo desde fuentes externas y persiste en DataLake.
      *
      * @return array<string,mixed>
      */
     public function syncFromRava(): array
     {
-        try {
-            $cedears = $this->ravaCedearsService->listCedears();
-            $acciones = $this->ravaAccionesService->listAcciones();
-            $bonos = $this->ravaBonosService->listBonos();
-        } catch (\Throwable $e) {
-            $this->logger->info('datalake.catalog.rava_fetch_failed', [
-                'message' => $e->getMessage(),
-            ]);
-            throw new \RuntimeException('No se pudo obtener listas RAVA para catálogo', 502, $e);
-        }
-
-        $symbolsFilter = [];
-        if ($this->portfolioService !== null) {
-            $symbols = $this->portfolioService->listSymbols();
-            $symbolsFilter = array_unique(array_map(static fn ($s) => strtoupper(trim((string) $s)), $symbols));
-        }
-
-        $map = [];
-        $this->normalizeItems((array) ($cedears['items'] ?? []), 'CEDEAR', $map);
-        $this->normalizeItems((array) ($acciones['items'] ?? []), 'ACCION_AR', $map);
-        $this->normalizeItems((array) ($bonos['items'] ?? []), 'BONO', $map);
-
-        if (!empty($symbolsFilter)) {
-            $map = array_filter($map, static fn ($item) => in_array($item['symbol'], $symbolsFilter, true));
-        }
-
-        $stored = 0;
-        try {
-            $stored = $this->repository->upsertMany(array_values($map));
-        } catch (\Throwable $e) {
-            $this->logger->info('datalake.catalog.persist_failed', [
-                'message' => $e->getMessage(),
-            ]);
-            throw new \RuntimeException('No se pudo persistir el catálogo en DataLake', 500, $e);
-        }
-
-        return [
-            'stored' => $stored,
-            'total' => count($map),
-            'source' => 'rava',
-            'filtered' => !empty($symbolsFilter),
-        ];
+        throw new \RuntimeException('Sincronización de catálogo deshabilitada: proveedores removidos.', 501);
     }
 
     /**
@@ -103,6 +47,30 @@ final class InstrumentCatalogService
                 'message' => $e->getMessage(),
             ]);
             throw new \RuntimeException('No se pudo leer el catálogo de DataLake', 500, $e);
+        }
+    }
+
+    /**
+     * Busca instrumentos filtrando por texto y metadatos.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public function search(?string $query, ?string $tipo, ?string $panel, ?string $mercado, ?string $currency, int $limit = 200, int $offset = 0): array
+    {
+        $limit = $limit > 0 ? $limit : 200;
+        $offset = $offset > 0 ? $offset : 0;
+        try {
+            return $this->repository->searchLatest($query, $tipo, $panel, $mercado, $currency, $limit, $offset);
+        } catch (\Throwable $e) {
+            $this->logger->info('datalake.catalog.search_failed', [
+                'query' => $query,
+                'tipo' => $tipo,
+                'panel' => $panel,
+                'mercado' => $mercado,
+                'currency' => $currency,
+                'message' => $e->getMessage(),
+            ]);
+            throw new \RuntimeException('No se pudo buscar en el catálogo de DataLake', 500, $e);
         }
     }
 
@@ -237,7 +205,7 @@ final class InstrumentCatalogService
                 'panel' => $row['panel'] ?? null,
                 'mercado' => $row['mercado'] ?? null,
                 'currency' => $row['currency'] ?? $row['moneda'] ?? null,
-                'source' => $row['source'] ?? $row['provider'] ?? 'rava',
+                'source' => $row['source'] ?? $row['provider'] ?? 'ingestion',
                 'as_of' => $row['as_of'] ?? $row['fecha'] ?? null,
                 'price' => $this->floatOrNull($row['ultimo'] ?? $row['price'] ?? $row['close'] ?? null),
                 'var_pct' => $this->floatOrNull($row['variacion'] ?? null),
@@ -370,21 +338,16 @@ final class InstrumentCatalogService
             $latest['captured_at'] = $now;
             return $latest;
         }
-        // fallback proveedor
-        $quote = null;
-        if ($this->priceService !== null) {
-            $quote = $this->priceService->getPrice(new \FinHub\Application\MarketData\Dto\PriceRequest($symbol));
-        }
         return $this->normalizeSingle([
             'symbol' => $symbol,
-            'name' => $quote['name'] ?? $latest['name'] ?? $symbol,
-            'price' => $quote['close'] ?? $quote['price'] ?? $quote['c'] ?? null,
-            'currency' => $quote['currency'] ?? $latest['currency'] ?? null,
-            'as_of' => $quote['asOf'] ?? $quote['as_of'] ?? $latest['as_of'] ?? null,
-            'provider' => $quote['source'] ?? $quote['provider'] ?? ($latest['source'] ?? 'provider'),
-            'var_pct' => $quote['var_pct'] ?? null,
-            'var_mtd' => $quote['var_mtd'] ?? null,
-            'var_ytd' => $quote['var_ytd'] ?? null,
+            'name' => $latest['name'] ?? $symbol,
+            'price' => $latest['price'] ?? null,
+            'currency' => $latest['currency'] ?? null,
+            'as_of' => $latest['as_of'] ?? null,
+            'provider' => $latest['source'] ?? 'manual',
+            'var_pct' => $latest['var_pct'] ?? null,
+            'var_mtd' => $latest['var_mtd'] ?? null,
+            'var_ytd' => $latest['var_ytd'] ?? null,
         ]);
     }
 }

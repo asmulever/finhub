@@ -230,7 +230,7 @@ CREATE TABLE IF NOT EXISTS `signals` (
 CREATE TABLE IF NOT EXISTS `dl_price_snapshots` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `symbol` VARCHAR(32) NOT NULL,
-  `provider` VARCHAR(32) NOT NULL DEFAULT 'twelvedata',
+  `provider` VARCHAR(32) NOT NULL DEFAULT 'ingestion',
   `as_of` DATETIME(6) NOT NULL,
   `payload_json` JSON NOT NULL,
   `payload_hash` BINARY(32) NOT NULL,
@@ -242,15 +242,6 @@ CREATE TABLE IF NOT EXISTS `dl_price_snapshots` (
   UNIQUE KEY `uniq_snapshot` (`symbol`, `provider`, `as_of`, `payload_hash`),
   KEY `idx_symbol_provider_asof` (`symbol`, `provider`, `as_of`),
   KEY `idx_created` (`created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS `dl_price_latest` (
-  `symbol` VARCHAR(32) NOT NULL,
-  `provider` VARCHAR(32) NOT NULL DEFAULT 'twelvedata',
-  `as_of` DATETIME(6) NOT NULL,
-  `payload_json` JSON NOT NULL,
-  `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  PRIMARY KEY (`symbol`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data Lake: catalogo de instrumentos

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>FinHub | Radar LLM (OpenRouter)</title>
+  <link rel="icon" href="/logo/favicon.png" />
+  <script>
+    window.__ENV = window.__ENV ?? {};
+    window.__ENV.API_BASE_URL = '/api';
+  </script>
+  <style>
+    :root { font-family: 'Inter', system-ui, sans-serif; }
+    body { margin:0; background: radial-gradient(circle at 15% 20%, #0b1021 0%, #050915 45%, #030712 100%); color:#e2e8f0; min-height:100vh; }
+    .shell { padding:18px 22px; max-width: 1200px; margin:0 auto; }
+    .card { background: rgba(15,23,42,0.95); border-radius:16px; padding:18px 20px; border:1px solid rgba(148,163,184,0.3); box-shadow:0 20px 45px rgba(2,6,23,0.6); }
+    h1 { margin: 0 0 6px; }
+    .muted { color:#94a3b8; }
+    .controls { display:flex; gap:12px; flex-wrap:wrap; margin:14px 0; }
+    select, button, textarea { background:#0f172a; color:#e2e8f0; border:1px solid rgba(148,163,184,0.35); border-radius:10px; padding:10px 12px; }
+    textarea { min-width:240px; min-height:72px; flex:1; resize:vertical; }
+    button.primary { background: linear-gradient(120deg,#22d3ee,#0ea5e9); border:none; color:#0b1021; font-weight:700; cursor:pointer; }
+    .pill { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; border:1px solid rgba(148,163,184,0.35); background: rgba(148,163,184,0.08); font-size:0.85rem; }
+    table { width:100%; border-collapse: collapse; margin-top:12px; color:#e2e8f0; }
+    th, td { padding:10px 8px; border-bottom:1px solid rgba(148,163,184,0.2); text-align:left; font-size:0.94rem; vertical-align:top; }
+    th { font-size:0.96rem; }
+    .decision-buy { color:#22c55e; font-weight:700; }
+    .decision-sell { color:#ef4444; font-weight:700; }
+    .decision-hold { color:#eab308; font-weight:700; }
+    @media (max-width: 720px) { .controls { flex-direction:column; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="card">
+      <h1>Radar LLM (OpenRouter)</h1>
+      <p class="muted">Trader LLM analiza tu portafolio y sugiere buy / hold / sell.</p>
+      <div class="controls">
+        <label>Modelo<br/><select id="model-select"></select></label>
+        <label>Riesgo<br/>
+          <select id="risk-select">
+            <option value="conservador">Conservador</option>
+            <option value="moderado" selected>Moderado</option>
+            <option value="agresivo">Agresivo</option>
+          </select>
+        </label>
+        <label style="flex:1;">Contexto adicional<br/>
+          <textarea id="note" placeholder="Ej: foco en tech USA, evitar duration larga en bonos"></textarea>
+        </label>
+        <div style="display:flex; align-items:flex-end; gap:8px;">
+          <button id="analyze-btn" class="primary" type="button">Analizar portafolio</button>
+          <span class="pill" id="model-pill">modelo: —</span>
+        </div>
+      </div>
+      <p id="models-error" class="muted" style="color:#fca5a5; margin-top:-6px; min-height:20px;"></p>
+      <p id="analyze-error" class="muted" style="color:#fca5a5; min-height:20px;"></p>
+      <div id="analysis-wrapper" class="analysis-grid">
+        <table>
+          <thead>
+            <tr><th>Ticker</th><th>Decisión</th><th>Tesis</th><th>Catalizadores</th><th>Riesgos</th><th>Conf.</th><th>Horizonte</th></tr>
+          </thead>
+          <tbody id="analysis-body">
+            <tr><td class="muted" colspan="7">Sin resultados</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+  <script type="module" src="/Frontend/paginas/radar.js"></script>
+</body>
+</html>

@@ -23,17 +23,9 @@ const toolbarTemplate = `
       <button type="button" class="icon-btn" id="oracle-menu" data-menu="oracle" data-link="/Frontend/oraculo.html" aria-label="Oráculo">
         <span class="circle-icon">🔮</span>
       </button>
-      <button type="button" id="datalake-menu" data-menu="datalake" data-link="/Frontend/datalake.html">DataLake</button>
-      <select id="providers-select" aria-label="Proveedores">
-        <option value="">Proveedores</option>
-        <option value="/Frontend/rava.html">Rava</option>
-        <option value="/Frontend/eodhd.html">EODHD</option>
-        <option value="/Frontend/twelvedata.html">TwelveData</option>
-        <option value="/Frontend/alphavantage.html">Alpha Vantage</option>
-        <option value="/Frontend/polygon.html">Polygon</option>
-        <option value="/Frontend/tiingo.html">Tiingo</option>
-        <option value="/Frontend/stooq.html">Stooq</option>
-      </select>
+      <button type="button" class="icon-btn" id="radar-menu" data-menu="radar" data-link="/Frontend/radar.html" aria-label="Radar">
+        <span class="circle-icon">📡</span>
+      </button>
     </nav>
     <div class="toolbar-user">
       <button id="user-menu-button" type="button">
@@ -156,16 +148,10 @@ const ensureToolbarStyles = () => {
 
 export const setAdminMenuVisibility = (profile) => {
   const adminButton = document.getElementById('admin-users-action');
-  const datalakeButton = document.getElementById('datalake-menu');
   const signalsButton = document.getElementById('signals-menu');
-  const ravaButton = document.getElementById('rava-menu');
-  const providersSelect = document.getElementById('providers-select');
   const isAdmin = isAdminProfile(profile);
   if (adminButton) adminButton.hidden = !isAdmin;
-  if (datalakeButton) datalakeButton.hidden = !isAdmin;
-  if (ravaButton) ravaButton.hidden = !isAdmin;
   if (signalsButton) signalsButton.hidden = false;
-  if (providersSelect) providersSelect.hidden = !isAdmin;
 };
 
 export const renderToolbar = () => {
@@ -186,16 +172,6 @@ export const highlightToolbar = () => {
     const link = button.getAttribute('data-link');
     button.classList.toggle('active', link === path);
   });
-  const providersSelect = document.getElementById('providers-select');
-  if (providersSelect) {
-    let matched = '';
-    Array.from(providersSelect.options).forEach((opt) => {
-      if (opt.value === path) {
-        matched = opt.value;
-      }
-    });
-    providersSelect.value = matched;
-  }
 };
 
 const updateToggleVisual = (toolbar, toggle) => {
@@ -247,23 +223,6 @@ export const bindToolbarNavigation = () => {
       window.location.href = link;
     });
   });
-  const providersSelect = document.getElementById('providers-select');
-  if (providersSelect) {
-    providersSelect.addEventListener('change', (event) => {
-      const link = providersSelect.value;
-      if (!link) return;
-      if (frame) {
-        event.preventDefault();
-        if (frame.src !== link) {
-          frame.src = link;
-        }
-        document.querySelectorAll('.toolbar-menu button').forEach((b) => b.classList.remove('active'));
-        providersSelect.blur();
-        return;
-      }
-      window.location.href = link;
-    });
-  }
   bindToolbarToggle();
 };
 

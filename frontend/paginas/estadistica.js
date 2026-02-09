@@ -7,7 +7,6 @@ const state = {
   grouped: {},
   run: null,
   status: 'idle',
-  speciesMap: {},
   lastChartSymbol: '',
 };
 
@@ -112,53 +111,6 @@ const groupPredictions = (items) => {
   state.grouped = grouped;
 };
 
-const loadSpeciesMap = async () => {
-  try {
-    const fetchList = async (path) => {
-      try {
-        const resp = await getJson(path);
-        return resp?.items ?? resp?.data ?? [];
-      } catch {
-        return [];
-      }
-    };
-    const [cedears, acciones, bonos] = await Promise.all([
-      fetchList('/rava/cedears'),
-      fetchList('/rava/acciones'),
-      fetchList('/rava/bonos'),
-    ]);
-    const map = {};
-    const add = (list) => {
-      list.forEach((row) => {
-        const symbol = (row.symbol ?? '').toUpperCase();
-        const especie = (row.especie ?? '').toUpperCase();
-        if (!symbol) return;
-        if (especie) {
-          map[symbol] = especie;
-        }
-      });
-    };
-    add(cedears);
-    add(acciones);
-    add(bonos);
-    state.speciesMap = map;
-  } catch {
-    state.speciesMap = {};
-  }
-};
-
-const applySpeciesMapping = () => {
-  Object.keys(state.grouped).forEach((sym) => {
-    const row = state.grouped[sym];
-    if (!row.especie || row.especie === sym) {
-      const mapped = state.speciesMap[sym];
-      if (mapped) {
-        row.especie = mapped;
-      }
-    }
-  });
-};
-
 const showAnalysisOverlay = (message, redirect = false) => {
   const overlayEl = document.getElementById('analysis-overlay');
   const titleEl = document.getElementById('analysis-overlay-title');
@@ -204,8 +156,6 @@ const fetchLatest = async () => {
 
   const predictions = Array.isArray(resp.predictions) ? resp.predictions : [];
   groupPredictions(predictions);
-  await loadSpeciesMap();
-  applySpeciesMapping();
   state.run = resp.run ?? null;
   const runLabel = resp.run?.finished_at ?? resp.run?.started_at ?? '--';
   setBadges('Listo', runLabel, '#22c55e');

@@ -5,30 +5,22 @@ namespace FinHub\Infrastructure;
 
 use FinHub\Application\Auth\AuthService;
 use FinHub\Application\Auth\ActivationService;
-use FinHub\Application\MarketData\Dto\PriceRequest;
-use FinHub\Application\MarketData\PriceService;
-use FinHub\Application\MarketData\ProviderUsageService;
-use FinHub\Application\MarketData\PolygonService;
-use FinHub\Application\MarketData\TiingoService;
-use FinHub\Application\MarketData\StooqService;
-use FinHub\Application\MarketData\RavaCedearsService;
-use FinHub\Application\MarketData\RavaAccionesService;
-use FinHub\Application\MarketData\RavaBonosService;
-use FinHub\Application\MarketData\RavaHistoricosService;
 use FinHub\Application\Portfolio\PortfolioService;
 use FinHub\Application\Portfolio\PortfolioSummaryService;
-use FinHub\Application\Portfolio\PortfolioSectorService;
 use FinHub\Application\Portfolio\PortfolioHeatmapService;
 use FinHub\Application\Analytics\PredictionService;
+use FinHub\Application\LLM\OpenRouterClient;
+use FinHub\Application\LLM\MoonshotClient;
 use FinHub\Application\DataLake\DataLakeService;
 use FinHub\Application\DataLake\InstrumentCatalogService;
+use FinHub\Application\Ingestion\DataReadinessService;
+use FinHub\Application\MarketData\RavaViewsService;
 use FinHub\Application\Signals\SignalService;
 use FinHub\Application\Backtest\BacktestRequest;
 use FinHub\Application\Backtest\BacktestService;
 use FinHub\Domain\User\UserRepositoryInterface;
 use FinHub\Infrastructure\Config\Config;
 use FinHub\Infrastructure\Logging\LoggerInterface;
-use FinHub\Infrastructure\MarketData\EodhdClient;
 use FinHub\Infrastructure\Security\JwtTokenProvider;
 use FinHub\Infrastructure\Security\PasswordHasher;
 use FinHub\Infrastructure\User\UserDeletionService;
@@ -39,28 +31,22 @@ final class ApiDispatcher
     private LoggerInterface $logger;
     private AuthService $authService;
     private ActivationService $activationService;
-    private PriceService $priceService;
     private UserRepositoryInterface $userRepository;
     private JwtTokenProvider $jwt;
     private PasswordHasher $passwordHasher;
-    private EodhdClient $eodhdClient;
-    private ProviderUsageService $providerUsage;
     private PortfolioService $portfolioService;
     private PortfolioSummaryService $portfolioSummaryService;
-    private PortfolioSectorService $portfolioSectorService;
     private PortfolioHeatmapService $portfolioHeatmapService;
     private PredictionService $predictionService;
+    private \FinHub\Application\Analytics\PredictionMarketService $predictionMarketService;
+    private MoonshotClient $moonshotClient;
+    private OpenRouterClient $openRouterClient;
     private DataLakeService $dataLakeService;
     private InstrumentCatalogService $instrumentCatalogService;
+    private RavaViewsService $ravaViewsService;
     private SignalService $signalService;
+    private DataReadinessService $dataReadinessService;
     private BacktestService $backtestService;
-    private PolygonService $polygonService;
-    private TiingoService $tiingoService;
-    private StooqService $stooqService;
-    private RavaCedearsService $ravaCedearsService;
-    private RavaAccionesService $ravaAccionesService;
-    private RavaBonosService $ravaBonosService;
-    private RavaHistoricosService $ravaHistoricosService;
     private UserDeletionService $userDeletionService;
     /** Rutas base deben terminar sin barra final. */
     private string $apiBase;
@@ -70,27 +56,21 @@ final class ApiDispatcher
         LoggerInterface $logger,
         AuthService $authService,
         ActivationService $activationService,
-        PriceService $priceService,
         UserRepositoryInterface $userRepository,
         JwtTokenProvider $jwt,
         PasswordHasher $passwordHasher,
-        EodhdClient $eodhdClient,
-        ProviderUsageService $providerUsage,
         PortfolioService $portfolioService,
         PortfolioSummaryService $portfolioSummaryService,
-        PortfolioSectorService $portfolioSectorService,
         PortfolioHeatmapService $portfolioHeatmapService,
         PredictionService $predictionService,
+        \FinHub\Application\Analytics\PredictionMarketService $predictionMarketService,
+        MoonshotClient $moonshotClient,
+        OpenRouterClient $openRouterClient,
         DataLakeService $dataLakeService,
         InstrumentCatalogService $instrumentCatalogService,
+        RavaViewsService $ravaViewsService,
         SignalService $signalService,
-        PolygonService $polygonService,
-        TiingoService $tiingoService,
-        StooqService $stooqService,
-        RavaCedearsService $ravaCedearsService,
-        RavaAccionesService $ravaAccionesService,
-        RavaBonosService $ravaBonosService,
-        RavaHistoricosService $ravaHistoricosService,
+        DataReadinessService $dataReadinessService,
         UserDeletionService $userDeletionService,
         BacktestService $backtestService
     )
@@ -100,28 +80,22 @@ final class ApiDispatcher
         $this->apiBase = rtrim($config->get('API_BASE_PATH', '/api'), '/');
         $this->authService = $authService;
         $this->activationService = $activationService;
-        $this->priceService = $priceService;
         $this->userRepository = $userRepository;
         $this->jwt = $jwt;
         $this->passwordHasher = $passwordHasher;
-        $this->eodhdClient = $eodhdClient;
-        $this->providerUsage = $providerUsage;
         $this->portfolioService = $portfolioService;
         $this->portfolioSummaryService = $portfolioSummaryService;
-        $this->portfolioSectorService = $portfolioSectorService;
         $this->portfolioHeatmapService = $portfolioHeatmapService;
         $this->predictionService = $predictionService;
+        $this->predictionMarketService = $predictionMarketService;
+        $this->moonshotClient = $moonshotClient;
+        $this->openRouterClient = $openRouterClient;
         $this->dataLakeService = $dataLakeService;
         $this->instrumentCatalogService = $instrumentCatalogService;
+        $this->ravaViewsService = $ravaViewsService;
         $this->signalService = $signalService;
+        $this->dataReadinessService = $dataReadinessService;
         $this->backtestService = $backtestService;
-        $this->polygonService = $polygonService;
-        $this->tiingoService = $tiingoService;
-        $this->stooqService = $stooqService;
-        $this->ravaCedearsService = $ravaCedearsService;
-        $this->ravaAccionesService = $ravaAccionesService;
-        $this->ravaBonosService = $ravaBonosService;
-        $this->ravaHistoricosService = $ravaHistoricosService;
         $this->userDeletionService = $userDeletionService;
     }
 
@@ -163,46 +137,9 @@ final class ApiDispatcher
             ]);
             return;
         }
-        if ($method === 'GET' && $path === '/rava/cedears') {
-            $this->handleRavaCedears();
-            return;
-        }
-        if ($method === 'GET' && $path === '/rava/acciones') {
-            $this->handleRavaAcciones();
-            return;
-        }
-        if ($method === 'GET' && $path === '/rava/bonos') {
-            $this->handleRavaBonos();
-            return;
-        }
-        if ($method === 'GET' && $path === '/rava/historicos') {
-            $this->handleRavaHistoricos();
-            return;
-        }
-        if ($method === 'GET' && $path === '/stocks') {
-            $exchange = trim((string) ($_GET['exchange'] ?? 'BA'));
-            try {
-                $stocks = $this->priceService->listStocks($exchange === '' ? 'BA' : $exchange);
-            } catch (\Throwable $e) {
-                $this->logger->error('stocks.error', [
-                    'trace_id' => $traceId,
-                    'exchange' => $exchange,
-                    'message' => $e->getMessage(),
-                ]);
-                throw new \RuntimeException('No se pudo obtener el listado de instrumentos', 502);
-            }
-            $this->sendJson(['data' => $stocks]);
-            return;
-        }
         if ($method === 'GET' && $path === '/me') {
             $user = $this->requireUser();
             $this->sendJson($user->toResponse());
-            return;
-        }
-        if ($method === 'GET' && $path === '/metrics/providers') {
-            $this->requireUser();
-            $metrics = $this->providerUsage->getUsage();
-            $this->sendJson($metrics);
             return;
         }
         if ($method === 'POST' && $path === '/backtests/run') {
@@ -235,63 +172,6 @@ final class ApiDispatcher
             $this->handleSignalsLatest($user);
             return;
         }
-        if ($method === 'GET' && $path === '/alphavantage/fx-daily') {
-            $this->requireUser();
-            $this->handleAlphaVantage($path);
-            return;
-        }
-        if ($method === 'GET' && str_starts_with($path, '/alphavantage/')) {
-            $this->requireAdmin();
-            $this->handleAlphaVantage($path);
-            return;
-        }
-        if ($method === 'GET' && str_starts_with($path, '/eodhd/')) {
-            $this->requireAdmin();
-            $this->handleEodhdAdmin($path);
-            return;
-        }
-        if ($method === 'GET' && str_starts_with($path, '/twelvedata/')) {
-            $this->requireAdmin();
-            $this->handleTwelveData($path);
-            return;
-        }
-        if ($method === 'GET' && str_starts_with($path, '/polygon/')) {
-            $this->requireAdmin();
-            $this->handlePolygon($path);
-            return;
-        }
-        if ($method === 'GET' && str_starts_with($path, '/tiingo/')) {
-            $this->requireAdmin();
-            $this->handleTiingo($path);
-            return;
-        }
-        if ($method === 'GET' && str_starts_with($path, '/stooq/')) {
-            $this->requireAdmin();
-            $this->handleStooq($path);
-            return;
-        }
-        if ($method === 'GET' && ($path === '/prices' || $path === '/quotes')) {
-            $request = PriceRequest::fromArray($_GET ?? []);
-            $quote = $this->priceService->getPrice($request);
-            $this->sendJson($quote);
-            return;
-        }
-        if ($method === 'GET' && $path === '/quote/search/bulk') {
-            $this->handleQuoteSearchBulk();
-            return;
-        }
-        if ($method === 'GET' && $path === '/quote/search') {
-            $this->handleQuoteSearch();
-            return;
-        }
-        if ($method === 'GET' && $path === '/quote/symbols') {
-            $this->handleQuoteSymbols();
-            return;
-        }
-        if ($method === 'POST' && $path === '/datalake/prices/collect') {
-            $this->handleCollectPrices($traceId);
-            return;
-        }
         if ($method === 'GET' && $path === '/datalake/prices/captures') {
             $this->handleCaptureList();
             return;
@@ -310,6 +190,40 @@ final class ApiDispatcher
             $this->handleLatestPrice();
             return;
         }
+        if ($method === 'GET' && $path === '/datalake/catalog') {
+            $this->requireUser();
+            $query = trim((string) ($_GET['q'] ?? ''));
+            $tipo = trim((string) ($_GET['tipo'] ?? ''));
+            $panel = trim((string) ($_GET['panel'] ?? ''));
+            $mercado = trim((string) ($_GET['mercado'] ?? ''));
+            $currency = strtoupper(trim((string) ($_GET['currency'] ?? '')));
+            $limit = (int) ($_GET['limit'] ?? 200);
+            $offset = (int) ($_GET['offset'] ?? 0);
+            $limit = max(1, min($limit, 500));
+            $offset = max(0, $offset);
+            $items = $this->instrumentCatalogService->search(
+                $query !== '' ? $query : null,
+                $tipo !== '' ? $tipo : null,
+                $panel !== '' ? $panel : null,
+                $mercado !== '' ? $mercado : null,
+                $currency !== '' ? $currency : null,
+                $limit,
+                $offset
+            );
+            $this->sendJson([
+                'data' => $items,
+                'count' => count($items),
+            ]);
+            return;
+        }
+        if ($method === 'GET' && $path === '/rava/catalog') {
+            $this->handleRavaCatalog();
+            return;
+        }
+        if ($method === 'GET' && $path === '/rava/dolares') {
+            $this->handleRavaDolares();
+            return;
+        }
         if ($method === 'POST' && $path === '/analytics/predictions/run') {
             $this->handlePredictionRunGlobal($traceId);
             return;
@@ -324,25 +238,21 @@ final class ApiDispatcher
             $this->handlePredictionLatest($user);
             return;
         }
-        if ($method === 'GET' && $path === '/eodhd/eod') {
-            $this->requireAdmin();
-            $this->handleEodhdEod();
+        if ($method === 'GET' && $path === '/prediction/trending') {
+            $this->handlePredictionTrending();
             return;
         }
-        if ($method === 'GET' && $path === '/eodhd/exchange-symbols') {
-            $this->requireAdmin();
-            $this->handleEodhdExchangeSymbols();
+        if ($method === 'GET' && $path === '/llm/models') {
+            $this->handleLlmModels();
             return;
         }
-        if ($method === 'GET' && $path === '/eodhd/exchanges-list') {
-            $this->requireAdmin();
-            $this->handleEodhdExchangesList();
+        if ($method === 'GET' && $path === '/llm/models/openrouter') {
+            $this->handleOpenRouterModels();
             return;
         }
-        if ($method === 'GET' && $path === '/eodhd/user') {
-            $this->requireAdmin();
-            $data = $this->eodhdClient->fetchUser();
-            $this->sendJson(['data' => $data]);
+        if ($method === 'POST' && $path === '/llm/radar/analyze') {
+            $user = $this->requireUser();
+            $this->handleLlmRadarAnalyze($user);
             return;
         }
         if ($method === 'GET' && $path === '/portfolio/instruments') {
@@ -359,14 +269,12 @@ final class ApiDispatcher
         }
         if ($method === 'GET' && $path === '/portfolio/heatmap') {
             $user = $this->requireUser();
+            $symbols = $this->portfolioService->listSymbols($user->getId());
+            $readiness = $this->dataReadinessService->ensureSeriesReady($symbols, '3m', 60, 2);
+            $this->logReadinessWarnings('portfolio.heatmap', $readiness, $user->getId());
             $data = $this->portfolioHeatmapService->build($user->getId());
+            $data = $this->attachReadinessWarnings($data, $readiness);
             $this->sendJson($data);
-            return;
-        }
-        if ($method === 'GET' && $path === '/portfolio/sector-industry') {
-            $user = $this->requireUser();
-            $data = $this->portfolioSectorService->listSectorIndustry($user->getId());
-            $this->sendJson(['data' => $data]);
             return;
         }
         if ($method === 'GET' && $path === '/portfolios') {
@@ -481,6 +389,27 @@ final class ApiDispatcher
 
         $payload = $this->authService->authenticate($email, $password);
         $this->sendJson($payload);
+    }
+
+    private function handleRavaCatalog(): void
+    {
+        $result = $this->ravaViewsService->fetchCatalog();
+        $this->sendJson([
+            'data' => $result['items'] ?? [],
+            'count' => $result['count'] ?? 0,
+            'counts' => $result['counts'] ?? [],
+            'fetched_at' => $result['fetched_at'] ?? null,
+        ]);
+    }
+
+    private function handleRavaDolares(): void
+    {
+        $result = $this->ravaViewsService->fetchDolares();
+        $this->sendJson([
+            'data' => $result['items'] ?? [],
+            'count' => $result['count'] ?? 0,
+            'fetched_at' => $result['fetched_at'] ?? null,
+        ]);
     }
 
     private function handleActivate(string $traceId): void
@@ -687,126 +616,6 @@ HTML;
     }
 
     /**
-     * Consulta EODHD EOD para un símbolo (solo Admin).
-     */
-    private function handleEodhdEod(): void
-    {
-        $symbol = trim((string) ($_GET['symbol'] ?? ''));
-        if ($symbol === '') {
-            throw new \RuntimeException('symbol requerido', 422);
-        }
-        $data = $this->eodhdClient->fetchEod($symbol);
-        $this->sendJson(['symbol' => $symbol, 'data' => $data]);
-    }
-
-    /**
-     * Lista símbolos de un exchange en EODHD (solo Admin).
-     */
-    private function handleEodhdExchangeSymbols(): void
-    {
-        $exchange = trim((string) ($_GET['exchange'] ?? 'US'));
-        if ($exchange === '') {
-            throw new \RuntimeException('exchange requerido', 422);
-        }
-        $data = $this->eodhdClient->fetchExchangeSymbols($exchange);
-        $this->sendJson(['exchange' => $exchange, 'data' => $data]);
-    }
-
-    /**
-     * Lista exchanges disponibles en EODHD (solo Admin).
-     */
-    private function handleEodhdExchangesList(): void
-    {
-        $data = $this->eodhdClient->fetchExchangesList();
-        $this->sendJson(['data' => $data]);
-    }
-
-    private function handleEodhdAdmin(string $path): void
-    {
-        if ($path === '/eodhd/eod') {
-            $symbol = trim((string) ($_GET['symbol'] ?? ''));
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $data = $this->eodhdClient->fetchEod($symbol);
-            $this->sendJson(['symbol' => $symbol, 'data' => $data]);
-            return;
-        }
-        if ($path === '/eodhd/search') {
-            $query = trim((string) ($_GET['q'] ?? ($_GET['query'] ?? '')));
-            if ($query === '') {
-                throw new \RuntimeException('q requerido', 422);
-            }
-            $parts = array_values(array_filter(array_map(static fn ($s) => trim((string) $s), explode(',', $query)), static fn ($s) => $s !== ''));
-            $results = [];
-            $errors = [];
-            foreach ($parts as $q) {
-                try {
-                    $data = $this->eodhdClient->search($q);
-                    if (is_array($data)) {
-                        $results = array_merge($results, $data);
-                    }
-                } catch (\Throwable $e) {
-                    $errors[] = ['query' => $q, 'message' => $e->getMessage()];
-                }
-            }
-            if (empty($results) && !empty($errors)) {
-                $first = $errors[0];
-                throw new \RuntimeException(sprintf('No se obtuvieron resultados: %s', $first['message']), 502);
-            }
-            $this->sendJson(['data' => $results]);
-            return;
-        }
-        if ($path === '/eodhd/exchange-symbols') {
-            $this->handleEodhdExchangeSymbols();
-            return;
-        }
-        if ($path === '/eodhd/exchanges-list') {
-            $this->handleEodhdExchangesList();
-            return;
-        }
-        if ($path === '/eodhd/user') {
-            $data = $this->eodhdClient->fetchUser();
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        throw new \RuntimeException('Ruta no encontrada', 404);
-    }
-
-    /**
-     * Lanza la recolección de precios para todos los símbolos de portafolios y guarda snapshots.
-     * Endpoint público sin auth por requerimiento.
-     */
-    private function handleCollectPrices(string $traceId): void
-    {
-        $symbols = [];
-        $body = $this->parseJsonBody();
-        if (isset($body['symbols']) && is_array($body['symbols'])) {
-            $symbols = array_values(array_filter(array_map('strval', $body['symbols'])));
-        }
-        if (empty($symbols)) {
-            $symbols = $this->portfolioService->listSymbols();
-        }
-        if (empty($symbols)) {
-            throw new \RuntimeException('No hay símbolos configurados para ingesta', 400);
-        }
-        $this->logger->info('datalake.collect.request', [
-            'trace_id' => $traceId,
-            'symbols_count' => count($symbols),
-        ]);
-        $results = $this->dataLakeService->collect($symbols);
-        $this->logger->info('datalake.collect.summary', [
-            'trace_id' => $traceId,
-            'ok' => $results['ok'],
-            'failed' => $results['failed'],
-            'total' => $results['total_symbols'],
-            'status' => $results['failed'] === $results['total_symbols'] ? 'failed' : ($results['failed'] > 0 ? 'partial' : 'ok'),
-        ]);
-        $status = $results['failed'] === $results['total_symbols'] ? 500 : 200;
-        $this->sendJson($results, $status);
-    }
-
-    /**
      * Lista grupos de capturas o devuelve las capturas de un bucket específico.
      */
     private function handleCaptureList(): void
@@ -837,58 +646,6 @@ HTML;
     }
 
     /**
-     * Lista CEDEARs obtenidos desde RAVA (cache + stale).
-     */
-    private function handleRavaCedears(): void
-    {
-        $result = $this->ravaCedearsService->listCedears();
-        $this->sendJson([
-            'data' => $result['items'] ?? [],
-            'meta' => $result['meta'] ?? [],
-        ]);
-    }
-
-    /**
-     * Lista Acciones Argentinas desde RAVA (agrupadas/normalizadas).
-     */
-    private function handleRavaAcciones(): void
-    {
-        $result = $this->ravaAccionesService->listAcciones();
-        $this->sendJson([
-            'data' => $result['items'] ?? [],
-            'meta' => $result['meta'] ?? [],
-        ]);
-    }
-
-    /**
-     * Lista Bonos desde RAVA.
-     */
-    private function handleRavaBonos(): void
-    {
-        $result = $this->ravaBonosService->listBonos();
-        $this->sendJson([
-            'data' => $result['items'] ?? [],
-            'meta' => $result['meta'] ?? [],
-        ]);
-    }
-
-    /**
-     * Devuelve histórico diario de una especie desde RAVA.
-     */
-    private function handleRavaHistoricos(): void
-    {
-        $especie = trim((string) ($_GET['especie'] ?? ($_GET['symbol'] ?? '')));
-        if ($especie === '') {
-            throw new \RuntimeException('Parámetro especie requerido', 422);
-        }
-        $result = $this->ravaHistoricosService->historicos($especie);
-        $this->sendJson([
-            'data' => $result['items'] ?? [],
-            'meta' => $result['meta'] ?? [],
-        ]);
-    }
-
-    /**
      * Devuelve la serie temporal para un símbolo en un período.
      */
     private function handlePriceSeries(): void
@@ -898,24 +655,6 @@ HTML;
         if ($symbol === '') {
             throw new \RuntimeException('symbol requerido', 422);
         }
-        // Intentar histórico de RAVA como fuente principal
-        try {
-            $result = $this->ravaHistoricosService->historicos($symbol);
-            $items = $result['items'] ?? $result['data'] ?? [];
-            $this->sendJson([
-                'symbol' => $symbol,
-                'period' => $period,
-                'points' => $items,
-                'source' => 'rava',
-            ]);
-            return;
-        } catch (\Throwable $e) {
-            $this->logger->info('datalake.series.rava_failed', [
-                'symbol' => $symbol,
-                'message' => $e->getMessage(),
-            ]);
-        }
-        // Fallback: proveedor directo
         $series = $this->dataLakeService->series($symbol, $period);
         $this->sendJson($series);
     }
@@ -946,609 +685,15 @@ HTML;
         $horizon = (int) ($_GET['horizon'] ?? 90);
         $forceRecompute = isset($_GET['force']) && in_array((string) $_GET['force'], ['1', 'true', 'yes'], true);
         $collectMissing = isset($_GET['collect']) && in_array((string) $_GET['collect'], ['1', 'true', 'yes'], true);
+        $readiness = $this->dataReadinessService->ensureSeriesReady($symbols, '6m', 120, 2);
+        $this->logReadinessWarnings('signals.latest', $readiness, $user->getId());
         $signals = $this->signalService->latest($symbols, $horizon, $forceRecompute, $collectMissing);
-        $this->sendJson(['data' => $signals]);
+        $payload = $this->attachReadinessWarnings(['data' => $signals], $readiness);
+        $this->sendJson($payload);
     }
 
     /**
-     * Busca un precio en proveedores externos (EODHD/TwelveData) con fallback y cache.
-     */
-    private function handleQuoteSearchBulk(): void
-    {
-        $rawSymbols = $_GET['s'] ?? '';
-        $symbols = [];
-        if (is_array($rawSymbols)) {
-            foreach ($rawSymbols as $chunk) {
-                $parts = preg_split('/,/', (string) $chunk, -1, PREG_SPLIT_NO_EMPTY);
-                if (is_array($parts)) {
-                    foreach ($parts as $p) {
-                        $symbols[] = strtoupper(trim($p));
-                    }
-                }
-            }
-        } else {
-            $parts = preg_split('/,/', (string) $rawSymbols, -1, PREG_SPLIT_NO_EMPTY);
-            if (is_array($parts)) {
-                foreach ($parts as $p) {
-                    $symbols[] = strtoupper(trim($p));
-                }
-            }
-        }
-
-        $symbols = array_values(array_filter(array_unique($symbols), static fn ($s) => $s !== ''));
-        if (empty($symbols)) {
-            throw new \RuntimeException('Parámetro s (symbols) requerido', 422);
-        }
-
-        $exchange = isset($_GET['ex']) ? strtoupper(trim((string) $_GET['ex'])) : null;
-        $preferred = strtolower(trim((string) ($_GET['preferred'] ?? 'twelvedata')));
-        $force = isset($_GET['force']) && (string) $_GET['force'] === '1';
-
-        $quotes = $this->priceService->searchQuotes($symbols, $exchange, $preferred, $force);
-        $this->sendJson(['data' => $quotes]);
-    }
-
-    /**
-     * Endpoints de prueba para Alpha Vantage (solo admin).
-     */
-    private function handleAlphaVantage(string $path): void
-    {
-        if ($path === '/alphavantage/quote') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $quote = $this->priceService->alphaQuote($symbol);
-            $this->sendJson(['data' => $quote]);
-            return;
-        }
-        if ($path === '/alphavantage/search') {
-            $keywords = trim((string) ($_GET['keywords'] ?? ''));
-            if ($keywords === '') {
-                throw new \RuntimeException('keywords requerido', 422);
-            }
-            $result = $this->priceService->alphaSearch($keywords);
-            $this->sendJson(['data' => $result]);
-            return;
-        }
-        if ($path === '/alphavantage/daily') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $outputSize = strtolower(trim((string) ($_GET['outputsize'] ?? 'compact')));
-            $data = $this->priceService->alphaDaily($symbol, $outputSize === 'full' ? 'full' : 'compact');
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/alphavantage/intraday') {
-            throw new \RuntimeException('Endpoint no disponible', 404);
-        }
-        if ($path === '/alphavantage/fx-intraday') {
-            throw new \RuntimeException('Endpoint no disponible', 404);
-        }
-        if ($path === '/alphavantage/fx-daily') {
-            $from = strtoupper(trim((string) ($_GET['from'] ?? '')));
-            $to = strtoupper(trim((string) ($_GET['to'] ?? '')));
-            if ($from === '' || $to === '') {
-                throw new \RuntimeException('from/to requeridos', 422);
-            }
-            $data = $this->priceService->alphaFxDaily($from, $to);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/alphavantage/crypto-intraday') {
-            throw new \RuntimeException('Endpoint no disponible', 404);
-        }
-        if ($path === '/alphavantage/sma') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            $interval = strtolower(trim((string) ($_GET['interval'] ?? 'daily')));
-            $timePeriod = (int) ($_GET['time_period'] ?? 20);
-            $seriesType = strtolower(trim((string) ($_GET['series_type'] ?? 'close')));
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $data = $this->priceService->alphaSma($symbol, $interval, $timePeriod, $seriesType);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/alphavantage/rsi') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            $interval = strtolower(trim((string) ($_GET['interval'] ?? 'daily')));
-            $timePeriod = (int) ($_GET['time_period'] ?? 14);
-            $seriesType = strtolower(trim((string) ($_GET['series_type'] ?? 'close')));
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $data = $this->priceService->alphaRsi($symbol, $interval, $timePeriod, $seriesType);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/alphavantage/overview') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $data = $this->priceService->alphaOverview($symbol);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        throw new \RuntimeException('Ruta no encontrada', 404);
-    }
-
-    private function handleTwelveData(string $path): void
-    {
-        if ($path === '/twelvedata/time_series') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $interval = (string) ($_GET['interval'] ?? '1day');
-            $outputsize = (string) ($_GET['outputsize'] ?? 'compact');
-            $data = $this->priceService->twelveTimeSeries($symbol, [
-                'interval' => $interval,
-                'outputsize' => $outputsize,
-            ]);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-
-        if ($path === '/twelvedata/quote') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $data = $this->priceService->twelveQuote($symbol);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-
-        if ($path === '/twelvedata/price') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $data = $this->priceService->twelvePrice($symbol);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-
-        if ($path === '/twelvedata/quotes') {
-            $symbolsParam = (string) ($_GET['symbols'] ?? '');
-            $symbols = array_filter(array_map(static fn ($s) => strtoupper(trim((string) $s)), explode(',', $symbolsParam)), static fn ($s) => $s !== '');
-            if (empty($symbols)) {
-                throw new \RuntimeException('symbols requeridos', 422);
-            }
-            $data = $this->priceService->twelveQuotes($symbols);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-
-        if ($path === '/twelvedata/stocks') {
-            $exchange = trim((string) ($_GET['exchange'] ?? ''));
-            $data = $this->priceService->twelveStocks($exchange === '' ? null : $exchange);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-
-        if ($path === '/twelvedata/stocks/by-exchange') {
-            $exchange = trim((string) ($_GET['exchange'] ?? ''));
-            if ($exchange === '') {
-                throw new \RuntimeException('exchange requerido', 422);
-            }
-            $data = $this->priceService->twelveStocksByExchange($exchange);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-
-        if ($path === '/twelvedata/usage') {
-            $data = $this->priceService->twelveUsage();
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-
-        if ($path === '/twelvedata/exchanges') {
-            $data = $this->priceService->twelveExchanges();
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-
-        if ($path === '/twelvedata/exchange_rate') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $data = $this->priceService->twelveExchangeRate($symbol);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-
-        if ($path === '/twelvedata/currency_conversion') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            $amount = (float) ($_GET['amount'] ?? 0);
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            if ($amount <= 0) {
-                throw new \RuntimeException('amount debe ser mayor a 0', 422);
-            }
-            $data = $this->priceService->twelveCurrencyConversion($symbol, $amount);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-
-        if ($path === '/twelvedata/market_state') {
-            $data = $this->priceService->twelveMarketState();
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-
-        if ($path === '/twelvedata/cryptocurrency_exchanges') {
-            $data = $this->priceService->twelveCryptoExchanges();
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-
-        if ($path === '/twelvedata/instrument_type') {
-            $data = $this->priceService->twelveInstrumentTypes();
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-
-        if ($path === '/twelvedata/symbol_search') {
-            $keywords = trim((string) ($_GET['symbol'] ?? ''));
-            if ($keywords === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $data = $this->priceService->twelveSymbolSearch($keywords);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-
-        if ($path === '/twelvedata/forex_pairs') {
-            $data = $this->priceService->twelveForexPairs();
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-
-        if ($path === '/twelvedata/cryptocurrencies') {
-            $data = $this->priceService->twelveCryptocurrencies();
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-
-        if ($path === '/twelvedata/earliest_timestamp') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            $exchange = isset($_GET['exchange']) ? strtoupper(trim((string) $_GET['exchange'])) : null;
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $data = $this->priceService->twelveEarliestTimestamp($symbol, $exchange);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-
-        if ($path === '/twelvedata/technical_indicator') {
-            $function = trim((string) ($_GET['function'] ?? ''));
-            $symbol = trim((string) ($_GET['symbol'] ?? ''));
-            $interval = trim((string) ($_GET['interval'] ?? '1day'));
-            if ($function === '' || $symbol === '') {
-                throw new \RuntimeException('function y symbol requeridos', 422);
-            }
-            $params = $_GET;
-            $params['symbol'] = $symbol;
-            $params['interval'] = $interval;
-            $data = $this->priceService->twelveTechnicalIndicator($function, $params);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-
-        throw new \RuntimeException('Ruta no encontrada', 404);
-    }
-
-    private function handlePolygon(string $path): void
-    {
-        if ($path === '/polygon/tickers') {
-            $query = [
-                'ticker' => trim((string) ($_GET['ticker'] ?? '')),
-                'search' => trim((string) ($_GET['search'] ?? '')),
-                'active' => isset($_GET['active']) ? (string) $_GET['active'] : null,
-                'market' => trim((string) ($_GET['market'] ?? '')),
-                'type' => trim((string) ($_GET['type'] ?? '')),
-                'locale' => trim((string) ($_GET['locale'] ?? 'us')),
-                'limit' => (int) ($_GET['limit'] ?? 20),
-                'order' => trim((string) ($_GET['order'] ?? 'asc')),
-                'sort' => trim((string) ($_GET['sort'] ?? 'ticker')),
-            ];
-            $data = $this->polygonService->listTickers($query);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/polygon/ticker-details') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $data = $this->polygonService->tickerDetails($symbol);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/polygon/aggregates') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            $multiplier = (int) ($_GET['multiplier'] ?? 1);
-            $timespan = trim((string) ($_GET['timespan'] ?? 'day'));
-            $from = trim((string) ($_GET['from'] ?? ''));
-            $to = trim((string) ($_GET['to'] ?? ''));
-            $sort = trim((string) ($_GET['sort'] ?? 'desc'));
-            $limit = (int) ($_GET['limit'] ?? 120);
-            $adjusted = !isset($_GET['adjusted']) || (string) $_GET['adjusted'] !== '0';
-            if ($symbol === '' || $from === '' || $to === '') {
-                throw new \RuntimeException('symbol, from y to son requeridos', 422);
-            }
-            $data = $this->polygonService->aggregates($symbol, max(1, $multiplier), $timespan, $from, $to, $adjusted, $sort, $limit);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/polygon/previous-close') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            $adjusted = !isset($_GET['adjusted']) || (string) $_GET['adjusted'] !== '0';
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $data = $this->polygonService->previousClose($symbol, $adjusted);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/polygon/daily-open-close') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            $date = trim((string) ($_GET['date'] ?? ''));
-            $adjusted = !isset($_GET['adjusted']) || (string) $_GET['adjusted'] !== '0';
-            if ($symbol === '' || $date === '') {
-                throw new \RuntimeException('symbol y date requeridos', 422);
-            }
-            $data = $this->polygonService->dailyOpenClose($symbol, $date, $adjusted);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/polygon/grouped-daily') {
-            $date = trim((string) ($_GET['date'] ?? ''));
-            if ($date === '') {
-                throw new \RuntimeException('date requerido', 422);
-            }
-            $market = trim((string) ($_GET['market'] ?? 'stocks'));
-            $locale = trim((string) ($_GET['locale'] ?? 'us'));
-            $adjusted = !isset($_GET['adjusted']) || (string) $_GET['adjusted'] !== '0';
-            $data = $this->polygonService->groupedDaily($date, $market === '' ? 'stocks' : $market, $locale === '' ? 'us' : $locale, $adjusted);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/polygon/last-trade') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $data = $this->polygonService->lastTrade($symbol);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/polygon/last-quote') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $data = $this->polygonService->lastQuote($symbol);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/polygon/snapshot') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $market = trim((string) ($_GET['market'] ?? 'stocks'));
-            $locale = trim((string) ($_GET['locale'] ?? 'us'));
-            $data = $this->polygonService->snapshot($symbol, $market === '' ? 'stocks' : $market, $locale === '' ? 'us' : $locale);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/polygon/news') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            $limit = (int) ($_GET['limit'] ?? 10);
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $data = $this->polygonService->news($symbol, max(1, min($limit, 50)));
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/polygon/dividends') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            $limit = (int) ($_GET['limit'] ?? 50);
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $data = $this->polygonService->dividends($symbol, max(1, min($limit, 100)));
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/polygon/splits') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            $limit = (int) ($_GET['limit'] ?? 50);
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $data = $this->polygonService->splits($symbol, max(1, min($limit, 100)));
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/polygon/exchanges') {
-            $asset = trim((string) ($_GET['asset_class'] ?? ($_GET['asset'] ?? 'stocks')));
-            $locale = trim((string) ($_GET['locale'] ?? ''));
-            $data = $this->polygonService->exchanges($asset === '' ? 'stocks' : $asset, $locale === '' ? null : $locale);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/polygon/market-status') {
-            $data = $this->polygonService->marketStatus();
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        throw new \RuntimeException('Ruta no encontrada', 404);
-    }
-
-    private function handleTiingo(string $path): void
-    {
-        if ($path === '/tiingo/iex/tops') {
-            $tickers = $this->splitSymbols((string) ($_GET['tickers'] ?? ''));
-            $data = $this->tiingoService->iexTops($tickers);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/tiingo/iex/last') {
-            $tickers = $this->splitSymbols((string) ($_GET['tickers'] ?? ''));
-            $data = $this->tiingoService->iexLast($tickers);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/tiingo/daily/prices') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $query = [
-                'startDate' => trim((string) ($_GET['startDate'] ?? '')),
-                'endDate' => trim((string) ($_GET['endDate'] ?? '')),
-                'resampleFreq' => trim((string) ($_GET['resampleFreq'] ?? '')),
-            ];
-            $data = $this->tiingoService->dailyPrices($symbol, $query);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/tiingo/daily/meta') {
-            $symbol = strtoupper(trim((string) ($_GET['symbol'] ?? '')));
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $data = $this->tiingoService->dailyMetadata($symbol);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/tiingo/crypto/prices') {
-            $tickers = $this->splitSymbols((string) ($_GET['tickers'] ?? ''));
-            $query = [
-                'startDate' => trim((string) ($_GET['startDate'] ?? '')),
-                'endDate' => trim((string) ($_GET['endDate'] ?? '')),
-                'resampleFreq' => trim((string) ($_GET['resampleFreq'] ?? '')),
-            ];
-            $data = $this->tiingoService->cryptoPrices($tickers, $query);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/tiingo/fx/prices') {
-            $tickers = $this->splitSymbols((string) ($_GET['tickers'] ?? ''));
-            $query = [
-                'startDate' => trim((string) ($_GET['startDate'] ?? '')),
-                'endDate' => trim((string) ($_GET['endDate'] ?? '')),
-                'resampleFreq' => trim((string) ($_GET['resampleFreq'] ?? '')),
-            ];
-            $data = $this->tiingoService->fxPrices($tickers, $query);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/tiingo/search') {
-            $query = trim((string) ($_GET['query'] ?? ''));
-            if ($query === '') {
-                throw new \RuntimeException('query requerido', 422);
-            }
-            $data = $this->tiingoService->search($query);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/tiingo/news') {
-            $tickers = $this->splitSymbols((string) ($_GET['tickers'] ?? ''));
-            if (empty($tickers)) {
-                throw new \RuntimeException('tickers requerido', 422);
-            }
-            $query = [
-                'startDate' => trim((string) ($_GET['startDate'] ?? '')),
-                'endDate' => trim((string) ($_GET['endDate'] ?? '')),
-                'limit' => (int) ($_GET['limit'] ?? 10),
-                'source' => trim((string) ($_GET['source'] ?? '')),
-            ];
-            $data = $this->tiingoService->news($tickers, $query);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        throw new \RuntimeException('Ruta no encontrada', 404);
-    }
-
-    private function handleStooq(string $path): void
-    {
-        if ($path === '/stooq/quotes') {
-            $tickers = $this->splitSymbols((string) ($_GET['symbols'] ?? ($_GET['s'] ?? '')));
-            if (empty($tickers)) {
-                throw new \RuntimeException('symbols requerido', 422);
-            }
-            $data = $this->stooqService->quotes($tickers);
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        if ($path === '/stooq/history') {
-            $symbol = strtolower(trim((string) ($_GET['symbol'] ?? '')));
-            $market = strtolower(trim((string) ($_GET['market'] ?? '')));
-            if ($symbol === '') {
-                throw new \RuntimeException('symbol requerido', 422);
-            }
-            $interval = strtolower(trim((string) ($_GET['interval'] ?? 'd')));
-            $symbolWithMarket = $market !== '' ? sprintf('%s.%s', $symbol, $market) : $symbol;
-            $data = $this->stooqService->history($symbolWithMarket, $interval);
-            $this->sendJson(['data' => $data, 'symbol' => $symbolWithMarket]);
-            return;
-        }
-        if ($path === '/stooq/markets') {
-            $data = $this->stooqService->markets();
-            $this->sendJson(['data' => $data]);
-            return;
-        }
-        throw new \RuntimeException('Ruta no encontrada', 404);
-    }
-
-    /**
-     * Busca un precio en proveedores externos (EODHD/TwelveData) con fallback y cache.
-     */
-    private function handleQuoteSearch(): void
-    {
-        $symbol = strtoupper(trim((string) ($_GET['s'] ?? '')));
-        $exchange = isset($_GET['ex']) ? strtoupper(trim((string) $_GET['ex'])) : null;
-        $preferred = strtolower(trim((string) ($_GET['preferred'] ?? 'twelvedata')));
-        $force = isset($_GET['force']) && (string) $_GET['force'] === '1';
-
-        if ($symbol === '') {
-            throw new \RuntimeException('Parámetro s (symbol) requerido', 422);
-        }
-        if ($preferred !== 'eodhd' && $preferred !== 'twelvedata' && $preferred !== 'alphavantage') {
-            $preferred = 'twelvedata';
-        }
-
-        $quote = $this->priceService->searchQuote($symbol, $exchange, $preferred, $force);
-        $this->sendJson($quote);
-    }
-
-    /**
-     * Lista unificada de símbolos (EODHD + TwelveData) para un exchange.
-     */
-    private function handleQuoteSymbols(): void
-    {
-        $exchange = strtoupper(trim((string) ($_GET['exchange'] ?? '')));
-        if ($exchange === '') {
-            throw new \RuntimeException('Parámetro exchange requerido', 422);
-        }
-        $symbols = $this->priceService->listSymbols($exchange);
-        $this->sendJson(['data' => $symbols]);
-    }
-
-    /**
-     * Devuelve el último precio disponible para un símbolo (catálogo fresco o proveedor).
+     * Devuelve el último precio disponible para un símbolo desde Data Lake.
      */
     private function handleLatestPrice(): void
     {
@@ -1556,40 +701,27 @@ HTML;
         if ($symbol === '') {
             throw new \RuntimeException('symbol requerido', 422);
         }
-
-        // 1) Intentar Data Lake primero (snapshot más reciente).
         try {
             $quote = $this->dataLakeService->latestQuote($symbol);
-            $this->sendJson([
-                'symbol' => $quote['symbol'] ?? $symbol,
-                'close' => $quote['close'] ?? null,
-                'open' => $quote['open'] ?? null,
-                'high' => $quote['high'] ?? null,
-                'low' => $quote['low'] ?? null,
-                'previous_close' => $quote['previous_close'] ?? $quote['previousClose'] ?? null,
-                'currency' => $quote['currency'] ?? null,
-                'asOf' => $quote['asOf'] ?? $quote['as_of'] ?? null,
-                'source' => $quote['source'] ?? $quote['provider'] ?? 'datalake',
-            ]);
-            return;
         } catch (\Throwable $e) {
-            $this->logger->info('datalake.latest.dl_failed', [
-                'symbol' => $symbol,
-                'message' => $e->getMessage(),
-            ]);
-        }
-
-        // 2) Último recurso: proveedor directo.
-        try {
-            $price = $this->priceService->getPrice(new PriceRequest($symbol));
-            $this->sendJson($price);
-        } catch (\Throwable $e) {
-            $this->logger->info('datalake.latest.provider_failed', [
+            $this->logger->info('datalake.latest.not_found', [
                 'symbol' => $symbol,
                 'message' => $e->getMessage(),
             ]);
             throw $e;
         }
+
+        $this->sendJson([
+            'symbol' => $quote['symbol'] ?? $symbol,
+            'close' => $quote['close'] ?? null,
+            'open' => $quote['open'] ?? null,
+            'high' => $quote['high'] ?? null,
+            'low' => $quote['low'] ?? null,
+            'previous_close' => $quote['previous_close'] ?? $quote['previousClose'] ?? null,
+            'currency' => $quote['currency'] ?? null,
+            'asOf' => $quote['asOf'] ?? $quote['as_of'] ?? null,
+            'source' => $quote['source'] ?? $quote['provider'] ?? 'datalake',
+        ]);
     }
 
     /**
@@ -1611,7 +743,11 @@ HTML;
      */
     private function handlePredictionRunMe(\FinHub\Domain\User\User $user, string $traceId): void
     {
+        $symbols = $this->portfolioService->listSymbols($user->getId());
+        $readiness = $this->dataReadinessService->ensureSeriesReady($symbols, '6m', 120, 2);
+        $this->logReadinessWarnings('analytics.prediction.run_user', $readiness, $user->getId());
         $result = $this->predictionService->runForUser($user->getId());
+        $result = $this->attachReadinessWarnings($result, $readiness);
         $status = $result['status'] === 'running' ? 202 : ($result['status'] === 'failed' ? 500 : 200);
         $this->logger->info('analytics.prediction.run_user', [
             'trace_id' => $traceId,
@@ -1628,6 +764,196 @@ HTML;
     {
         $result = $this->predictionService->latestForUser($user->getId());
         $this->sendJson($result);
+    }
+
+    /**
+     * Devuelve trending de prediction markets (Yahoo Finance) con deltas.
+     */
+    private function handlePredictionTrending(): void
+    {
+        $result = $this->predictionMarketService->getTrending();
+        $payload = [
+            'as_of' => $result['as_of'] ?? null,
+            'items' => $result['items'] ?? [],
+            'cache' => $result['cache'] ?? null,
+            'previous_snapshot' => $result['previous_snapshot'] ?? null,
+        ];
+        $this->sendJson($payload);
+    }
+
+    private function handleOpenRouterModels(): void
+    {
+        $cacheFile = dirname(__DIR__, 2) . '/storage/openrouter_models.json';
+        $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
+        if (file_exists($cacheFile)) {
+            $content = json_decode((string) file_get_contents($cacheFile), true);
+            if (is_array($content) && ($content['date'] ?? '') === $today && isset($content['data'])) {
+                $this->sendJson(['data' => $content['data'], 'cache' => true]);
+                return;
+            }
+        }
+        $raw = $this->openRouterClient->listModels();
+        $items = $this->filterAndSortModels($raw['data'] ?? []);
+        @file_put_contents($cacheFile, json_encode(['date' => $today, 'data' => $items]));
+        $this->sendJson(['data' => $items, 'cache' => false]);
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $models
+     * @return array<int,array<string,mixed>>
+     */
+    private function filterAndSortModels(array $models): array
+    {
+        $filtered = array_values(array_filter($models, static function ($m) {
+            $id = (string) ($m['id'] ?? '');
+            return $id !== '' && str_ends_with($id, ':free');
+        }));
+        usort($filtered, static function ($a, $b) {
+            $ra = (bool) ($a['supports_reasoning'] ?? false);
+            $rb = (bool) ($b['supports_reasoning'] ?? false);
+            if ($ra !== $rb) return $ra ? -1 : 1;
+            $cla = (int) ($a['context_length'] ?? 0);
+            $clb = (int) ($b['context_length'] ?? 0);
+            if ($cla !== $clb) return $clb <=> $cla;
+            $va = (bool) ($a['supports_vision'] ?? false);
+            $vb = (bool) ($b['supports_vision'] ?? false);
+            if ($va !== $vb) return $va ? -1 : 1;
+            $ta = (bool) preg_match('/turbo|distill/i', (string) ($a['id'] ?? ''));
+            $tb = (bool) preg_match('/turbo|distill/i', (string) ($b['id'] ?? ''));
+            if ($ta !== $tb) return $ta ? 1 : -1; // no-turbo first
+            return strcmp((string) ($a['id'] ?? ''), (string) ($b['id'] ?? ''));
+        });
+        return array_map(static function ($m) {
+            return [
+                'id' => (string) ($m['id'] ?? ''),
+                'context_length' => $m['context_length'] ?? null,
+                'supports_reasoning' => (bool) ($m['supports_reasoning'] ?? false),
+                'supports_vision' => (bool) ($m['supports_vision'] ?? false),
+            ];
+        }, $filtered);
+    }
+
+    private function handleLlmModels(): void
+    {
+        $result = $this->moonshotClient->listModels();
+        $this->sendJson($result);
+    }
+
+    private function handleLlmRadarAnalyze(\FinHub\Domain\User\User $user): void
+    {
+        $payload = $this->parseJsonBody();
+        $model = (string) ($payload['model'] ?? 'kimi-k2-thinking');
+        $risk = (string) ($payload['risk_profile'] ?? 'moderado');
+        $note = trim((string) ($payload['note'] ?? ''));
+        $baseCurrency = $this->portfolioService->getBaseCurrency($user->getId());
+        $symbols = $this->portfolioService->listSymbols($user->getId());
+        if (empty($symbols)) {
+            throw new \RuntimeException('El portafolio no tiene tickers para analizar', 422);
+        }
+
+        $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
+        $cacheDir = dirname(__DIR__, 2) . '/storage/radar_reports';
+        if (!is_dir($cacheDir)) {
+            @mkdir($cacheDir, 0775, true);
+        }
+        $cacheFile = $cacheDir . '/user-' . $user->getId() . '-' . $today . '.json';
+        if (file_exists($cacheFile)) {
+            $cached = json_decode((string) file_get_contents($cacheFile), true);
+            if (is_array($cached) && isset($cached['raw_text'])) {
+                $this->sendJson($cached + ['cache' => true]);
+                return;
+            }
+        }
+
+        $systemPrompt = implode("\n", [
+            'Sos trader y analista financiero senior. Analiza el portafolio del usuario autenticado.',
+            'Para cada ticker decide: buy / hold / sell.',
+            'Devuelve JSON con clave \"analysis\": array de {symbol, decision, confidence_pct, horizon_days, thesis, catalysts, risks, toast}.',
+            'Usá español conciso, máximo 3 bullets por sección. Si falta data reciente, menciónalo en risks.',
+        ]);
+
+        $userPrompt = sprintf(
+            'Perfil de riesgo: %s. Moneda base: %s. Analiza y decide para: %s.%s',
+            $risk ?: 'moderado',
+            $baseCurrency ?: 'ARS',
+            implode(', ', $symbols),
+            $note !== '' ? ' Nota del usuario: ' . $note : ''
+        );
+
+        $messages = [
+            ['role' => 'system', 'content' => $systemPrompt],
+            ['role' => 'user', 'content' => $userPrompt],
+        ];
+
+        $models = $this->resolveModelList($payload);
+        $lastError = null;
+        foreach ($models as $candidateModel) {
+            try {
+                $raw = $this->openRouterClient->chat($messages, $candidateModel, ['temperature' => 0.35]);
+                $content = (string) ($raw['choices'][0]['message']['content'] ?? '');
+                $decoded = json_decode($content, true);
+                $response = [
+                    'model' => $candidateModel,
+                    'symbols' => $symbols,
+                    'raw_text' => $content,
+                    'analysis' => is_array($decoded) ? $decoded : null,
+                    'cache' => false,
+                ];
+                @file_put_contents($cacheFile, json_encode($response));
+                $this->sendJson($response);
+                return;
+            } catch (\Throwable $e) {
+                $code = (int) ($e->getCode() ?: 500);
+                if (in_array($code, [429, 402])) {
+                    $lastError = $e;
+                    continue;
+                }
+                throw $e;
+            }
+        }
+        throw $lastError ?? new \RuntimeException('No se pudo obtener respuesta del LLM', 502);
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     * @return array<int,string>
+     */
+    private function resolveModelList(array $payload): array
+    {
+        $preferred = (string) ($payload['model'] ?? '');
+        $models = [];
+        try {
+            $models = $this->handleOpenRouterModelsInternal();
+        } catch (\Throwable $e) {
+            $this->logger->info('openrouter.models.fetch_failed', ['message' => $e->getMessage()]);
+        }
+        $ids = array_map(fn ($m) => (string) ($m['id'] ?? ''), $models);
+        if ($preferred !== '' && !in_array($preferred, $ids, true)) {
+            array_unshift($ids, $preferred);
+        }
+        if (empty($ids)) {
+            $ids = [$preferred !== '' ? $preferred : 'openrouter/auto'];
+        }
+        return array_values(array_filter($ids, fn ($id) => $id !== ''));
+    }
+
+    /**
+     * @return array<int,array<string,mixed>>
+     */
+    private function handleOpenRouterModelsInternal(): array
+    {
+        $cacheFile = dirname(__DIR__, 2) . '/storage/openrouter_models.json';
+        $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
+        if (file_exists($cacheFile)) {
+            $content = json_decode((string) file_get_contents($cacheFile), true);
+            if (is_array($content) && ($content['date'] ?? '') === $today && isset($content['data']) && is_array($content['data'])) {
+                return $content['data'];
+            }
+        }
+        $raw = $this->openRouterClient->listModels();
+        $items = $this->filterAndSortModels($raw['data'] ?? []);
+        @file_put_contents($cacheFile, json_encode(['date' => $today, 'data' => $items]));
+        return $items;
     }
 
     /**
@@ -1692,23 +1018,6 @@ HTML;
     }
 
     /**
-     * Normaliza símbolos separados por comas.
-     *
-     * @return array<int,string>
-     */
-    private function splitSymbols(string $input): array
-    {
-        $symbols = [];
-        $parts = preg_split('/,/', $input, -1, PREG_SPLIT_NO_EMPTY);
-        if (is_array($parts)) {
-            foreach ($parts as $p) {
-                $symbols[] = strtoupper(trim($p));
-            }
-        }
-        return array_values(array_filter(array_unique($symbols), static fn ($s) => $s !== ''));
-    }
-
-    /**
      * Ejecuta un backtest y devuelve el id.
      */
     private function handleBacktestRun(\FinHub\Domain\User\User $user): void
@@ -1761,6 +1070,8 @@ HTML;
             $user->getId()
         );
         try {
+            $readiness = $this->dataReadinessService->ensureBacktestReady($universe, $start, $end, 2);
+            $this->logReadinessWarnings('backtests.run', $readiness, $user->getId());
             $id = $this->backtestService->run($request);
             // Enlazar backtest a señales existentes del universo.
             try {
@@ -1772,7 +1083,8 @@ HTML;
                     'message' => $e->getMessage(),
                 ]);
             }
-            $this->sendJson(['id' => $id, 'status' => 'completed'], 201);
+            $payload = $this->attachReadinessWarnings(['id' => $id, 'status' => 'completed'], $readiness);
+            $this->sendJson($payload, 201);
         } catch (\Throwable $e) {
             $this->logger->error('backtest.run.error', [
                 'user_id' => $user->getId(),
@@ -1812,6 +1124,59 @@ HTML;
     {
         $trades = $this->backtestService->getTrades($id);
         $this->sendJson(['data' => $trades]);
+    }
+
+    /**
+     * Adjunta advertencias de readiness si corresponde.
+     *
+     * @param array<string,mixed> $payload
+     * @param array<string,mixed> $readiness
+     * @return array<string,mixed>
+     */
+    private function attachReadinessWarnings(array $payload, array $readiness): array
+    {
+        if (empty($readiness['warnings'])) {
+            return $payload;
+        }
+        $payload['warnings'] = $readiness['warnings'];
+        $payload['readiness'] = $this->compactReadiness($readiness);
+        return $payload;
+    }
+
+    /**
+     * @param array<string,mixed> $readiness
+     * @return array<string,mixed>
+     */
+    private function compactReadiness(array $readiness): array
+    {
+        $keys = ['ready', 'missing', 'period', 'min_points', 'max_age_days', 'start', 'end', 'attempts'];
+        $compact = [];
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $readiness)) {
+                $compact[$key] = $readiness[$key];
+            }
+        }
+        return $compact;
+    }
+
+    /**
+     * Registra en info si hubo advertencias de readiness.
+     *
+     * @param array<string,mixed> $readiness
+     */
+    private function logReadinessWarnings(string $context, array $readiness, ?int $userId = null): void
+    {
+        if (empty($readiness['warnings'])) {
+            return;
+        }
+        $this->logger->info('datalake.readiness.warning', [
+            'context' => $context,
+            'user_id' => $userId,
+            'ready' => $readiness['ready'] ?? null,
+            'missing' => $readiness['missing'] ?? null,
+            'warnings' => $readiness['warnings'],
+            'attempts' => $readiness['attempts'] ?? null,
+        ]);
     }
 
     private function requireUser(): \FinHub\Domain\User\User
