@@ -5,24 +5,30 @@ namespace FinHub\Application\Portfolio;
 
 use FinHub\Application\DataLake\DataLakeService;
 use FinHub\Infrastructure\Logging\LoggerInterface;
+use FinHub\Application\Cache\CacheInterface;
 
 /**
  * Arma un resumen del portafolio con precios y señales básicas persistiendo análisis en el Data Lake.
  */
 final class PortfolioSummaryService
 {
+    private const CACHE_TTL = 60; // segundos
+
     private PortfolioService $portfolioService;
     private DataLakeService $dataLakeService;
     private LoggerInterface $logger;
+    private CacheInterface $cache;
 
     public function __construct(
         PortfolioService $portfolioService,
         DataLakeService $dataLakeService,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        CacheInterface $cache
     ) {
         $this->portfolioService = $portfolioService;
         $this->dataLakeService = $dataLakeService;
         $this->logger = $logger;
+        $this->cache = $cache;
     }
 
     /**
@@ -31,6 +37,12 @@ final class PortfolioSummaryService
     public function summaryForUser(int $userId): array
     {
         $instruments = $this->portfolioService->listInstruments($userId);
+        $signature = $this->hashInstruments($instruments);
+        $cacheKey = sprintf('portfolio:summary:%d:%s', $userId, $signature);
+        $cached = $this->cache->get($cacheKey, null);
+        if (is_array($cached)) {
+            return $cached;
+        }
         $now = new \DateTimeImmutable();
         $result = [];
 
@@ -87,7 +99,19 @@ final class PortfolioSummaryService
             }
         }
 
+        $this->cache->set($cacheKey, $result, self::CACHE_TTL);
         return $result;
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $instruments
+     */
+    private function hashInstruments(array $instruments): string
+    {
+        if (empty($instruments)) {
+            return 'empty';
+        }
+        return substr(hash('sha256', json_encode($instruments)), 0, 16);
     }
 
     private function fetchQuote(string $especie): array

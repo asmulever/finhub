@@ -7,7 +7,81 @@ const state = {
   grouped: {},
   run: null,
   status: 'idle',
+  instruments: [],
   lastChartSymbol: '',
+  snapWarning: '',
+};
+
+// --- R2Lite helpers -------------------------------------------------------
+
+const guessCategory = (item) => {
+  const type = String(item?.type ?? '').toUpperCase();
+  const country = String(item?.country ?? '').toUpperCase();
+  const currency = String(item?.currency ?? '').toUpperCase();
+  const symbol = String(item?.symbol ?? item?.especie ?? '').toUpperCase();
+  if (type.includes('BOND') || type.includes('BONO')) return 'BONO';
+  if (type.includes('CEDEAR') || symbol.endsWith('D')) return 'CEDEAR';
+  if (country === 'AR' || currency === 'ARS') return 'ACCIONES_AR';
+  return 'MERCADO_GLOBAL';
+};
+
+const providerOrder = (category) => {
+  // Preferir históricos primero; rava queda como último precio de respaldo
+  if (category === 'MERCADO_GLOBAL') return ['twelvedata', 'alphavantage', 'rava'];
+  return ['twelvedata', 'alphavantage', 'rava'];
+};
+
+const fetchPortfolioInstruments = async () => {
+  const resp = await getJson('/portfolio/instruments');
+  const items = Array.isArray(resp?.data) ? resp.data : [];
+  state.instruments = items;
+  return items;
+};
+
+const ensureSnapshots = async (symbolsInput) => {
+  const items = state.instruments.length ? state.instruments : await fetchPortfolioInstruments();
+  const symbolsSet = new Set((symbolsInput && symbolsInput.length ? symbolsInput : items.map((i) => i.symbol || i.especie || '')).map((s) => String(s).toUpperCase()).filter(Boolean));
+  if (!symbolsSet.size) return { ok: false, details: [] };
+
+  const byCategory = {};
+  items.forEach((it) => {
+    const sym = String(it.symbol || it.especie || '').toUpperCase();
+    if (!symbolsSet.has(sym)) return;
+    const cat = guessCategory(it);
+    byCategory[cat] = byCategory[cat] || [];
+    byCategory[cat].push(sym);
+  });
+
+  const details = [];
+  let warning = '';
+  for (const [category, symbols] of Object.entries(byCategory)) {
+    if (!symbols.length) continue;
+    const providers = providerOrder(category);
+    let success = false;
+    for (const provider of providers) {
+      const qs = encodeURIComponent(symbols.join(','));
+      try {
+        const res = await getJson(`/r2lite/${provider}/daily?symbols=${qs}&category=${encodeURIComponent(category)}`);
+        details.push({ category, provider, count: res?.count ?? 0, symbols });
+        success = (res?.count ?? 0) > 0 || provider === 'rava';
+        if (provider === 'rava' && warning === '' && (res?.count ?? 0) <= 1) {
+          warning = 'Solo se obtuvo último precio (Rava), sin histórico suficiente para indicadores.';
+        }
+        if (success && provider !== 'rava') {
+          break; // ya tenemos histórico
+        }
+      } catch (error) {
+        console.info('[estadistica] R2Lite fallo', category, provider, error);
+        details.push({ category, provider, error: error?.error?.message ?? 'error', symbols });
+      }
+    }
+    if (!success && warning === '') {
+      warning = 'No se pudo obtener histórico; se intentó múltiple proveedor y falló.';
+    }
+  }
+  state.snapWarning = warning;
+  const ok = details.every((d) => !d.error);
+  return { ok, details };
 };
 
 const setStatus = (msg, type = '') => {
@@ -130,7 +204,20 @@ const showAnalysisOverlay = (message, redirect = false) => {
 };
 
 const fetchLatest = async () => {
+  setStatus('Preparando datos (R2Lite)...', 'info');
+  // Garantizar snapshots previos para los símbolos del portafolio
+  const ingest = await ensureSnapshots();
+  if (!ingest.ok) {
+    setStatus('No se pudieron preparar snapshots (R2Lite)', 'error');
+    setBadges('Error ingestando', 'n/a', '#ef4444');
+    return;
+  }
+  if (state.snapWarning) {
+    setStatus(state.snapWarning, 'info');
+  }
+  setBadges('Snapshots OK', 'n/a', '#22c55e');
   setStatus('Cargando predicciones...', 'info');
+
   const resp = await getJson('/analytics/predictions/latest');
   const status = resp?.status ?? 'unknown';
   state.status = status;
@@ -164,6 +251,18 @@ const fetchLatest = async () => {
 };
 
 const triggerRun = async (redirectAfter = false) => {
+  // Preparar snapshots antes de lanzar el run
+  setStatus('Preparando snapshots (R2Lite)...', 'info');
+  const ingest = await ensureSnapshots();
+  if (!ingest.ok) {
+    setStatus('No se pudieron preparar snapshots (R2Lite)', 'error');
+    setBadges('Error ingestando', 'n/a', '#ef4444');
+    return;
+  }
+  if (state.snapWarning) {
+    setStatus(state.snapWarning, 'info');
+  }
+  setBadges('Snapshots OK', 'n/a', '#22c55e');
   const resp = await postJson('/analytics/predictions/run/me', {});
   const status = resp?.status ?? 'unknown';
   const runId = resp?.run_id ?? resp?.run?.id ?? null;
@@ -476,6 +575,8 @@ const openChart = async (symbol) => {
   const entry = state.grouped[symbol] ?? {};
   const especie = (entry.especie || state.speciesMap[symbol] || symbol).toUpperCase();
   const period = days === null ? '12m' : (days <= 30 ? '1m' : (days <= 90 ? '3m' : '6m'));
+  // Asegurar snapshot para el símbolo antes de leer del Data Lake
+  await ensureSnapshots([especie]);
   const resp = await getJson(`/datalake/prices/series?symbol=${encodeURIComponent(especie)}&period=${encodeURIComponent(period)}`);
   const points = Array.isArray(resp?.points) ? resp.points : [];
   const parsed = points.map((p) => {

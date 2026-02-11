@@ -10,7 +10,6 @@ use FinHub\Application\Portfolio\PortfolioSummaryService;
 use FinHub\Application\Portfolio\PortfolioHeatmapService;
 use FinHub\Application\Analytics\PredictionService;
 use FinHub\Application\LLM\OpenRouterClient;
-use FinHub\Application\LLM\MoonshotClient;
 use FinHub\Application\DataLake\DataLakeService;
 use FinHub\Application\DataLake\InstrumentCatalogService;
 use FinHub\Application\Ingestion\DataReadinessService;
@@ -18,6 +17,7 @@ use FinHub\Application\MarketData\RavaViewsService;
 use FinHub\Application\Signals\SignalService;
 use FinHub\Application\Backtest\BacktestRequest;
 use FinHub\Application\Backtest\BacktestService;
+use FinHub\Application\Cache\CacheInterface;
 use FinHub\Domain\User\UserRepositoryInterface;
 use FinHub\Infrastructure\Config\Config;
 use FinHub\Infrastructure\Logging\LoggerInterface;
@@ -29,6 +29,7 @@ final class ApiDispatcher
 {
     private Config $config;
     private LoggerInterface $logger;
+    private string $objectStore;
     private AuthService $authService;
     private ActivationService $activationService;
     private UserRepositoryInterface $userRepository;
@@ -39,7 +40,6 @@ final class ApiDispatcher
     private PortfolioHeatmapService $portfolioHeatmapService;
     private PredictionService $predictionService;
     private \FinHub\Application\Analytics\PredictionMarketService $predictionMarketService;
-    private MoonshotClient $moonshotClient;
     private OpenRouterClient $openRouterClient;
     private DataLakeService $dataLakeService;
     private InstrumentCatalogService $instrumentCatalogService;
@@ -48,8 +48,11 @@ final class ApiDispatcher
     private DataReadinessService $dataReadinessService;
     private BacktestService $backtestService;
     private UserDeletionService $userDeletionService;
+    private CacheInterface $cache;
     /** Rutas base deben terminar sin barra final. */
     private string $apiBase;
+    private const RADAR_ANALYSIS_TTL = 86400; // 24h
+    private const RADAR_MODELS_TTL = 600;     // 10m
 
     public function __construct(
         Config $config,
@@ -64,7 +67,6 @@ final class ApiDispatcher
         PortfolioHeatmapService $portfolioHeatmapService,
         PredictionService $predictionService,
         \FinHub\Application\Analytics\PredictionMarketService $predictionMarketService,
-        MoonshotClient $moonshotClient,
         OpenRouterClient $openRouterClient,
         DataLakeService $dataLakeService,
         InstrumentCatalogService $instrumentCatalogService,
@@ -72,11 +74,13 @@ final class ApiDispatcher
         SignalService $signalService,
         DataReadinessService $dataReadinessService,
         UserDeletionService $userDeletionService,
-        BacktestService $backtestService
+        BacktestService $backtestService,
+        CacheInterface $cache
     )
     {
         $this->config = $config;
         $this->logger = $logger;
+        $this->objectStore = rtrim($config->get('OBJECT_STORE_PATH', '/var/www/html/storage/object_store'), '/');
         $this->apiBase = rtrim($config->get('API_BASE_PATH', '/api'), '/');
         $this->authService = $authService;
         $this->activationService = $activationService;
@@ -88,7 +92,6 @@ final class ApiDispatcher
         $this->portfolioHeatmapService = $portfolioHeatmapService;
         $this->predictionService = $predictionService;
         $this->predictionMarketService = $predictionMarketService;
-        $this->moonshotClient = $moonshotClient;
         $this->openRouterClient = $openRouterClient;
         $this->dataLakeService = $dataLakeService;
         $this->instrumentCatalogService = $instrumentCatalogService;
@@ -97,6 +100,7 @@ final class ApiDispatcher
         $this->dataReadinessService = $dataReadinessService;
         $this->backtestService = $backtestService;
         $this->userDeletionService = $userDeletionService;
+        $this->cache = $cache;
     }
 
     /**
@@ -112,6 +116,7 @@ final class ApiDispatcher
             return;
         }
         $path = $this->getRoutePath($uri);
+        error_log(sprintf('api.route method=%s uri=%s path=%s base=%s', $method, $uri, $path, $this->apiBase));
         try {
             $this->route($method, $path, $traceId);
         } catch (\Throwable $throwable) {
@@ -128,6 +133,18 @@ final class ApiDispatcher
         if ($method === 'GET' && $path === '/health') {
             $this->sendJson(['status' => 'ok', 'trace_id' => $traceId]);
             return;
+        }
+        // Object store (R2Lite UI "Storage")
+        if ($method === 'GET' && $path === '/objects') {
+            $this->handleObjectList();
+            return;
+        }
+        if (preg_match('#^/objects/(.+)$#', $path, $m) === 1) {
+            $key = $m[1];
+            if ($method === 'HEAD') { $this->handleObjectHead($key); return; }
+            if ($method === 'GET')  { $this->handleObjectGet($key); return; }
+            if ($method === 'PUT')  { $this->handleObjectPut($key); return; }
+            if ($method === 'DELETE') { $this->handleObjectDelete($key); return; }
         }
         if ($method === 'GET' && $path === '/status') {
             $this->sendJson([
@@ -835,8 +852,16 @@ HTML;
 
     private function handleLlmModels(): void
     {
-        $result = $this->moonshotClient->listModels();
-        $this->sendJson($result);
+        $cacheKey = 'radar:models:list';
+        $cached = $this->cache->get($cacheKey, null);
+        if (is_array($cached)) {
+            $this->sendJson($cached + ['cache' => true]);
+        }
+        $result = $this->openRouterClient->listModels();
+        $filtered = $this->filterAndSortModels($result['data'] ?? []);
+        $payload = ['data' => $filtered];
+        $this->cache->set($cacheKey, $payload, self::RADAR_MODELS_TTL);
+        $this->sendJson($payload);
     }
 
     private function handleLlmRadarAnalyze(\FinHub\Domain\User\User $user): void
@@ -851,18 +876,22 @@ HTML;
             throw new \RuntimeException('El portafolio no tiene tickers para analizar', 422);
         }
 
-        $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
-        $cacheDir = dirname(__DIR__, 2) . '/storage/radar_reports';
-        if (!is_dir($cacheDir)) {
-            @mkdir($cacheDir, 0775, true);
-        }
-        $cacheFile = $cacheDir . '/user-' . $user->getId() . '-' . $today . '.json';
-        if (file_exists($cacheFile)) {
-            $cached = json_decode((string) file_get_contents($cacheFile), true);
-            if (is_array($cached) && isset($cached['raw_text'])) {
-                $this->sendJson($cached + ['cache' => true]);
-                return;
-            }
+        $portfolioHash = substr(hash('sha256', implode(',', $symbols)), 0, 16);
+        $noteHash = $note !== '' ? substr(hash('sha256', $note), 0, 16) : 'none';
+        $riskKey = $risk !== '' ? $risk : 'moderado';
+        $modelKey = $model !== '' ? $model : 'auto';
+        $cacheKey = sprintf(
+            'radar:analysis:user:%d:%s:%s:%s:%s',
+            $user->getId(),
+            $riskKey,
+            $modelKey,
+            $portfolioHash,
+            $noteHash
+        );
+        $cached = $this->cache->get($cacheKey, null);
+        if (is_array($cached) && isset($cached['raw_text'])) {
+            $this->sendJson($cached + ['cache' => true]);
+            return;
         }
 
         $systemPrompt = implode("\n", [
@@ -899,7 +928,7 @@ HTML;
                     'analysis' => is_array($decoded) ? $decoded : null,
                     'cache' => false,
                 ];
-                @file_put_contents($cacheFile, json_encode($response));
+                $this->cache->set($cacheKey, $response, self::RADAR_ANALYSIS_TTL);
                 $this->sendJson($response);
                 return;
             } catch (\Throwable $e) {
@@ -1015,6 +1044,29 @@ HTML;
         }
 
         return $decoded;
+    }
+
+    /**
+     * Parsea symbols desde querystring (csv o repetidos).
+     * @return array<int,string>
+     */
+    private function parseSymbolsQuery(): array
+    {
+        $symbolsParam = $_GET['symbols'] ?? '';
+        $symbols = [];
+        if (is_array($symbolsParam)) {
+            $symbols = $symbolsParam;
+        } else {
+            $symbols = preg_split('/[,\\s]+/', (string) $symbolsParam, -1, PREG_SPLIT_NO_EMPTY);
+        }
+        $clean = [];
+        foreach ($symbols as $s) {
+            $v = strtoupper(trim((string) $s));
+            if ($v !== '') {
+                $clean[$v] = true;
+            }
+        }
+        return array_keys($clean);
     }
 
     /**
@@ -1179,6 +1231,131 @@ HTML;
         ]);
     }
 
+    // ---------------------------------------------------------------------
+    // Object store (mini S3 local para R2Lite UI)
+    // ---------------------------------------------------------------------
+    private function sanitizeObjectKey(string $raw): string
+    {
+        $raw = str_replace('\\', '/', trim($raw));
+        if ($raw === '') {
+            throw new \RuntimeException('Key requerida', 400);
+        }
+        if (str_starts_with($raw, '/') || str_contains($raw, '..')) {
+            throw new \RuntimeException('Key inválida', 400);
+        }
+        while (str_contains($raw, '//')) {
+            $raw = str_replace('//', '/', $raw);
+        }
+        if (strlen($raw) > 240) {
+            throw new \RuntimeException('Key demasiado larga', 400);
+        }
+        return $raw;
+    }
+
+    private function ensureObjectDir(string $path): void
+    {
+        $dir = dirname($path);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+    }
+
+    private function handleObjectList(): void
+    {
+        $limit = isset($_GET['limit']) ? max(1, min(500, (int) $_GET['limit'])) : 100;
+        $prefix = isset($_GET['prefix']) ? trim((string) $_GET['prefix']) : '';
+        $items = [];
+        if (!is_dir($this->objectStore)) {
+            @mkdir($this->objectStore, 0775, true);
+        }
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($this->objectStore, \FilesystemIterator::SKIP_DOTS)
+        );
+        foreach ($iterator as $fileInfo) {
+            if (!$fileInfo->isFile()) {
+                continue;
+            }
+            $rel = substr($fileInfo->getPathname(), strlen($this->objectStore) + 1);
+            $rel = str_replace('\\', '/', $rel);
+            if ($prefix !== '' && !str_starts_with($rel, $prefix)) {
+                continue;
+            }
+            $items[] = [
+                'key' => $rel,
+                'size' => $fileInfo->getSize(),
+                'mime_type' => $finfo->file($fileInfo->getPathname()) ?: 'application/octet-stream',
+                'etag' => md5_file($fileInfo->getPathname()) ?: '',
+                'created_at' => date(DATE_ATOM, $fileInfo->getMTime()),
+            ];
+            if (count($items) >= $limit) {
+                break;
+            }
+        }
+        $this->sendJson(['objects' => $items, 'count' => count($items)]);
+    }
+
+    private function handleObjectHead(string $key): void
+    {
+        $key = $this->sanitizeObjectKey($key);
+        $path = $this->objectStore . '/' . $key;
+        if (!is_file($path)) {
+            http_response_code(404);
+            return;
+        }
+        http_response_code(200);
+    }
+
+    private function handleObjectGet(string $key): void
+    {
+        $key = $this->sanitizeObjectKey($key);
+        $path = $this->objectStore . '/' . $key;
+        if (!is_file($path)) {
+            throw new \RuntimeException('Objeto no encontrado', 404);
+        }
+        $mime = mime_content_type($path) ?: 'application/octet-stream';
+        header('Content-Type: ' . $mime);
+        header('Content-Length: ' . filesize($path));
+        readfile($path);
+        exit;
+    }
+
+    private function handleObjectPut(string $key): void
+    {
+        $key = $this->sanitizeObjectKey($key);
+        $path = $this->objectStore . '/' . $key;
+        if (is_file($path)) {
+            throw new \RuntimeException('Objeto ya existe', 409);
+        }
+        $contentLength = isset($_SERVER['CONTENT_LENGTH']) ? (int) $_SERVER['CONTENT_LENGTH'] : 0;
+        if ($contentLength > 6 * 1024 * 1024) { // 6MB guard-rail
+            throw new \RuntimeException('Payload demasiado grande', 413);
+        }
+        $this->ensureObjectDir($path);
+        $data = file_get_contents('php://input');
+        if ($data === false) {
+            throw new \RuntimeException('No se pudo leer payload', 400);
+        }
+        $bytes = file_put_contents($path, $data);
+        if ($bytes === false) {
+            throw new \RuntimeException('No se pudo escribir objeto', 500);
+        }
+        $this->sendJson(['status' => 'created', 'key' => $key], 201);
+    }
+
+    private function handleObjectDelete(string $key): void
+    {
+        $key = $this->sanitizeObjectKey($key);
+        $path = $this->objectStore . '/' . $key;
+        if (!is_file($path)) {
+            throw new \RuntimeException('Objeto no encontrado', 404);
+        }
+        if (!@unlink($path)) {
+            throw new \RuntimeException('No se pudo borrar', 500);
+        }
+        http_response_code(204);
+    }
+
     private function requireUser(): \FinHub\Domain\User\User
     {
         $payload = $this->requireAuthPayload();
@@ -1279,11 +1456,15 @@ HTML;
         $code = (int) $throwable->getCode();
         $status = $code >= 100 && $code < 600 ? $code : 500;
         $message = $status === 404 ? 'not_found' : 'unexpected_error';
+        $method = $_SERVER['REQUEST_METHOD'] ?? '';
+        $uri = $_SERVER['REQUEST_URI'] ?? '';
         $payload = [
             'error' => [
                 'code' => $message,
                 'message' => $throwable->getMessage(),
                 'trace_id' => $traceId,
+                'method' => $method,
+                'uri' => $uri,
             ],
         ];
         $this->sendJson($payload, $status);

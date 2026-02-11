@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace FinHub\Application\DataLake;
 
 use FinHub\Infrastructure\Logging\LoggerInterface;
+use FinHub\Application\R2Lite\R2LiteService;
 
 /**
  * Casos de uso de Data Lake: ingesta, lectura de último precio y series.
@@ -13,20 +14,25 @@ final class DataLakeService
     private PriceSnapshotRepositoryInterface $repository;
     private LoggerInterface $logger;
     private int $batchSize;
+    private R2LiteService $r2lite;
 
     public function __construct(
         PriceSnapshotRepositoryInterface $repository,
         LoggerInterface $logger,
-        int $batchSize = 10
+        int $batchSize = 10,
+        ?R2LiteService $r2lite = null
     ) {
         $this->repository = $repository;
         $this->logger = $logger;
         $this->batchSize = $batchSize > 0 ? $batchSize : 10;
+        $this->r2lite = $r2lite ?? throw new \RuntimeException('R2LiteService requerido');
     }
 
     public function collect(array $symbols): array
     {
-        throw new \RuntimeException('Recolección deshabilitada: proveedores externos removidos.', 501);
+        // Asumir categoría por símbolo? default CEDEAR/ACCIONES_AR requiere mapping externo.
+        $result = $this->r2lite->ensureSeries($symbols, 'ACCIONES_AR');
+        return $result;
     }
 
     public function latestQuote(string $symbol): array
@@ -162,8 +168,18 @@ final class DataLakeService
         };
     }
 
-    private function normalizeSnapshotPayload(array $payload, string $symbol, string $provider, string $asOf): array
+    private function normalizeSnapshotPayload(array|string $payload, string $symbol, string $provider, string $asOf): array
     {
+        // Si viene como string JSON desde la base, decodificar.
+        if (is_string($payload)) {
+            $decoded = json_decode($payload, true);
+            if (is_array($decoded)) {
+                $payload = $decoded;
+            } else {
+                $payload = [];
+            }
+        }
+
         // Si el payload es una lista (ej. EODHD devuelve array con un único elemento), tomar el primero.
         if (isset($payload[0]) && is_array($payload[0])) {
             $payload = $payload[0];

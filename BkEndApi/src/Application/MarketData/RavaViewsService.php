@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace FinHub\Application\MarketData;
 
+use FinHub\Application\Cache\CacheInterface;
 use FinHub\Infrastructure\Logging\LoggerInterface;
 
 /**
@@ -10,13 +11,18 @@ use FinHub\Infrastructure\Logging\LoggerInterface;
  */
 final class RavaViewsService
 {
+    private const TTL_CATALOG = 120; // segundos
+    private const TTL_DOLARES = 60;  // segundos
+
     private RavaViewsClientInterface $client;
     private LoggerInterface $logger;
+    private CacheInterface $cache;
 
-    public function __construct(RavaViewsClientInterface $client, LoggerInterface $logger)
+    public function __construct(RavaViewsClientInterface $client, LoggerInterface $logger, CacheInterface $cache)
     {
         $this->client = $client;
         $this->logger = $logger;
+        $this->cache = $cache;
     }
 
     /**
@@ -26,6 +32,11 @@ final class RavaViewsService
      */
     public function fetchCatalog(): array
     {
+        $cached = $this->cache->get('rava:catalog', null);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
         try {
             $items = [];
             $items = array_merge($items, $this->normalizeAcciones($this->client->fetchAcciones()));
@@ -34,12 +45,14 @@ final class RavaViewsService
             $items = array_merge($items, $this->normalizeMercadosGlobales($this->client->fetchMercadosGlobales()));
 
             $counts = $this->countByCategory($items);
-            return [
+            $result = [
                 'items' => $items,
                 'count' => count($items),
                 'counts' => $counts,
                 'fetched_at' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
             ];
+            $this->cache->set('rava:catalog', $result, self::TTL_CATALOG);
+            return $result;
         } catch (\Throwable $e) {
             $this->logger->info('rava.catalog.fetch_failed', [
                 'message' => $e->getMessage(),
@@ -55,6 +68,11 @@ final class RavaViewsService
      */
     public function fetchDolares(): array
     {
+        $cached = $this->cache->get('rava:dolares', null);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
         try {
             $raw = $this->client->fetchDolares();
             $items = [];
@@ -67,11 +85,13 @@ final class RavaViewsService
                 }
             }
 
-            return [
+            $result = [
                 'items' => $items,
                 'count' => count($items),
                 'fetched_at' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
             ];
+            $this->cache->set('rava:dolares', $result, self::TTL_DOLARES);
+            return $result;
         } catch (\Throwable $e) {
             $this->logger->info('rava.dolares.fetch_failed', [
                 'message' => $e->getMessage(),

@@ -6,6 +6,7 @@ namespace FinHub\Infrastructure\Config;
 use FinHub\Infrastructure\Config\Config;
 use FinHub\Infrastructure\Config\Container;
 use FinHub\Infrastructure\Logging\FileLogger;
+use FinHub\Infrastructure\Logging\LoggerInterface;
 use FinHub\Application\Backtest\BacktestService;
 use FinHub\Application\Auth\ActivationService;
 use FinHub\Application\Portfolio\PortfolioService;
@@ -15,7 +16,6 @@ use FinHub\Application\Signals\SignalService;
 use FinHub\Application\DataLake\DataLakeService;
 use FinHub\Application\DataLake\InstrumentCatalogService;
 use FinHub\Application\LLM\OpenRouterClient;
-use FinHub\Application\LLM\MoonshotClient;
 use FinHub\Application\Analytics\PredictionService;
 use FinHub\Application\Analytics\PredictionMarketService;
 use FinHub\Application\Analytics\PredictionMarketFetcherInterface;
@@ -24,9 +24,17 @@ use FinHub\Application\Ingestion\DataReadinessService;
 use FinHub\Application\MarketData\RavaViewsService;
 use FinHub\Infrastructure\Security\JwtTokenProvider;
 use FinHub\Infrastructure\Security\PasswordHasher;
+use FinHub\Application\Cache\CacheInterface;
+use FinHub\Infrastructure\Cache\RedisCache;
+use FinHub\Infrastructure\Cache\NullCache;
+use FinHub\Infrastructure\R2Lite\R2LiteAuditLogger;
 use FinHub\Infrastructure\Portfolio\PdoPortfolioRepository;
-use FinHub\Infrastructure\DataLake\NullPriceSnapshotRepository;
+use FinHub\Infrastructure\DataLake\PdoPriceSnapshotRepository;
 use FinHub\Infrastructure\DataLake\PdoInstrumentCatalogRepository;
+use FinHub\Application\R2Lite\R2LiteService;
+use FinHub\Infrastructure\R2Lite\Provider\RavaProvider;
+use FinHub\Infrastructure\R2Lite\Provider\TwelveDataProvider;
+use FinHub\Infrastructure\R2Lite\Provider\AlphaVantageProvider;
 use FinHub\Infrastructure\User\PdoUserRepository;
 use FinHub\Infrastructure\User\UserDeletionService;
 use FinHub\Infrastructure\Mail\BrevoMailSender;
@@ -80,6 +88,7 @@ final class ApplicationBootstrap
 
         $logPath = $this->normalizeLogPath($config->get('LOG_FILE_PATH'));
         $logger = new FileLogger($logPath, $config->get('LOG_LEVEL', 'info'));
+        [$cache, $redisClient] = $this->buildCache($config, $logger);
         $jwt = new JwtTokenProvider($config->require('JWT_SECRET'));
         $passwordHasher = new PasswordHasher();
         $userRepository = new PdoUserRepository($pdo);
@@ -89,12 +98,17 @@ final class ApplicationBootstrap
         $mailSender = new BrevoMailSender($config);
         $activationService = new ActivationService($userRepository, $passwordHasher, $jwt, $config, $mailSender);
         $portfolioRepository = new PdoPortfolioRepository($pdo);
-        $priceSnapshotRepository = new NullPriceSnapshotRepository();
+        $priceSnapshotRepository = new PdoPriceSnapshotRepository($pdo);
         $ingestBatchSize = (int) $config->get('DATALAKE_INGEST_BATCH_SIZE', 10);
+        $providers = $this->buildR2LiteProviders($config, $logger, $cache);
+        $auditPath = $config->get('R2LITE_AUDIT_LOG', $this->rootDir . '/storage/logs/r2lite_audit.log');
+        $auditLogger = new R2LiteAuditLogger($auditPath);
+        $r2LiteService = new R2LiteService($priceSnapshotRepository, $providers, $logger, $cache, $auditLogger);
         $dataLakeService = new DataLakeService(
             $priceSnapshotRepository,
             $logger,
-            $ingestBatchSize
+            $ingestBatchSize,
+            $r2LiteService
         );
         $openRouterClient = new OpenRouterClient(
             $config->require('OPENROUTER_API_KEY'),
@@ -103,32 +117,29 @@ final class ApplicationBootstrap
             $config->get('OPENROUTER_REFERER', 'https://finhub.local'),
             $config->get('OPENROUTER_TITLE', 'FinHub Radar')
         );
-        $moonshotClient = new MoonshotClient(
-            $config->require('MOONSHOT_API_KEY'),
-            $logger,
-            $config->get('MOONSHOT_BASE_URL', 'https://api.moonshot.ai/v1')
-        );
         $predictionMarketFetcher = new HttpYahooPredictionFetcher($logger);
         $predictionMarketRepository = new PdoPredictionMarketRepository($pdo, $logger);
         $predictionMarketService = new PredictionMarketService($predictionMarketFetcher, $predictionMarketRepository, $logger);
         $instrumentCatalogRepository = new PdoInstrumentCatalogRepository($pdo);
         $portfolioService = new PortfolioService($portfolioRepository);
         $ravaViewsClient = new RavaViewsClient($config);
-        $ravaViewsService = new RavaViewsService($ravaViewsClient, $logger);
+        $ravaViewsService = new RavaViewsService($ravaViewsClient, $logger, $cache);
         $instrumentCatalogService = new InstrumentCatalogService($instrumentCatalogRepository, $logger, $portfolioService);
-        $portfolioSummaryService = new PortfolioSummaryService($portfolioService, $dataLakeService, $logger);
-        $portfolioHeatmapService = new PortfolioHeatmapService($portfolioService, $portfolioSummaryService, $logger);
+        $portfolioSummaryService = new PortfolioSummaryService($portfolioService, $dataLakeService, $logger, $cache);
+        $portfolioHeatmapService = new PortfolioHeatmapService($portfolioService, $portfolioSummaryService, $logger, $cache);
         $predictionService = new PredictionService($predictionRepository, $predictionRunRepository, $portfolioService, $dataLakeService, $userRepository);
         $signalRepository = new PdoSignalRepository($pdo, $logger);
         $signalService = new SignalService($signalRepository, $dataLakeService, $logger);
         $backtestRepository = new PdoBacktestRepository($pdo, $logger);
         $backtestService = new BacktestService($backtestRepository, $logger);
-        $dataReadinessService = new DataReadinessService($logger);
+        $dataReadinessService = new DataReadinessService($logger, $r2LiteService);
 
         return new Container([
             'config' => $config,
             'pdo' => $pdo,
             'logger' => $logger,
+            'cache' => $cache,
+            'redis_client' => $redisClient,
             'jwt' => $jwt,
             'password_hasher' => $passwordHasher,
             'user_repository' => $userRepository,
@@ -150,14 +161,85 @@ final class ApplicationBootstrap
             'prediction_run_repository' => $predictionRunRepository,
             'signal_repository' => $signalRepository,
             'signal_service' => $signalService,
+            'r2lite_service' => $r2LiteService,
             'backtest_repository' => $backtestRepository,
             'backtest_service' => $backtestService,
             'datalake_service' => $dataLakeService,
             'openrouter_client' => $openRouterClient,
-            'moonshot_client' => $moonshotClient,
             'instrument_catalog_service' => $instrumentCatalogService,
             'data_readiness_service' => $dataReadinessService,
         ]);
+    }
+
+    /**
+     * Construye el cache táctico. Si falta configuración o Predis no está disponible, devuelve NullCache.
+     *
+     * @return array{0: CacheInterface, 1: mixed|null} [cache, redisClient|null]
+     */
+    private function buildCache(Config $config, LoggerInterface $logger): array
+    {
+        $host = $config->get('REDIS_HOST');
+        $port = $config->get('REDIS_PORT');
+        $password = $config->get('REDIS_API_KEY') ?? $config->get('REDIS_PASS') ?? $config->get('REDIS_PASSWORD');
+
+        if ($host === null || $host === '' || $port === null || $password === null || $password === '') {
+            return [new NullCache(), null];
+        }
+
+        $autoload = $this->rootDir . '/vendor/predis/predis/autoload.php';
+        if (!@file_exists($autoload)) {
+            $logger->warning('cache.redis.autoload_missing', ['path' => $autoload]);
+            return [new NullCache(), null];
+        }
+
+        require_once $autoload;
+
+        $scheme = $config->get('REDIS_SCHEME', 'tcp');
+        $username = $config->get('REDIS_USER') ?? null;
+        $db = (int) $config->get('REDIS_DB', 0);
+        $defaultTtl = (int) $config->get('CACHE_DEFAULT_TTL', 120);
+        $maxTtl = (int) $config->get('CACHE_MAX_TTL', 900);
+        $prefix = $config->get('CACHE_PREFIX', 'apb');
+
+        try {
+            $parameters = [
+                'scheme' => $scheme,
+                'host' => $host,
+                'port' => (int) $port,
+                'password' => $password,
+                'database' => $db,
+                'timeout' => 1.0,
+                'read_write_timeout' => 2.0,
+                'persistent' => true,
+            ];
+            if ($username !== null && $username !== '') {
+                $parameters['username'] = $username;
+            }
+
+            $client = new \Predis\Client($parameters);
+            $cache = new RedisCache($client, $logger, $prefix, $defaultTtl, $maxTtl);
+            return [$cache, $client];
+        } catch (\Throwable $e) {
+            $logger->warning('cache.redis.unavailable', [
+                'message' => $e->getMessage(),
+                'host' => $host,
+                'port' => $port,
+                'scheme' => $scheme,
+            ]);
+            return [new NullCache(), null];
+        }
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function buildR2LiteProviders(Config $config, LoggerInterface $logger, CacheInterface $cache): array
+    {
+        return [
+            'rava' => new RavaProvider($config, $logger, $cache),
+            'twelvedata' => new TwelveDataProvider($config, $logger, $cache),
+            'alphavantage' => new AlphaVantageProvider($config, $logger, $cache),
+        ];
     }
 
     /**

@@ -16,4 +16,6 @@ interface PriceSnapshotRepositoryInterface
     public function fetchCaptureGroups(string $group = 'minute'): array;
 
     public function fetchCaptures(string $bucket, string $group = 'minute', ?string $symbol = null): array;
+
+    public function purgeOlderThan(\DateTimeImmutable $threshold): int;
 }

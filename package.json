@@ -1,0 +1,11 @@
+{
+  "name": "finhub-r2lite",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "npx esbuild Frontend/paginas/*.js --bundle --format=esm --sourcemap --outdir=dist/paginas"
+  },
+  "devDependencies": {
+    "esbuild": "^0.19.0"
+  }
+}

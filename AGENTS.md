@@ -4,6 +4,7 @@ _hablame siempre en español.
 _no hagas commit automatico , siempre espera la peticion expresa.
 _siempre espera confirmacion expresa para hacer modificaciones.
 _no hagas ajustes sin confirmacion expresa.
+_apps_separadas: No mezclar código entre aplicaciones (BkEndApi y R2Lite/UI). Solo pueden comunicarse entre sí; mantienen código aislado aunque implique duplicar rutinas.
 
 Regla toolbar: todas las opciones actuales y futuras deben ser visibles y accesibles para usuarios finales, excepto el combo `providers-select` y la vista DataLake, que permanecen restringidos a administradores.
 

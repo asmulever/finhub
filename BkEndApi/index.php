@@ -25,9 +25,10 @@ $portfolioSummaryService = $container->get('portfolio_summary_service');
 $portfolioHeatmapService = $container->get('portfolio_heatmap_service');
 $predictionService = $container->get('prediction_service');
 $predictionMarketService = $container->get('prediction_market_service');
+$cache = $container->get('cache');
 $dataLakeService = $container->get('datalake_service');
+$r2liteService = $container->get('r2lite_service');
 $openRouterClient = $container->get('openrouter_client');
-$moonshotClient = $container->get('moonshot_client');
 $instrumentCatalogService = $container->get('instrument_catalog_service');
 $ravaViewsService = $container->get('rava_views_service');
 $userRepository = $container->get('user_repository');
@@ -54,7 +55,6 @@ $dispatcher = new ApiDispatcher(
     $portfolioHeatmapService,
     $predictionService,
     $predictionMarketService,
-    $moonshotClient,
     $openRouterClient,
     $dataLakeService,
     $instrumentCatalogService,
@@ -62,7 +62,8 @@ $dispatcher = new ApiDispatcher(
     $signalService,
     $dataReadinessService,
     $userDeletionService,
-    $backtestService
+    $backtestService,
+    $cache
 );
 $dispatcher->dispatch($traceId);
 

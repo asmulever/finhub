@@ -5,6 +5,7 @@ namespace FinHub\Application\Portfolio;
 
 use FinHub\Infrastructure\Logging\LoggerInterface;
 use FinHub\Application\Portfolio\PortfolioSummaryService;
+use FinHub\Application\Cache\CacheInterface;
 
 /**
  * Arma el payload de heatmap del portafolio con precios, FX y sector/industry.
@@ -12,18 +13,23 @@ use FinHub\Application\Portfolio\PortfolioSummaryService;
  */
 final class PortfolioHeatmapService
 {
+    private const CACHE_TTL = 120; // segundos
+
     private PortfolioService $portfolioService;
     private PortfolioSummaryService $portfolioSummaryService;
     private LoggerInterface $logger;
+    private CacheInterface $cache;
 
     public function __construct(
         PortfolioService $portfolioService,
         PortfolioSummaryService $portfolioSummaryService,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        CacheInterface $cache
     ) {
         $this->portfolioService = $portfolioService;
         $this->portfolioSummaryService = $portfolioSummaryService;
         $this->logger = $logger;
+        $this->cache = $cache;
     }
 
     /**
@@ -33,6 +39,12 @@ final class PortfolioHeatmapService
     {
         $baseCurrency = $this->portfolioService->getBaseCurrency($userId);
         $instruments = $this->portfolioService->listInstruments($userId);
+        $signature = $this->hashInstruments($instruments);
+        $cacheKey = sprintf('portfolio:heatmap:%d:%s:%s', $userId, $baseCurrency ?: 'BASE', $signature);
+        $cached = $this->cache->get($cacheKey, null);
+        if (is_array($cached)) {
+            return $cached;
+        }
         $uniqueSymbols = [];
         foreach ($instruments as $instrument) {
             $especie = strtoupper((string) ($instrument['especie'] ?? $instrument['symbol'] ?? ''));
@@ -176,7 +188,7 @@ final class PortfolioHeatmapService
 
         $asOf = $this->maxAsOf($items) ?? $now->format(DATE_ATOM);
 
-        return [
+        $result = [
             'account_id' => (string) $userId,
             'base_currency' => $baseCurrency,
             'as_of' => $asOf,
@@ -184,6 +196,8 @@ final class PortfolioHeatmapService
             'fx_at' => $fxMeta['fx_at'],
             'groups' => array_values($groups),
         ];
+        $this->cache->set($cacheKey, $result, self::CACHE_TTL);
+        return $result;
     }
 
     /**
@@ -273,5 +287,16 @@ final class PortfolioHeatmapService
         }
         $normalized = str_replace(',', '.', (string) $value);
         return is_numeric($normalized) ? (float) $normalized : null;
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $instruments
+     */
+    private function hashInstruments(array $instruments): string
+    {
+        if (empty($instruments)) {
+            return 'empty';
+        }
+        return substr(hash('sha256', json_encode($instruments)), 0, 16);
     }
 }

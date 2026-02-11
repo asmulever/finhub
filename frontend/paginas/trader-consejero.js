@@ -7,12 +7,69 @@ const state = {
   signals: [],
   selected: null,
   lastChartSymbol: '',
+  instruments: [],
   chartControls: {
     start: null,
     end: null,
     preset: '1y',
     touchZoom: false,
   },
+};
+
+// --- R2Lite helpers -------------------------------------------------------
+
+const guessCategory = (item) => {
+  const type = String(item?.type ?? '').toUpperCase();
+  const country = String(item?.country ?? '').toUpperCase();
+  const currency = String(item?.currency ?? '').toUpperCase();
+  const symbol = String(item?.symbol ?? item?.especie ?? '').toUpperCase();
+  if (type.includes('BOND') || type.includes('BONO')) return 'BONO';
+  if (type.includes('CEDEAR') || symbol.endsWith('D')) return 'CEDEAR';
+  if (country === 'AR' || currency === 'ARS') return 'ACCIONES_AR';
+  return 'MERCADO_GLOBAL';
+};
+
+const providerFor = (category) => {
+  if (category === 'MERCADO_GLOBAL') return 'twelvedata';
+  return 'rava';
+};
+
+const fetchPortfolioInstruments = async () => {
+  const resp = await getJson('/portfolio/instruments');
+  const items = Array.isArray(resp?.data) ? resp.data : [];
+  state.instruments = items;
+  return items;
+};
+
+const ensureSnapshots = async (symbolsInput) => {
+  const items = state.instruments.length ? state.instruments : await fetchPortfolioInstruments();
+  const symbolsSet = new Set((symbolsInput && symbolsInput.length ? symbolsInput : items.map((i) => i.symbol || i.especie || '')).map((s) => String(s).toUpperCase()).filter(Boolean));
+  if (!symbolsSet.size) return { ok: false, details: [] };
+
+  const byCategory = {};
+  items.forEach((it) => {
+    const sym = String(it.symbol || it.especie || '').toUpperCase();
+    if (!symbolsSet.has(sym)) return;
+    const cat = guessCategory(it);
+    byCategory[cat] = byCategory[cat] || [];
+    byCategory[cat].push(sym);
+  });
+
+  const details = [];
+  for (const [category, symbols] of Object.entries(byCategory)) {
+    const provider = providerFor(category);
+    if (!symbols.length) continue;
+    const qs = encodeURIComponent(symbols.join(','));
+    try {
+      const res = await getJson(`/r2lite/${provider}/daily?symbols=${qs}&category=${encodeURIComponent(category)}`);
+      details.push({ category, provider, count: res?.count ?? 0, symbols });
+    } catch (error) {
+      console.info('[trader-consejero] R2Lite fallo', category, error);
+      details.push({ category, provider, error: error?.error?.message ?? 'error', symbols });
+    }
+  }
+  const ok = details.every((d) => !d.error);
+  return { ok, details };
 };
 
 const formatPct = (v, digits = 2) => (Number.isFinite(v) ? `${(v * 100).toFixed(digits)}%` : '—');
@@ -334,6 +391,8 @@ const openChart = async (signal) => {
 
   let series = Array.isArray(signal.series_json) ? signal.series_json : [];
   if (!series.length) {
+    // Si no hay serie embebida, primero asegurar snapshot para el símbolo, luego leer DataLake.
+    await ensureSnapshots([signal.especie || signal.symbol]);
     const preset = state.chartControls.preset;
     const period = preset === 'custom' ? '12m' : (preset === 'all' ? '12m' : preset);
     const resp = await getJson(`/datalake/prices/series?symbol=${encodeURIComponent(signal.especie || signal.symbol)}&period=${period}`);
@@ -432,6 +491,13 @@ const closeOverlay = () => {
 const fetchSignals = async ({ force = false, collect = false } = {}) => {
   const label = force ? 'Recalculando tendencias...' : 'Cargando señales...';
   setStatus(label, 'info');
+  // Ingesta previa con R2Lite para los símbolos actuales del portafolio
+  const ingest = await ensureSnapshots();
+  if (!ingest.ok) {
+    setStatus('No se pudieron preparar snapshots (R2Lite)', 'error');
+    return;
+  }
+
   const buildQuery = (opts) => {
     const params = [];
     if (opts.force) params.push('force=1');

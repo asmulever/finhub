@@ -3,18 +3,21 @@ declare(strict_types=1);
 
 namespace FinHub\Application\Ingestion;
 
+use FinHub\Application\R2Lite\R2LiteService;
 use FinHub\Infrastructure\Logging\LoggerInterface;
 
 /**
- * Stub: disponibilidad de datos marcada como lista tras eliminar R2Lite.
+ * Verifica y dispara ingesta de series vía R2Lite.
  */
 final class DataReadinessService
 {
     private LoggerInterface $logger;
+    private R2LiteService $r2lite;
 
-    public function __construct(LoggerInterface $logger)
+    public function __construct(LoggerInterface $logger, R2LiteService $r2lite)
     {
         $this->logger = $logger;
+        $this->r2lite = $r2lite;
     }
 
     /**
@@ -24,13 +27,11 @@ final class DataReadinessService
     public function ensureSeriesReady(array $symbols, string $period, int $minPoints, int $maxAgeDays = 2): array
     {
         $symbols = $this->normalizeSymbols($symbols);
-        $this->logger->info('data_readiness.stub.ensure_series', ['symbols' => $symbols]);
-        return [
+        $attempts = $this->r2lite->ensureSeries($symbols, 'ACCIONES_AR');
+        return $attempts + [
             'ready' => true,
             'missing' => [],
-            'details' => [],
             'warnings' => [],
-            'attempts' => [],
             'start' => null,
             'end' => null,
             'max_age_days' => $maxAgeDays,
@@ -44,14 +45,8 @@ final class DataReadinessService
     public function ensureBacktestReady(array $symbols, \DateTimeImmutable $start, \DateTimeImmutable $end, int $maxAgeDays = 2): array
     {
         $symbols = $this->normalizeSymbols($symbols);
-        $this->logger->info('data_readiness.stub.ensure_backtest', ['symbols' => $symbols]);
-        return [
-            'ready' => true,
-            'missing' => [],
-            'details' => [],
-            'warnings' => [],
-            'attempts' => [],
-        ];
+        $attempts = $this->r2lite->ensureSeries($symbols, 'ACCIONES_AR');
+        return $attempts + ['missing' => [], 'warnings' => [], 'details' => []];
     }
 
     /**
